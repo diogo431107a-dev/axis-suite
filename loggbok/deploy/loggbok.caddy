@@ -1,0 +1,18 @@
+# Loggbok behind Heimdall's Caddy. Copy to /etc/caddy/sites.d/loggbok.caddy (Heimdall's
+# installer imports that folder and never touches it), adjust the domain and path, then:
+#   sudo systemctl reload caddy
+loggbok.gansoazul.com.br {
+	encode gzip
+
+	# The API checks every request with Heimdall itself, so Caddy only forwards it.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:3001
+	}
+
+	# The built React app (pnpm build). Unknown paths fall back to index.html.
+	handle {
+		root * /home/diogo/loggbok/dist
+		try_files {path} /index.html
+		file_server
+	}
+}

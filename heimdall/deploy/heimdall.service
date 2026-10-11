@@ -1,0 +1,41 @@
+[Unit]
+Description=Heimdall login gate
+After=network.target
+
+[Service]
+Type=simple
+# A throwaway system user is created for each run; it can only write to its StateDirectory.
+DynamicUser=yes
+WorkingDirectory=/opt/heimdall
+# Saved sessions live in /var/lib/heimdall (passed to the app as STATE_DIRECTORY).
+StateDirectory=heimdall
+StateDirectoryMode=0700
+Environment=NODE_ENV=production
+Environment=HOST=127.0.0.1
+Environment=PORT=3000
+Environment=TRUST_PROXY=1
+Environment=COOKIE_SECURE=1
+# Share the session with sibling apps such as Loggbok. Adjust both to your domains.
+Environment=COOKIE_DOMAIN=gansoazul.com.br
+Environment=RETURN_ORIGINS=https://loggbok.gansoazul.com.br
+ExecStart=/usr/bin/node /opt/heimdall/dist/server.js
+Restart=on-failure
+RestartSec=2
+
+# Hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

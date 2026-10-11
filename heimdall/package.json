@@ -1,0 +1,20 @@
+{
+  "name": "heimdall",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Heimdall — a minimal web login gate",
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/server.js",
+    "dev": "tsc && node dist/server.js",
+    "hash-password": "tsc && node dist/hash-password.js"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.43",
+    "typescript": "^5.9.3"
+  }
+}

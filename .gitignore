@@ -1,0 +1,14 @@
+# Dependencies and build output
+node_modules/
+dist/
+
+# Runtime data (sessions, databases)
+data/
+*.db
+*.db-shm
+*.db-wal
+
+# Logs, archives, secrets
+*.log
+*.tgz
+.env*
