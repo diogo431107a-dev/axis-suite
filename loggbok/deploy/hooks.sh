@@ -19,5 +19,10 @@ before_install() {
   fi
   # systemd hands /var/lib/loggbok over to the new service user when the service starts.
   echo "    Loggbok used to run from $old_dir and now runs from /opt/loggbok."
-  echo "    Delete the old copy once you no longer need it."
+  if [[ -f $old_dir/../deploy/install.sh ]]; then
+    # It ran from inside an axis-suite checkout, which later installs still come from.
+    echo "    Keep that checkout. Only its loggbok/dist and loggbok/node_modules are no longer used."
+  else
+    echo "    Delete the old copy once you no longer need it."
+  fi
 }
