@@ -1,6 +1,6 @@
 // The menu of a bullet's dot (right-click the dot, or the ⋯ button on the row).
 import { useEffect, useRef, type ReactNode } from "react";
-import { Check, Link, Star, Trash2 } from "lucide-react";
+import { Check, Download, Link, Star, Trash2 } from "lucide-react";
 import * as cmd from "../model/commands.ts";
 import { useNode, useOutliner } from "./hooks.ts";
 import { pathOf } from "./nav.ts";
@@ -8,11 +8,9 @@ import { pathOf } from "./nav.ts";
 interface Props {
   id: string;
   onClose: () => void;
-  /** Extra items (export). */
-  children?: ReactNode;
 }
 
-export function BulletMenu({ id, onClose, children }: Props) {
+export function BulletMenu({ id, onClose }: Props) {
   const o = useOutliner();
   const node = useNode(id);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,7 +45,9 @@ export function BulletMenu({ id, onClose, children }: Props) {
       <Item icon={<Check className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.toggleComplete(ctx, [id])))}>
         {node.completedAt ? "Mark as not completed" : "Complete"}
       </Item>
-      {children}
+      <Item icon={<Download className="h-4 w-4" />} onClick={act(() => o.ui.setDialog({ kind: "export", root: id }))}>
+        Export…
+      </Item>
       <Item
         icon={<Link className="h-4 w-4" />}
         onClick={act(() => void navigator.clipboard?.writeText(new URL(pathOf(id), location.origin).href))}

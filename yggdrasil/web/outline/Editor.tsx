@@ -1,6 +1,7 @@
 // The one textarea: the bullet being edited shows its raw text here, every other bullet shows
 // formatted text. It grows with its content, so it looks like the text it replaces.
 import { useLayoutEffect, useRef } from "react";
+import { looksLikeOpml, parseOpml } from "../io/opml.ts";
 import { parsePlainText } from "../io/plaintext.ts";
 import * as cmd from "../model/commands.ts";
 import type { Field } from "../model/ui.ts";
@@ -85,7 +86,15 @@ export function Editor({ id, field, className = "", placeholder }: Props) {
           save(ta);
           return;
         }
-        o.run((ctx) => cmd.pasteDrafts(ctx, id, parsePlainText(trimmed)));
+        let drafts = null;
+        if (looksLikeOpml(trimmed)) {
+          try {
+            drafts = parseOpml(trimmed).drafts;
+          } catch {
+            // not readable as OPML after all: pasted as text
+          }
+        }
+        o.run((ctx) => cmd.pasteDrafts(ctx, id, drafts ?? parsePlainText(trimmed)));
       }}
       onBlur={() => {
         // Clicking elsewhere on the page ends editing; switching to another window doesn't.

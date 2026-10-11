@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<opml version="2.0">
+  <head>
+    <title>Reading list</title>
+    <flavor>dynalist</flavor>
+    <source>https://dynalist.io</source>
+    <ownerName>Odin</ownerName>
+    <ownerEmail>odin@example.com</ownerEmail>
+  </head>
+  <body>
+    <outline text="Books" _note="Read before winter.&#10;Ask Freya for her copies.">
+      <outline text="**The Prose Edda** by Snorri" complete="true" />
+      <outline text="__Heimskringla__ #history !(2026-11-01)" checkbox="true" />
+      <outline text="Poetic Edda" color="2">
+        <outline text="Völuspá" />
+        <outline text="Hávamál — read `stanza 77` aloud" _note="Cattle die, kinsmen die" />
+      </outline>
+    </outline>
+    <outline text="Links &amp; notes" heading="1">
+      <outline text="[Dynalist help](https://help.dynalist.io) and https://example.com/a?b=1" />
+      <outline text="Ask @freya about &lt;runes&gt;" />
+      <outline text="" />
+    </outline>
+  </body>
+</opml>

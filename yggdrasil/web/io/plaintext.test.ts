@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { Node } from "../../shared/protocol.ts";
 import { newNode } from "../model/store.ts";
-import { parsePlainText, toHtml, toPlainText } from "./plaintext.ts";
+import { parsePlainText, toHtml, toIndentedText, toMarkdown, toPlainText } from "./plaintext.ts";
 
 function source(nodes: (Partial<Node> & { id: string })[]) {
   const byId = new Map(nodes.map((n) => [n.id, { ...newNode(n.id, null, "a0"), ...n }]));
@@ -27,6 +27,15 @@ describe("toPlainText and toHtml", () => {
 
   it("writes nested lists, escaped", () => {
     expect(toHtml(tree, ["b"])).toBe("<ul><li>Milk<ul><li>Oat &lt;or&gt; soy</li></ul></li></ul>");
+  });
+
+  it("exports Markdown and plain indented text", () => {
+    const done = source([
+      { id: "a", content: "**Plan**", note: "two\nlines" },
+      { id: "b", parentId: "a", content: "Shipped", completedAt: "2026-10-01T00:00:00.000Z" },
+    ]);
+    expect(toMarkdown(done, ["a"])).toBe("- **Plan**\n  two\n  lines\n  - ~~Shipped~~\n");
+    expect(toIndentedText(done, ["a"])).toBe('Plan\n  "two\n  lines"\n  Shipped\n');
   });
 
   it("reads back what it writes", () => {

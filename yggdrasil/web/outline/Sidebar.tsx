@@ -1,8 +1,9 @@
 // The file pane: starred bullets, top-level bullets and every tag with its count. Built from the
 // whole tree, so it updates a moment after typing (useDeferredValue) rather than on every key.
-import { useDeferredValue, useMemo, type ReactNode } from "react";
-import { Hash, Star } from "lucide-react";
+import { useDeferredValue, useMemo, useRef, type ReactNode } from "react";
+import { Download, Hash, Star, Upload } from "lucide-react";
 import type { Node } from "../../shared/protocol.ts";
+import { importFile } from "../io/importer.ts";
 import type { Store } from "../model/store.ts";
 import { derived } from "../search/match.ts";
 import { plainText } from "../text/plain.ts";
@@ -39,6 +40,7 @@ function overview(store: Store): Overview {
 
 export function Sidebar({ onPick }: { onPick?: () => void }) {
   const o = useOutliner();
+  const fileInput = useRef<HTMLInputElement>(null);
   const version = useDeferredValue(useTreeVersion());
   const { zoom } = useView();
   // version is what changes; the store itself is always the same object.
@@ -98,6 +100,38 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
           ))}
         </Section>
       )}
+      <section className="space-y-px border-t border-gray-100 pt-3">
+        <button
+          type="button"
+          onClick={() => fileInput.current?.click()}
+          className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-gray-600 hover:bg-gray-100"
+        >
+          <Upload className="h-3.5 w-3.5 text-gray-400" />
+          Import OPML…
+        </button>
+        <input
+          ref={fileInput}
+          type="file"
+          accept=".opml,.xml,text/x-opml,application/xml,text/xml"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.currentTarget.files?.[0];
+            e.currentTarget.value = "";
+            if (file) void importFile(o, file).then(() => onPick?.());
+          }}
+        />
+        <button
+          type="button"
+          onClick={() => {
+            o.ui.setDialog({ kind: "export", root: null });
+            onPick?.();
+          }}
+          className="flex w-full items-center gap-1.5 rounded px-2 py-1 text-left text-gray-600 hover:bg-gray-100"
+        >
+          <Download className="h-3.5 w-3.5 text-gray-400" />
+          Export…
+        </button>
+      </section>
     </nav>
   );
 }

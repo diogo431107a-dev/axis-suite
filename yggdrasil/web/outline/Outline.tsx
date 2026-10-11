@@ -1,5 +1,6 @@
 // The page's main column: breadcrumbs, the zoomed-in bullet as the title, and its children.
 import { useEffect } from "react";
+import { looksLikeOpml, parseOpml } from "../io/opml.ts";
 import { parsePlainText, toHtml, toPlainText } from "../io/plaintext.ts";
 import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
@@ -32,7 +33,14 @@ function useSelectionEvents(o: Outliner) {
       const sel = o.ui.selection;
       if (!sel || isTyping(e.target) || !e.clipboardData) return;
       e.preventDefault();
-      const drafts = parsePlainText(e.clipboardData.getData("text/plain"));
+      const text = e.clipboardData.getData("text/plain");
+      let drafts = null;
+      try {
+        drafts = looksLikeOpml(text) ? parseOpml(text).drafts : null;
+      } catch {
+        // pasted as text
+      }
+      drafts ??= parsePlainText(text);
       o.run((ctx) => cmd.insertDrafts(ctx, sel.parentId, sel.ids.at(-1)!, drafts));
     };
     // A click outside the selected bullets ends the selection.

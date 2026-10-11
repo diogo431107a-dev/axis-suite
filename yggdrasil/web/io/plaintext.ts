@@ -3,26 +3,52 @@
 // into a tree by its indentation.
 import type { Node } from "../../shared/protocol.ts";
 import type { Draft } from "../model/commands.ts";
+import { plainText } from "../text/plain.ts";
 
 export interface TextSource {
   get(id: string): Node | undefined;
-  /** The children to include, in order. */
-  children(id: string): readonly string[];
+  /** The children to include, in order (null: the top level). */
+  children(id: string | null): readonly string[];
 }
 
-/** The bullets and everything under them as indented "- " lines. */
-export function toPlainText(tree: TextSource, ids: readonly string[]): string {
+/** Each bullet as `line(node)`, two spaces deeper per level, its note's lines under it. */
+function writeLines(
+  tree: TextSource,
+  ids: readonly string[],
+  line: (node: Node) => string,
+  note: (text: string) => string = (text) => text,
+): string {
   const lines: string[] = [];
   const walk = (id: string, depth: number) => {
     const node = tree.get(id);
     if (!node) return;
     const pad = "  ".repeat(depth);
-    lines.push(`${pad}- ${node.content}`);
-    if (node.note) for (const line of node.note.split("\n")) lines.push(`${pad}  ${line}`);
+    lines.push(pad + line(node));
+    if (node.note) for (const l of note(node.note).split("\n")) lines.push(`${pad}  ${l}`);
     for (const kid of tree.children(id)) walk(kid, depth + 1);
   };
   for (const id of ids) walk(id, 0);
   return lines.join("\n");
+}
+
+/** The bullets and everything under them as indented "- " lines, as the clipboard gets them. */
+export function toPlainText(tree: TextSource, ids: readonly string[]): string {
+  return writeLines(tree, ids, (n) => `- ${n.content}`);
+}
+
+/** For export as Markdown: a nested list, completed bullets struck through. */
+export function toMarkdown(tree: TextSource, ids: readonly string[]): string {
+  return `${writeLines(tree, ids, (n) => `- ${n.completedAt && n.content ? `~~${n.content}~~` : n.content}`)}\n`;
+}
+
+/** For export as plain text: indented lines without markup, notes in quotes. */
+export function toIndentedText(tree: TextSource, ids: readonly string[]): string {
+  return `${writeLines(
+    tree,
+    ids,
+    (n) => plainText(n.content),
+    (text) => `"${text}"`,
+  )}\n`;
 }
 
 const escapeHtml = (s: string) =>

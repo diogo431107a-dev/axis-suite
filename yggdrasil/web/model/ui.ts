@@ -38,6 +38,9 @@ export interface View {
   highlight: RegExp | null;
 }
 
+/** A dialog over the page. */
+export type Dialog = { kind: "export"; root: string | null };
+
 const SHOW_COMPLETED_KEY = "yggdrasil.showCompleted";
 
 function readShowCompleted(): boolean {
@@ -74,6 +77,18 @@ export class Ui {
 
   get view(): View {
     return this.#view;
+  }
+
+  #dialog: Dialog | null = null;
+
+  get dialog(): Dialog | null {
+    return this.#dialog;
+  }
+
+  /** Opens a dialog (null closes it). */
+  setDialog(dialog: Dialog | null): void {
+    this.#dialog = dialog;
+    this.#emit();
   }
 
   isSelected(id: string): boolean {

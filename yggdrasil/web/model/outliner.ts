@@ -26,6 +26,8 @@ export class Outliner {
   readonly ui = new Ui();
   readonly sync: Sync;
   readonly username: string;
+  /** Tells the user something went wrong (a toast). */
+  readonly notice: (message: string) => void;
 
   #query = "";
   #terms: Term[] = [];
@@ -36,6 +38,7 @@ export class Outliner {
 
   constructor(username: string, events: Pick<SyncEvents, "notice">) {
     this.username = username;
+    this.notice = events.notice;
     this.sync = new Sync(this.store, username, {
       notice: events.notice,
       // Steps recorded before a reload may refer to nodes that are gone.

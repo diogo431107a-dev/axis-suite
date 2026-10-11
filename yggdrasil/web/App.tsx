@@ -1,7 +1,9 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CircleCheck, PanelLeft, UserRound } from "lucide-react";
 import { SignedOutError, fetchMe, goToSignIn, watchForSignIn, type Me } from "@axis-suite/heimdall-client/browser";
+import { importFile } from "./io/importer.ts";
 import { Outliner } from "./model/outliner.ts";
+import { ExportDialog } from "./outline/ExportDialog.tsx";
 import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./outline/hooks.ts";
 import { focusSearch, zoomFromLocation, zoomTo } from "./outline/nav.ts";
 import { Outline } from "./outline/Outline.tsx";
@@ -81,6 +83,12 @@ function Page({ me, notice }: { me: Me; notice: string }) {
   const signedOut = sync.kind === "signedOut" ? sync.loginUrl : null;
   // On narrow screens the sidebar opens over the outline.
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [dropping, setDropping] = useState(false);
+  const dialog = useSyncExternalStore(
+    useCallback((cb: () => void) => o.ui.subscribe(cb), [o]),
+    () => o.ui.dialog,
+  );
+  const closeDialog = useCallback(() => o.ui.setDialog(null), [o]);
 
   // Ctrl+F searches the outline rather than the page.
   useEffect(() => {
@@ -180,10 +188,28 @@ function Page({ me, notice }: { me: Me; notice: string }) {
         >
           <Sidebar onPick={() => setSidebarOpen(false)} />
         </aside>
-        <main className="mx-auto min-w-0 max-w-3xl flex-1 px-4 pt-6">
+        <main
+          className={`mx-auto min-w-0 max-w-3xl flex-1 px-4 pt-6 ${dropping ? "rounded-lg outline-2 outline-dashed outline-green-600" : ""}`}
+          // An OPML file dropped on the outline is imported into the zoomed-in bullet.
+          onDragOver={(e) => {
+            if (!e.dataTransfer.types.includes("Files")) return;
+            e.preventDefault();
+            setDropping(true);
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={(e) => {
+            const file = e.dataTransfer.files[0];
+            setDropping(false);
+            if (!file) return;
+            e.preventDefault();
+            void importFile(o, file);
+          }}
+        >
           <Outline />
         </main>
       </div>
+      <SaveProgress />
+      {dialog?.kind === "export" && <ExportDialog root={dialog.root} onClose={closeDialog} />}
     </div>
   );
 }
@@ -203,5 +229,33 @@ function SyncStatus() {
     <span role="status" className={`text-xs ${color}`}>
       {text}
     </span>
+  );
+}
+
+/** A progress bar while many changes are on their way to the server (an import, say). */
+function SaveProgress() {
+  const sync = useSyncState();
+  const waiting = sync.kind === "saved" ? 0 : sync.waiting;
+  const total = useRef(0);
+  if (waiting === 0) total.current = 0;
+  else total.current = Math.max(total.current, waiting);
+  if (total.current < 1000) return null;
+  const done = total.current - waiting;
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={total.current}
+      aria-valuenow={done}
+      className="fixed bottom-4 left-1/2 z-30 w-72 -translate-x-1/2 rounded-md bg-white p-3 text-xs text-gray-600 shadow-lg ring-1 ring-gray-200"
+    >
+      <div className="mb-1.5">
+        {sync.kind === "offline" ? "Offline — " : "Saving "}
+        {done.toLocaleString()} of {total.current.toLocaleString()} changes
+      </div>
+      <div className="h-1.5 overflow-hidden rounded bg-gray-100">
+        <div className="h-full bg-green-600 transition-all" style={{ width: `${(100 * done) / total.current}%` }} />
+      </div>
+    </div>
   );
 }

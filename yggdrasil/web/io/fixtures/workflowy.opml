@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<opml version="2.0">
+  <head>
+    <ownerEmail>
+      odin@example.com
+    </ownerEmail>
+  </head>
+  <body>
+    <outline text="Projects" >
+      <outline text="&lt;b&gt;Launch&lt;/b&gt; the &lt;i&gt;longship&lt;/i&gt;" _note="Before the storm&#10;Check the oars" >
+        <outline text="Caulk the hull" _complete="true" />
+        <outline text="See &lt;a href=&quot;https://example.com/map&quot;&gt;the map&lt;/a&gt;" />
+      </outline>
+      <outline text="&lt;span class=&quot;colored c-red&quot;&gt;Red text&lt;/span&gt; and &lt;s&gt;old plan&lt;/s&gt; #urgent" />
+      <outline text="Bad &lt;a href=&quot;javascript:alert(1)&quot;&gt;link&lt;/a&gt; &lt;img src=x onerror=alert(1)&gt;" />
+      <outline text="Fish &amp;amp; chips" />
+    </outline>
+  </body>
+</opml>
