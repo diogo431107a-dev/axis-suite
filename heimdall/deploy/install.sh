@@ -12,9 +12,18 @@ SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 [[ $EUID -eq 0 ]] || { echo "Please run as root (sudo)." >&2; exit 1; }
 [[ -n $SITE ]] || { echo "Usage: sudo $0 <domain-or-ipv4>" >&2; exit 1; }
 
-echo "==> Installing packages (nodejs, npm, caddy, rsync, curl)"
+# The suite's shared Node.js version lives one level up, in axis-suite/deploy/.
+NODE_SH="$SRC_DIR/../deploy/node.sh"
+[[ -f $NODE_SH ]] || { echo "Missing $NODE_SH. Copy the whole axis-suite folder, not just heimdall/." >&2; exit 1; }
+# shellcheck source=../../deploy/node.sh
+source "$NODE_SH"
+
+echo "==> Installing packages (caddy, rsync, curl)"
 apt-get update -q
-apt-get install -y -q nodejs npm caddy rsync curl
+apt-get install -y -q caddy rsync curl ca-certificates
+
+echo "==> Node.js $AXIS_NODE_MAJOR+ (shared by the whole suite)"
+ensure_node
 
 echo "==> Copying app to $APP_DIR and building"
 mkdir -p "$APP_DIR"

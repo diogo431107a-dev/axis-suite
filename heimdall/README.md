@@ -63,22 +63,22 @@ sudo ufw status verbose   # check the list, then:
 sudo ufw enable
 ```
 
-**3. Copy the project up from Windows (PowerShell).** Run this from the folder that *contains* `heimdall`:
+**3. Copy the suite up from Windows (PowerShell).** Copy the whole `axis-suite` folder, not just `heimdall`, because the installers share `axis-suite/deploy/`. Run this from the folder that *contains* `axis-suite`:
 
 ```powershell
-tar --exclude=node_modules --exclude=dist --exclude=data -czf heimdall.tgz heimdall
-scp heimdall.tgz youruser@your-vps:~
+tar --exclude=node_modules --exclude=dist --exclude=data --exclude=*.db --exclude=.git -czf axis-suite.tgz axis-suite
+scp axis-suite.tgz youruser@your-vps:~
 ```
 
 **4. On the VPS, unpack and install:**
 
 ```bash
-tar -xzf heimdall.tgz
-cd heimdall
+tar -xzf axis-suite.tgz
+cd axis-suite/heimdall
 sudo bash deploy/install.sh heimdall.example.com
 ```
 
-The installer pulls `nodejs`, `npm`, `caddy`, `rsync` and `curl` from Debian's repos. It builds the app into `/opt/heimdall`, starts the `heimdall` systemd service on `127.0.0.1:3000`, and configures Caddy to serve it over HTTPS. To update the app, repeat steps 3 and 4. The installer is safe to re-run.
+The installer installs `caddy`, `rsync` and `curl` from Debian's repos. Node.js comes from NodeSource, at the version shared by the whole suite (set in `axis-suite/deploy/node.sh`, currently 22), instead of Debian's Node 20. It builds the app into `/opt/heimdall`, starts the `heimdall` systemd service on `127.0.0.1:3000`, and configures Caddy to serve it over HTTPS. To update the app, repeat steps 3 and 4. The installer is safe to re-run.
 
 > The installer replaces `/etc/caddy/Caddyfile` (it backs up the old one first). If the VPS already hosts other sites through Caddy, merge the `heimdall` block by hand instead.
 

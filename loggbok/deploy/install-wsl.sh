@@ -23,16 +23,18 @@ systemctl is-active --quiet heimdall || { echo "Heimdall isn't running. Install 
 NODE=/usr/bin/node
 PNPM=/usr/bin/pnpm
 
+# The suite's shared Node.js version lives one level up, in axis-suite/deploy/.
+NODE_SH="$SRC_DIR/../deploy/node.sh"
+[[ -f $NODE_SH ]] || { echo "Missing $NODE_SH. Copy the whole axis-suite folder, not just loggbok/." >&2; exit 1; }
+# shellcheck source=../../deploy/node.sh
+source "$NODE_SH"
+
 echo "==> Packages"
 apt-get update -q
 apt-get install -y -q curl ca-certificates rsync
 
-echo "==> Node.js 22+ (node:sqlite)"
-if ! "$NODE" -e 'process.exit(+process.versions.node.split(".")[0] >= 22 ? 0 : 1)' 2>/dev/null; then
-  curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
-  apt-get install -y -q nodejs
-fi
-echo "    node $("$NODE" --version)"
+echo "==> Node.js $AXIS_NODE_MAJOR+ (shared by the whole suite; Loggbok needs node:sqlite)"
+ensure_node
 
 echo "==> pnpm"
 [[ -x $PNPM ]] || npm install -g --no-audit --no-fund pnpm@11

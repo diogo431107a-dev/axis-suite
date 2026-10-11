@@ -5,7 +5,7 @@
   "description": "Heimdall — a minimal web login gate",
   "type": "module",
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "scripts": {
     "build": "tsc",

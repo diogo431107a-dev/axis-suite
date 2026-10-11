@@ -23,6 +23,12 @@ browser ──https──▶ Caddy ──▶ Heimdall  127.0.0.1:3000   accounts
 - **Return after login.** When nobody is signed in, Loggbok sends the browser to Heimdall's `/?next=<page>`. Heimdall only sends users back to addresses listed in its `RETURN_ORIGINS`.
 - **Keep them in step.** A change to `/whoami`, the cookie, or these two settings has to be made on both sides in the same commit.
 
+## Runtime
+
+The whole suite runs on **one Node.js version**, because a server has a single `/usr/bin/node` and every app's service uses it. The version is set once, in [`deploy/node.sh`](deploy/node.sh) (currently 22, from NodeSource). Each app's installer sources that file and installs or keeps that version. Debian's own `nodejs`/`npm` packages aren't used: they conflict with NodeSource's.
+
+To move the suite to a newer Node, change `AXIS_NODE_MAJOR` in `deploy/node.sh`, `.node-version`, and the `engines` field in each app's `package.json`. Then re-run the installers.
+
 ## Installing
 
 Install them in this order:
@@ -49,6 +55,7 @@ Heimdall is then at https://localhost and Loggbok at https://localhost:8443.
 ## Repository layout
 
 ```
+deploy/     shared by the installers (node.sh: the suite's Node.js version)
 heimdall/   sign-in service (see its README)
 loggbok/    notes app (see its README)
 ```

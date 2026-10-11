@@ -126,13 +126,11 @@ SSH into your VPS as a non-root user with `sudo` access before starting.
 
 Point `loggbok.gansoazul.com.br` at the VPS with an A record, the same way as Heimdall's domain. Caddy gets the certificate automatically.
 
-### 2. Install Node.js 22 and pnpm
+### 2. Install pnpm
 
-Heimdall's installer installs Debian 13's Node.js, which is **v20**. That is too old for `node:sqlite`, so replace it with Node 22 from NodeSource. Its `nodejs` package bundles npm and removes Debian's separate `npm` and `node-*` packages, which is expected. Heimdall keeps running on the new Node.
+Node.js is already there: Heimdall's installer sets up the version shared by the whole suite (`axis-suite/deploy/node.sh`, currently 22 from NodeSource), which is what `node:sqlite` needs. Only pnpm is missing:
 
 ```bash
-curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
-sudo apt-get install -y nodejs
 node --version    # v22.x
 sudo npm install -g pnpm@11
 ```
