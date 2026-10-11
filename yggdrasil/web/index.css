@@ -3,9 +3,22 @@
 html,
 body,
 #root {
-  height: 100%;
   margin: 0;
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* The rendered text of a bullet and the textarea that replaces it while editing look the same,
+   so the line doesn't move when editing starts. */
+.ygg-text {
+  font: inherit;
+  letter-spacing: inherit;
+  line-height: inherit;
+  color: inherit;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
