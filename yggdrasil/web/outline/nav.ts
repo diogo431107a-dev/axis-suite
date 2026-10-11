@@ -18,3 +18,10 @@ export function zoomTo(o: Outliner, id: string | null): void {
   if (location.pathname !== pathOf(id)) history.pushState(null, "", pathOf(id));
   window.scrollTo({ top: 0 });
 }
+
+/** Puts the cursor in the search box (Ctrl+F). */
+export function focusSearch(): void {
+  const input = document.querySelector<HTMLInputElement>("[data-search]");
+  input?.focus();
+  input?.select();
+}

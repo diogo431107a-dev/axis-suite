@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
-import { UserRound } from "lucide-react";
+import { CircleCheck, PanelLeft, UserRound } from "lucide-react";
 import { SignedOutError, fetchMe, goToSignIn, watchForSignIn, type Me } from "@axis-suite/heimdall-client/browser";
 import { Outliner } from "./model/outliner.ts";
 import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./outline/hooks.ts";
-import { zoomFromLocation, zoomTo } from "./outline/nav.ts";
+import { focusSearch, zoomFromLocation, zoomTo } from "./outline/nav.ts";
 import { Outline } from "./outline/Outline.tsx";
+import { SearchBox } from "./outline/SearchBox.tsx";
+import { Sidebar } from "./outline/Sidebar.tsx";
 import { plainText } from "./text/plain.ts";
 
 export default function App() {
@@ -74,9 +76,23 @@ export default function App() {
 function Page({ me, notice }: { me: Me; notice: string }) {
   const o = useOutliner();
   const sync = useSyncState();
-  const { zoom } = useView();
+  const { zoom, showCompleted } = useView();
   const root = useNode(zoom);
   const signedOut = sync.kind === "signedOut" ? sync.loginUrl : null;
+  // On narrow screens the sidebar opens over the outline.
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Ctrl+F searches the outline rather than the page.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+        e.preventDefault();
+        focusSearch();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   // Each time the user comes back to this tab, check who is signed in: after signing in again
   // from the banner's link, the waiting changes go out; if someone else signed in, the page
@@ -104,18 +120,40 @@ function Page({ me, notice }: { me: Me; notice: string }) {
           (opens a new tab), then come back here.
         </div>
       )}
-      <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-gray-100 bg-white/95 px-4 py-2 backdrop-blur">
+      <header className="sticky top-0 z-20 flex h-12 items-center gap-3 border-b border-gray-100 bg-white/95 px-3 backdrop-blur">
+        <button
+          type="button"
+          aria-label="Show the sidebar"
+          onClick={() => setSidebarOpen((v) => !v)}
+          className="rounded p-1 text-gray-500 hover:bg-gray-100 md:hidden"
+        >
+          <PanelLeft className="h-5 w-5" />
+        </button>
         <a
           href="/"
           onClick={(e) => {
             e.preventDefault();
             zoomTo(o, null);
           }}
-          className="font-semibold tracking-tight text-green-800"
+          className="hidden font-semibold tracking-tight text-green-800 sm:block md:w-52"
         >
           Yggdrasil
         </a>
-        <div className="flex-1" />
+        <div className="flex min-w-0 flex-1 justify-center">
+          <SearchBox />
+        </div>
+        <button
+          type="button"
+          aria-pressed={showCompleted}
+          title={showCompleted ? "Hide completed bullets" : "Show completed bullets"}
+          onClick={() => o.ui.setView({ showCompleted: !showCompleted })}
+          className={`flex items-center gap-1 rounded px-1.5 py-1 text-xs hover:bg-gray-100 ${
+            showCompleted ? "text-green-800" : "text-gray-400"
+          }`}
+        >
+          <CircleCheck className="h-4 w-4" />
+          <span className="hidden lg:inline">{showCompleted ? "Completed shown" : "Completed hidden"}</span>
+        </button>
         <SyncStatus />
         <a
           href={me.accountUrl}
@@ -123,7 +161,7 @@ function Page({ me, notice }: { me: Me; notice: string }) {
           className="flex items-center gap-1 truncate text-xs text-gray-400 transition-colors hover:text-green-800"
         >
           <UserRound className="h-3.5 w-3.5 shrink-0" />
-          <span className="truncate">{me.name}</span>
+          <span className="hidden truncate sm:inline">{me.name}</span>
         </a>
       </header>
       {notice && (
@@ -134,9 +172,18 @@ function Page({ me, notice }: { me: Me; notice: string }) {
           {notice}
         </div>
       )}
-      <main className="mx-auto max-w-3xl px-4 pt-6">
-        <Outline />
-      </main>
+      <div className="flex">
+        <aside
+          className={`${sidebarOpen ? "fixed inset-y-12 left-0 z-10 block bg-white shadow-lg" : "hidden"}
+                      w-64 shrink-0 overflow-y-auto border-r border-gray-100 md:sticky md:top-12 md:block
+                      md:h-[calc(100vh-3rem)] md:shadow-none`}
+        >
+          <Sidebar onPick={() => setSidebarOpen(false)} />
+        </aside>
+        <main className="mx-auto min-w-0 max-w-3xl flex-1 px-4 pt-6">
+          <Outline />
+        </main>
+      </div>
     </div>
   );
 }

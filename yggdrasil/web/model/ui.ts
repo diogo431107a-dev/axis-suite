@@ -34,6 +34,8 @@ export interface View {
   filter: ReadonlySet<string> | null;
   /** The bullets that match the search, for highlighting. */
   matches: ReadonlySet<string> | null;
+  /** The search's words, to highlight in the matches. */
+  highlight: RegExp | null;
 }
 
 const SHOW_COMPLETED_KEY = "yggdrasil.showCompleted";
@@ -58,7 +60,7 @@ export class Ui {
   #seq = 0;
   #selection: Selection | null = null;
   #selected = new Set<string>();
-  #view: View = { zoom: null, showCompleted: readShowCompleted(), filter: null, matches: null };
+  #view: View = { zoom: null, showCompleted: readShowCompleted(), filter: null, matches: null, highlight: null };
   #idListeners = new Map<string, Set<Listener>>();
   #listeners = new Set<Listener>();
 

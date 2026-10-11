@@ -2,6 +2,9 @@
 // goes through commit(), which applies it, queues it for the server and records it for undo.
 import type { Op } from "../../shared/protocol.ts";
 import type { TextSource } from "../io/plaintext.ts";
+import { localDate } from "../text/dates.ts";
+import { parseQuery, type Term } from "../search/query.ts";
+import { highlightPattern, runSearch, sameSet } from "../search/run.ts";
 import type { Ctx, Result } from "./commands.ts";
 import { Store } from "./store.ts";
 import { Sync, type SyncEvents } from "./sync.ts";
@@ -24,6 +27,13 @@ export class Outliner {
   readonly sync: Sync;
   readonly username: string;
 
+  #query = "";
+  #terms: Term[] = [];
+  #queryListeners = new Set<() => void>();
+  #searchScheduled = false;
+  /** What the shown search results were computed for. */
+  #searchedFor = { zoom: null as string | null, showCompleted: true };
+
   constructor(username: string, events: Pick<SyncEvents, "notice">) {
     this.username = username;
     this.sync = new Sync(this.store, username, {
@@ -31,7 +41,65 @@ export class Outliner {
       // Steps recorded before a reload may refer to nodes that are gone.
       reloaded: () => this.history.clear(),
     });
+    // An open search follows the tree as it changes, and the zoom and view settings.
+    this.store.subscribe(() => this.#scheduleSearch());
+    this.ui.subscribe(() => {
+      const { zoom, showCompleted } = this.ui.view;
+      if (zoom !== this.#searchedFor.zoom || showCompleted !== this.#searchedFor.showCompleted) this.#scheduleSearch();
+    });
   }
+
+  // ---- Search -------------------------------------------------------------------------------
+
+  get query(): string {
+    return this.#query;
+  }
+
+  /** Opens, changes or (with "") closes the search within the zoomed-in bullet. */
+  setQuery(query: string): void {
+    if (query === this.#query) return;
+    this.#query = query;
+    this.#terms = parseQuery(query);
+    this.#search();
+    for (const l of this.#queryListeners) l();
+  }
+
+  subscribeQuery(listener: () => void): () => void {
+    this.#queryListeners.add(listener);
+    return () => this.#queryListeners.delete(listener);
+  }
+
+  // Once per burst of changes, after the change that caused it (and any caret move) is done.
+  #scheduleSearch(): void {
+    if (this.#terms.length === 0 || this.#searchScheduled) return;
+    this.#searchScheduled = true;
+    queueMicrotask(() => {
+      this.#searchScheduled = false;
+      this.#search();
+    });
+  }
+
+  #search(): void {
+    const view = this.ui.view;
+    this.#searchedFor = { zoom: view.zoom, showCompleted: view.showCompleted };
+    if (this.#terms.length === 0) {
+      if (view.filter) this.ui.setView({ filter: null, matches: null, highlight: null });
+      return;
+    }
+    const keep = this.ui.caret?.id ?? null;
+    const result = runSearch(this.store, view.zoom, this.#terms, view.showCompleted, localDate(), keep);
+    const highlight = highlightPattern(this.#terms);
+    if (
+      sameSet(result.filter, view.filter) &&
+      sameSet(result.matches, view.matches) &&
+      String(highlight) === String(view.highlight)
+    ) {
+      return;
+    }
+    this.ui.setView({ filter: result.filter, matches: result.matches, highlight });
+  }
+
+  // ---- Editing ------------------------------------------------------------------------------
 
   /** The outline as commands see it: what is shown, inside the zoomed-in bullet. */
   ctx(): Ctx {

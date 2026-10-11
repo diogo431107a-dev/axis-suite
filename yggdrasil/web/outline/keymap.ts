@@ -3,6 +3,7 @@
 import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
 import type { Field } from "../model/ui.ts";
+import { localDate } from "../text/dates.ts";
 import { makeLink, toggleWrap, type Edit } from "../text/format.ts";
 import { caretClientX, onFirstLine, onLastLine, sourceOffsetOnLine } from "./caret.ts";
 import { zoomTo } from "./nav.ts";
@@ -176,6 +177,18 @@ export function editorKeyDown(o: Outliner, e: Keys, ta: HTMLTextAreaElement, id:
       if (!mod || e.shiftKey || e.altKey) return;
       const edit = key === "k" ? makeLink(value, start, end) : toggleWrap(value, start, end, key === "b" ? "**" : "__");
       replaceText(ta, edit);
+      return handled();
+    }
+
+    case "d": {
+      // Alt+D: today's date at the caret.
+      if (!e.altKey || mod || e.shiftKey) return;
+      const date = `!(${localDate()})`;
+      replaceText(ta, {
+        value: value.slice(0, start) + date + value.slice(end),
+        start: start + date.length,
+        end: start + date.length,
+      });
       return handled();
     }
 
