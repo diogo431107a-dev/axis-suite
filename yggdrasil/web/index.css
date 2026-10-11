@@ -1,4 +1,7 @@
 @import "tailwindcss";
+/* No classes are used there. */
+@source not "../server";
+@source not "../shared";
 
 html,
 body,

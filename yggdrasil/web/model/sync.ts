@@ -2,9 +2,10 @@
 // in a queue that is sent after a short pause, retried while the network is down, and saved in
 // localStorage so a closed tab's changes go out on the next load. Changes from other tabs and
 // devices arrive as "rev" events, then GET /api/changes.
-import { SignedOutError, apiFetch, fetchMe, signInUrl } from "@axis-suite/heimdall-client/browser";
+import { SignedOutError, fetchMe, signInUrl } from "@axis-suite/heimdall-client/browser";
 import {
   FIELD_NAMES,
+  USER_HEADER,
   type ChangesResponse,
   type Op,
   type OpsResponse,
@@ -104,6 +105,7 @@ export class Sync {
   /** Identifies this tab in the event stream. */
   readonly clientId = crypto.randomUUID();
   readonly #store: Store;
+  readonly #username: string;
   readonly #events: SyncEvents;
   readonly #storageKey: string;
   readonly #storagePrefix: string;
@@ -135,6 +137,7 @@ export class Sync {
 
   constructor(store: Store, username: string, events: SyncEvents) {
     this.#store = store;
+    this.#username = username;
     this.#events = events;
     this.#storagePrefix = `${STORAGE_PREFIX}${username}.`;
     this.#storageKey = this.#storagePrefix + this.clientId;
@@ -142,7 +145,7 @@ export class Sync {
 
   /** Loads the tree, sends what closed tabs left behind, and starts listening for changes. */
   async start(): Promise<void> {
-    const tree = (await apiFetch<TreeResponse>("/api/tree"))!;
+    const tree = await this.#get<TreeResponse>("/api/tree");
     this.#store.load(tree.nodes);
     this.#rev = this.#latestRev = tree.rev;
     this.#adoptSavedQueues();
@@ -155,8 +158,14 @@ export class Sync {
     document.addEventListener("visibilitychange", () => {
       if (document.visibilityState === "hidden") void this.#flush();
     });
+    // Leaving the page: whatever is still unsaved is for the next tab to send, straight away.
+    window.addEventListener("pagehide", () => {
+      if (this.pending > 0) this.#save(0);
+    });
     setInterval(() => {
       if (this.pending > 0) this.#save();
+      // A tab closed (or reloaded) with unsent changes: they go out from here.
+      this.#adoptSavedQueues();
     }, HEARTBEAT_MS);
     this.#listen();
   }
@@ -219,7 +228,7 @@ export class Sync {
     try {
       res = await fetch("/api/ops", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", [USER_HEADER]: this.#username },
         body: JSON.stringify({ clientId: this.clientId, ops: batch }),
       });
     } catch {
@@ -229,6 +238,10 @@ export class Sync {
       const { loginUrl } = (await res.json().catch(() => ({}))) as { loginUrl?: string };
       this.#requeue(batch);
       return loginUrl ? this.#signedOut(loginUrl) : this.#sendFailed([]);
+    }
+    if (res.status === 409) {
+      this.#requeue(batch);
+      return this.#otherUser();
     }
     if (res.status >= 500 || res.status === 408 || res.status === 429) return this.#sendFailed(batch);
 
@@ -299,7 +312,7 @@ export class Sync {
 
   #listen(): void {
     clearTimeout(this.#sourceTimer);
-    const source = new EventSource("/api/events");
+    const source = new EventSource(`/api/events?user=${encodeURIComponent(this.#username)}`);
     this.#source = source;
     source.addEventListener("open", () => {
       this.#sourceRetry = RETRY_MIN_MS;
@@ -323,7 +336,7 @@ export class Sync {
         this.#sourceRetry = Math.min(RETRY_MAX_MS, this.#sourceRetry * 2);
       };
       fetchMe()
-        .then(retry)
+        .then((me) => (me.username === this.#username ? retry() : this.#otherUser()))
         .catch((err) => (err instanceof SignedOutError ? this.#signedOut(err.loginUrl) : retry()));
     });
   }
@@ -346,7 +359,7 @@ export class Sync {
     this.#fetching = true;
     let failed = false;
     try {
-      const changes = (await apiFetch<ChangesResponse>(`/api/changes?since=${this.#rev}`))!;
+      const changes = await this.#get<ChangesResponse>(`/api/changes?since=${this.#rev}`);
       if (changes.reset) {
         await this.#reload();
       } else {
@@ -382,7 +395,7 @@ export class Sync {
   /** Loads the whole tree again, then reapplies the changes not saved yet. */
   async #reload(): Promise<void> {
     try {
-      const tree = (await apiFetch<TreeResponse>("/api/tree"))!;
+      const tree = await this.#get<TreeResponse>("/api/tree");
       this.#store.batch(() => {
         this.#store.load(tree.nodes);
         this.#store.applyAll([...(this.#inflight ?? []), ...this.#queue]);
@@ -396,6 +409,29 @@ export class Sync {
       if (err instanceof SignedOutError) this.#signedOut(err.loginUrl);
       else console.error("Reloading the tree failed:", err);
     }
+  }
+
+  // ---- Requests -----------------------------------------------------------------------------
+
+  /** A GET from the API, on behalf of this page's user. */
+  async #get<T>(path: string): Promise<T> {
+    const res = await fetch(path, { headers: { [USER_HEADER]: this.#username } });
+    if (res.status === 401) {
+      const { loginUrl } = (await res.json().catch(() => ({}))) as { loginUrl?: string };
+      if (loginUrl) throw new SignedOutError(loginUrl);
+    }
+    if (res.status === 409) this.#otherUser();
+    if (!res.ok) throw new Error(`GET ${path} answered ${res.status}`);
+    return (await res.json()) as T;
+  }
+
+  /**
+   * Someone else signed in, in another tab. This page shows the previous user's tree, so it
+   * starts over as the new user. Unsaved changes stay in localStorage for the previous user.
+   */
+  #otherUser(): void {
+    this.#save(0);
+    location.reload();
   }
 
   // ---- State and storage --------------------------------------------------------------------
@@ -414,10 +450,11 @@ export class Sync {
     for (const l of this.#listeners) l();
   }
 
-  #save(): void {
+  /** Saves the unsent ops, stamped with `at`: a stamp older than STALE_MS marks them as abandoned. */
+  #save(at = Date.now()): void {
     const ops = [...(this.#inflight ?? []), ...this.#queue];
     try {
-      if (ops.length > 0) localStorage.setItem(this.#storageKey, JSON.stringify({ at: Date.now(), ops }));
+      if (ops.length > 0) localStorage.setItem(this.#storageKey, JSON.stringify({ at, ops }));
       else localStorage.removeItem(this.#storageKey);
     } catch (err) {
       // Full, or blocked: the queue still lives in memory.

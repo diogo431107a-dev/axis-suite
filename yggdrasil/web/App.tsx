@@ -15,20 +15,27 @@ export default function App() {
 
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const user = await fetchMe();
-      const o = new Outliner(user.username, { notice: setNotice });
-      o.ui.setView({ zoom: zoomFromLocation() });
-      await o.sync.start();
-      if (cancelled) return;
-      setMe(user);
-      setOutliner(o);
-    })().catch((e) => {
-      if (e instanceof SignedOutError) goToSignIn(e);
-      else setLoadError("Could not load your outline. Try again in a moment.");
-    });
+    let retry: ReturnType<typeof setTimeout> | undefined;
+    const load = async (attempt: number) => {
+      try {
+        const user = await fetchMe();
+        const o = new Outliner(user.username, { notice: setNotice });
+        o.ui.setView({ zoom: zoomFromLocation() });
+        await o.sync.start();
+        if (cancelled) return;
+        setMe(user);
+        setOutliner(o);
+      } catch (e) {
+        if (e instanceof SignedOutError) return goToSignIn(e);
+        // The server may be restarting: keep trying, less and less often.
+        setLoadError("Can’t reach Yggdrasil right now. Trying again…");
+        if (!cancelled) retry = setTimeout(() => void load(attempt + 1), Math.min(30_000, 1000 * 2 ** attempt));
+      }
+    };
+    void load(0);
     return () => {
       cancelled = true;
+      clearTimeout(retry);
     };
   }, []);
 
@@ -71,12 +78,16 @@ function Page({ me, notice }: { me: Me; notice: string }) {
   const root = useNode(zoom);
   const signedOut = sync.kind === "signedOut" ? sync.loginUrl : null;
 
-  // While signed out, check again whenever the user comes back to this tab (e.g. after signing
-  // in from the banner's link). Someone else signing in gets a fresh page.
-  useEffect(() => {
-    if (!signedOut) return;
-    return watchForSignIn(me.username, () => o.sync.resume());
-  }, [signedOut, me.username, o]);
+  // Each time the user comes back to this tab, check who is signed in: after signing in again
+  // from the banner's link, the waiting changes go out; if someone else signed in, the page
+  // starts over with their tree.
+  useEffect(
+    () =>
+      watchForSignIn(me.username, () => {
+        if (o.sync.state.kind === "signedOut") o.sync.resume();
+      }),
+    [me.username, o],
+  );
 
   useEffect(() => {
     document.title = root ? `${plainText(root.content) || "Untitled"} · Yggdrasil` : "Yggdrasil";

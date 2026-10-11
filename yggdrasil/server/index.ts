@@ -1,6 +1,6 @@
 import express from "express";
 import { heimdallAuth } from "@axis-suite/heimdall-client/server";
-import { LIMITS } from "../shared/protocol.ts";
+import { LIMITS, USER_HEADER } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { createEvents } from "./events.ts";
 import { BatchError, createTree } from "./tree.ts";
@@ -32,8 +32,14 @@ app.get("/healthz", (_req, res) => {
 
 // An OPML import sends a few thousand bullets at once.
 app.use(express.json({ limit: "10mb" }));
-app.use("/api", auth.sameOriginWrites, auth.requireUser, (_req, res, next) => {
+app.use("/api", auth.sameOriginWrites, auth.requireUser, (req, res, next) => {
   res.set("Cache-Control", "no-store");
+  // A page names the user whose tree it shows. If someone else has signed in since (in another
+  // tab), its changes must not land in their tree: 409 makes it reload as the new user.
+  const expected = req.get(USER_HEADER) ?? req.query.user;
+  if (typeof expected === "string" && expected !== auth.user(req).username) {
+    return void res.status(409).json({ error: "Someone else is signed in now" });
+  }
   next();
 });
 

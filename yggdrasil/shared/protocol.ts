@@ -46,6 +46,12 @@ export type Op =
   | { op: "delete"; id: string }
   | { op: "restore"; id: string };
 
+/**
+ * Every API request from the page names the user whose tree it shows, in this header (the event
+ * stream, which can't send headers, uses ?user=). The API answers 409 if someone else is signed in.
+ */
+export const USER_HEADER = "X-Yggdrasil-User";
+
 /** POST /api/ops */
 export interface OpsRequest {
   /** Identifies the browser tab, so it can recognise its own changes in the event stream. */

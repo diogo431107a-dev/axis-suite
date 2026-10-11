@@ -89,7 +89,7 @@ export function Outline() {
   };
 
   return (
-    <div data-outline className="pb-24">
+    <div data-outline>
       <Breadcrumbs />
       {zoom !== null && <RootTitle id={zoom} />}
       <div className="pl-5">
@@ -97,7 +97,7 @@ export function Outline() {
           <Bullet key={k} id={k} />
         ))}
       </div>
-      <div className="min-h-32 cursor-text" onClick={clickBelow}>
+      <div className="min-h-[50vh] cursor-text" onClick={clickBelow}>
         {kids.length === 0 && <p className="pl-[42px] pt-1 text-gray-400">Click here to add a bullet.</p>}
       </div>
     </div>
