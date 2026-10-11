@@ -1,0 +1,13 @@
+# Every module of the suite, plus the packages they share. A new module is added here
+# and in deploy/modules.conf.
+packages:
+  - heimdall
+  - loggbok
+  - packages/*
+
+# One version of each shared tool for the whole suite. Packages ask for these with "catalog:".
+catalog:
+  "@types/node": ^22.20.5
+  oxlint: ^1.71.0
+  prettier: ^3.9.10
+  typescript: ~6.0.3

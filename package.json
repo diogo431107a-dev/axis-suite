@@ -1,0 +1,21 @@
+{
+  "name": "axis-suite",
+  "private": true,
+  "type": "module",
+  "packageManager": "pnpm@11.28.5",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "scripts": {
+    "dev": "pnpm --recursive --parallel dev",
+    "build": "pnpm --recursive build",
+    "typecheck": "pnpm --recursive typecheck",
+    "lint": "oxlint",
+    "format": "prettier --write .",
+    "check": "prettier --check . && oxlint && pnpm --recursive typecheck"
+  },
+  "devDependencies": {
+    "oxlint": "catalog:",
+    "prettier": "catalog:"
+  }
+}

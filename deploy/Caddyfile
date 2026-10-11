@@ -1,0 +1,16 @@
+# Managed by axis-suite/deploy/install.sh, which rewrites this file on every run.
+# Each module's site is in /etc/caddy/sites.d/<module>.caddy. Other sites can go in that
+# folder too (see deploy/certbot-webroot.caddy); they are kept.
+
+# Imported by every module's site.
+(axis_site) {
+	@TLS@
+	encode zstd gzip
+	# "?" only sets a header the module didn't set itself.
+	header {
+		?X-Content-Type-Options nosniff
+		?Referrer-Policy strict-origin-when-cross-origin
+	}
+}
+
+import /etc/caddy/sites.d/*.caddy

@@ -1,0 +1,31 @@
+{
+  "name": "@axis-suite/heimdall-client",
+  "version": "1.0.0",
+  "private": true,
+  "description": "How a module of the suite learns who is signed in to Heimdall",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    "./server": {
+      "development": "./src/server.ts",
+      "default": "./dist/server.js"
+    },
+    "./browser": {
+      "development": "./src/browser.ts",
+      "default": "./dist/browser.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "typecheck": "tsc -b"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:"
+  }
+}

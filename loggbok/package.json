@@ -1,35 +1,40 @@
 {
   "name": "loggbok",
+  "version": "1.0.0",
   "private": true,
-  "version": "0.0.0",
+  "description": "Loggbok — notes, private to each signed-in user",
   "type": "module",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "dev": "concurrently -k -n client,server -c blue,green \"vite\" \"node server/index.js\"",
-    "dev:client": "vite",
-    "dev:server": "node server/index.js",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
-    "preview": "vite preview"
+    "typecheck": "tsc -b",
+    "start": "node dist/server/index.js",
+    "dev": "concurrently -k -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
+    "dev:web": "vite",
+    "dev:server": "node --conditions=development --watch server/index.ts"
   },
   "dependencies": {
-    "express": "^5.1.0",
-    "lucide-react": "^0.525.0",
-    "react": "^19.2.7",
-    "react-dom": "^19.2.7"
+    "@axis-suite/heimdall-client": "workspace:*",
+    "express": "^5.1.0"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.1.11",
-    "@types/node": "^24.13.2",
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.2",
     "concurrently": "^9.1.2",
-    "oxlint": "^1.69.0",
+    "lucide-react": "^0.525.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
     "tailwindcss": "^4.1.11",
-    "typescript": "~6.0.2",
+    "typescript": "catalog:",
     "vite": "^8.1.0"
   }
 }

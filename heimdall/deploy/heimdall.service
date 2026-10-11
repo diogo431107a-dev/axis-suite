@@ -1,5 +1,5 @@
 [Unit]
-Description=Heimdall login gate
+Description=Heimdall, the Axis Suite sign-in service
 After=network.target
 
 [Service]
@@ -10,19 +10,21 @@ WorkingDirectory=/opt/heimdall
 # Saved sessions live in /var/lib/heimdall (passed to the app as STATE_DIRECTORY).
 StateDirectory=heimdall
 StateDirectoryMode=0700
+UMask=0077
+# Written by axis-suite/deploy/install.sh: the suite's domain and URLs (incl. COOKIE_DOMAIN),
+# then this module's HOST, PORT and PUBLIC_URL. Other modules add RETURN_ORIGIN_<MODULE>
+# through drop-ins in /etc/systemd/system/heimdall.service.d/.
+EnvironmentFile=/etc/axis-suite/suite.env
+EnvironmentFile=/etc/axis-suite/heimdall.env
 Environment=NODE_ENV=production
-Environment=HOST=127.0.0.1
-Environment=PORT=3000
+# Trust Caddy's X-Forwarded-For, and only send the cookie over HTTPS.
 Environment=TRUST_PROXY=1
 Environment=COOKIE_SECURE=1
-# Share the session with sibling apps such as Loggbok. Adjust both to your domains.
-Environment=COOKIE_DOMAIN=gansoazul.com.br
-Environment=RETURN_ORIGINS=https://loggbok.gansoazul.com.br
-ExecStart=/usr/bin/node /opt/heimdall/dist/server.js
+ExecStart=/usr/bin/node /opt/heimdall/dist/server/index.js
 Restart=on-failure
 RestartSec=2
 
-# Hardening
+# Hardening. Keep this block the same in every module's unit.
 NoNewPrivileges=yes
 ProtectSystem=strict
 ProtectHome=yes

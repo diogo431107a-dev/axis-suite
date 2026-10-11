@@ -1,0 +1,10 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "server",
+    "outDir": "dist/server",
+    "tsBuildInfoFile": "dist/tsconfig.server.tsbuildinfo"
+  },
+  "include": ["server"],
+  "references": [{ "path": "../packages/heimdall-client/tsconfig.server.json" }]
+}

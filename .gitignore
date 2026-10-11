@@ -1,6 +1,7 @@
 # Dependencies and build output
 node_modules/
 dist/
+*.tsbuildinfo
 
 # Runtime data (sessions, databases)
 data/
@@ -8,7 +9,14 @@ data/
 *.db-shm
 *.db-wal
 
-# Logs, archives, secrets
+# Logs, archives, secrets, local overrides
 *.log
 *.tgz
 .env*
+*.local
+
+# Editors and OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store

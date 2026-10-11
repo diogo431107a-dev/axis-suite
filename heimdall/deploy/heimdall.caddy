@@ -1,0 +1,6 @@
+# Heimdall's Caddy site. axis-suite/deploy/install.sh fills in the @PLACEHOLDERS@ and writes it
+# to /etc/caddy/sites.d/heimdall.caddy.
+@SITE@ {
+	import axis_site
+	reverse_proxy 127.0.0.1:@PORT@
+}

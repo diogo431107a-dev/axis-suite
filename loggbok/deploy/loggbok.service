@@ -1,0 +1,39 @@
+[Unit]
+Description=Loggbok, the Axis Suite notes API
+After=network.target heimdall.service
+
+[Service]
+Type=simple
+# A throwaway system user is created for each run; it can only write to its StateDirectory.
+DynamicUser=yes
+WorkingDirectory=/opt/loggbok
+# Every user's notes live in /var/lib/loggbok (passed to the app as STATE_DIRECTORY).
+StateDirectory=loggbok
+StateDirectoryMode=0700
+UMask=0077
+# Written by axis-suite/deploy/install.sh: the suite's domain and Heimdall's URLs,
+# then this module's HOST, PORT and PUBLIC_URL.
+EnvironmentFile=/etc/axis-suite/suite.env
+EnvironmentFile=/etc/axis-suite/loggbok.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/loggbok/dist/server/index.js
+Restart=on-failure
+RestartSec=2
+
+# Hardening. Keep this block the same in every module's unit.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

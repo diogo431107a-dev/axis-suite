@@ -1,6 +1,7 @@
-# Node.js for the whole Axis Suite. Sourced by every app's installer, so all
-# apps on a server share one /usr/bin/node. To move the suite to a newer Node,
-# change AXIS_NODE_MAJOR here (and .node-version / the "engines" fields).
+# Node.js and pnpm for the whole Axis Suite, sourced by deploy/install.sh. Every module on a
+# server runs on the one /usr/bin/node. To move the suite to a newer Node, change
+# AXIS_NODE_MAJOR here, in .node-version, and the "engines" fields; then re-run the installer
+# for every module.
 
 AXIS_NODE_MAJOR=22
 
@@ -13,4 +14,14 @@ ensure_node() {
     apt-get install -y -q nodejs
   fi
   echo "    node $(/usr/bin/node --version), npm $(/usr/bin/npm --version)"
+}
+
+# Installs the pnpm version named by "packageManager" in the suite's package.json ($1).
+ensure_pnpm() {
+  local want
+  want=$(/usr/bin/node -p "require(process.argv[1]).packageManager.split('@')[1]" "$1")
+  if [[ $(/usr/bin/pnpm --version 2>/dev/null) != "$want" ]]; then
+    /usr/bin/npm install -g --no-audit --no-fund "pnpm@$want" >/dev/null
+  fi
+  echo "    pnpm $(/usr/bin/pnpm --version)"
 }
