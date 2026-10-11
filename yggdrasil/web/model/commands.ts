@@ -49,7 +49,8 @@ const liveChildren = (ctx: Ctx, id: string) => ctx.children(id).filter((k) => ct
 
 // ---- Moving around --------------------------------------------------------------------------
 
-function lastShownDescendant(ctx: Ctx, id: string): string {
+/** The last bullet shown inside `id` (`id` itself when its children are hidden or it has none). */
+export function lastShownDescendant(ctx: Ctx, id: string): string {
   for (let cur = id; ;) {
     const kids = ctx.expanded(cur) ? ctx.shown(cur) : [];
     if (kids.length === 0) return cur;

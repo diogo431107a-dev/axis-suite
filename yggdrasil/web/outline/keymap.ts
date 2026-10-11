@@ -3,6 +3,7 @@
 import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
 import type { Field } from "../model/ui.ts";
+import { makeLink, toggleWrap, type Edit } from "../text/format.ts";
 import { caretClientX, onFirstLine, onLastLine, sourceOffsetOnLine } from "./caret.ts";
 import { zoomTo } from "./nav.ts";
 
@@ -169,10 +170,29 @@ export function editorKeyDown(o: Outliner, e: Keys, ta: HTMLTextAreaElement, id:
       o.redo();
       return handled();
 
+    case "b":
+    case "i":
+    case "k": {
+      if (!mod || e.shiftKey || e.altKey) return;
+      const edit = key === "k" ? makeLink(value, start, end) : toggleWrap(value, start, end, key === "b" ? "**" : "__");
+      replaceText(ta, edit);
+      return handled();
+    }
+
     case "Escape":
       selectBlock(o, id);
       return handled();
   }
+}
+
+/**
+ * Changes the textarea's text as if typed: the editor's change handler saves it (and records
+ * the selection before and after for undo).
+ */
+export function replaceText(ta: HTMLTextAreaElement, edit: Edit): void {
+  ta.setRangeText(edit.value, 0, ta.value.length);
+  ta.setSelectionRange(edit.start, edit.end);
+  ta.dispatchEvent(new Event("input", { bubbles: true }));
 }
 
 /** Handles a key while bullets are selected as blocks. */

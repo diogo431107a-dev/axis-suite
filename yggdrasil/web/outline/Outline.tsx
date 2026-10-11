@@ -74,16 +74,16 @@ export function Outline() {
     );
   }
 
-  /** A click below the last bullet edits it, or adds one if it isn't empty. */
+  /** A click below the list edits the last bullet shown, or adds the first one. */
   const clickBelow = () => {
     const last = kids.at(-1);
-    const node = last ? o.store.get(last) : undefined;
-    if (node && node.content === "" && !o.store.children(last!).length) {
-      o.ui.setCaret(node.id, 0);
+    if (last) {
+      const id = cmd.lastShownDescendant(o.ctx(), last);
+      o.ui.setCaret(id, o.store.get(id)?.content.length ?? 0);
       return;
     }
     o.run((ctx) => {
-      const { ops, ids } = cmd.insertDrafts(ctx, zoom, last ?? null, [{ content: "", children: [] }]);
+      const { ops, ids } = cmd.insertDrafts(ctx, zoom, null, [{ content: "", children: [] }]);
       return { ops, caret: { id: ids[0]!, offset: 0 } };
     });
   };
