@@ -1,9 +1,34 @@
 import { DatabaseSync } from 'node:sqlite';
+import { existsSync } from 'fs';
 import { fileURLToPath } from 'url';
 import { dirname, join } from 'path';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
-export const db = new DatabaseSync(join(__dirname, 'notes.db'));
+// systemd sets STATE_DIRECTORY (/var/lib/loggbok), keeping notes out of the checkout and
+// private to the service; locally it falls back to this folder.
+const DATA_DIR = process.env.STATE_DIRECTORY ?? __dirname;
+const DB_FILE = join(DATA_DIR, 'notes.db');
+
+// A database left next to the code by an install from before STATE_DIRECTORY.
+const OLD_FILE = join(__dirname, 'notes.db');
+if (DB_FILE !== OLD_FILE && existsSync(OLD_FILE)) {
+  if (!existsSync(DB_FILE)) {
+    // Starting empty would make everyone's notes look lost, and new ones would split from them.
+    console.error(
+      `The notes are still at ${OLD_FILE}, but this service keeps them in ${DATA_DIR}.\n` +
+      'Move them once, then start the service again:\n' +
+      '  sudo systemctl stop loggbok\n' +
+      `  sudo mv ${OLD_FILE}* ${DATA_DIR}/\n` +
+      `  sudo chown "$(stat -c %U ${DATA_DIR})": ${DB_FILE}* && sudo chmod 600 ${DB_FILE}*\n` +
+      '  sudo systemctl start loggbok'
+    );
+    process.exit(1);
+  }
+  console.warn(`An old copy of the notes is still at ${OLD_FILE}, readable outside the service. Delete it.`);
+}
+
+export const db = new DatabaseSync(DB_FILE);
+console.log(`Notes database: ${DB_FILE}`);
 
 db.exec('PRAGMA foreign_keys = ON');
 

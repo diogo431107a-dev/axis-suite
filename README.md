@@ -29,6 +29,17 @@ The whole suite runs on **one Node.js version**, because a server has a single `
 
 To move the suite to a newer Node, change `AXIS_NODE_MAJOR` in `deploy/node.sh`, `.node-version`, and the `engines` field in each app's `package.json`. Then re-run the installers.
 
+## Where data lives
+
+On a server, each app keeps its data in its own systemd `StateDirectory`. That directory is outside any checkout and readable only by that app's service:
+
+| App      | Data                     | Location             |
+|----------|--------------------------|----------------------|
+| Heimdall | sessions                 | `/var/lib/heimdall/` |
+| Loggbok  | every user's notes       | `/var/lib/loggbok/`  |
+
+In local development they fall back to `heimdall/data/` and `loggbok/server/notes.db`, which `.gitignore` keeps out of commits. Never keep server data in the checkout: Caddy needs the home directory to be `o+x`, so the checkout is readable by other accounts.
+
 ## Installing
 
 Install them in this order:

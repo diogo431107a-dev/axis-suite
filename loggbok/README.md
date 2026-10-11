@@ -10,7 +10,7 @@ Loggbok has no login of its own. It uses the sessions of [Heimdall](../heimdall)
 |-----------|-------------------------------------|
 | Frontend  | React 19, Vite 8, Tailwind CSS 4    |
 | Backend   | Express 5, Node.js built-in sqlite  |
-| Database  | SQLite file at `server/notes.db`    |
+| Database  | SQLite: `/var/lib/loggbok/notes.db` on a server, `server/notes.db` in dev |
 | Sign-in   | Heimdall sessions                   |
 | Package   | pnpm 11                             |
 
@@ -64,7 +64,7 @@ Requires **Node.js 22+** and **pnpm**, plus Heimdall running locally.
 
 If Heimdall runs elsewhere, set `HEIMDALL_INTERNAL_URL` and `HEIMDALL_PUBLIC_URL` for the API (both default to `http://127.0.0.1:3000`).
 
-The SQLite database is created automatically at `server/notes.db` on first run. A database from before user accounts existed has its notes discarded on the first start (the log says how many).
+The SQLite database is created automatically at `server/notes.db` on first run. If `STATE_DIRECTORY` is set, it lives there instead. systemd sets it on a server (see step 5 below), and the log's first line names the file in use. A database from before user accounts existed has its notes discarded on the first start (the log says how many).
 
 Individual servers:
 
@@ -106,8 +106,8 @@ sudo bash /mnt/c/Users/<you>/Claude/axis-suite/loggbok/deploy/install-wsl.sh
 
 The script is safe to re-run after every change on the Windows side. It does the VPS steps below with WSL values:
 - installs Node 22 and pnpm if they're missing
-- copies the project to `~/loggbok` (keeping `server/notes.db`) and builds it as your user
-- installs the `loggbok` service
+- copies the project to `~/loggbok` and builds it as your user
+- installs the `loggbok` service, with the notes in `/var/lib/loggbok/` (moving them there once from `~/loggbok/server/notes.db` if an older install left them there)
 - serves the app at **https://localhost:8443** through Caddy
 
 Both apps live on the host `localhost`, and cookies ignore ports, so Heimdall's ordinary cookie reaches Loggbok without `COOKIE_DOMAIN`. The script adds a systemd drop-in to Heimdall, `/etc/systemd/system/heimdall.service.d/loggbok-wsl.conf`. It clears `COOKIE_DOMAIN` and sets `RETURN_ORIGINS=https://localhost:8443`, and it survives Heimdall reinstalls.
@@ -164,8 +164,8 @@ Description=Loggbok API
 After=network.target heimdall.service
 
 [Service]
-User=<your-user>
-WorkingDirectory=/home/<your-user>/loggbok
+User=diroadm
+WorkingDirectory=/home/diroadm/axis-suite/loggbok
 ExecStart=/usr/bin/node server/index.js
 Restart=on-failure
 Environment=HOST=127.0.0.1
@@ -174,6 +174,16 @@ Environment=HEIMDALL_INTERNAL_URL=http://127.0.0.1:3000
 Environment=HEIMDALL_PUBLIC_URL=https://heimdall.gansoazul.com.br
 StandardOutput=journal
 StandardError=journal
+# Notes live in /var/lib/loggbok (passed to the app as STATE_DIRECTORY), readable only by User=.
+StateDirectory=loggbok
+StateDirectoryMode=0700
+UMask=0077
+
+# Hardening: the state directory is the only place the service can write.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
 
 [Install]
 WantedBy=multi-user.target
@@ -184,7 +194,24 @@ sudo systemctl enable --now loggbok
 sudo systemctl status loggbok
 ```
 
-Replace `<your-user>` with your actual username (e.g. `/home/diogo/loggbok`). Check that status shows `active (running)` before continuing.
+If your user or checkout path differs, change `User=` and `WorkingDirectory=`. Check that status shows `active (running)` before continuing. `journalctl -u loggbok` should start with `Notes database: /var/lib/loggbok/notes.db`.
+
+The notes are kept outside the checkout on purpose:
+- Caddy needs your home directory to be `o+x`, so anything in the checkout is readable by every other account on the server.
+- `git clean` or a fresh clone would delete everyone's notes along with it.
+
+#### Moving the database from an older install
+
+Older installs kept the notes in `server/notes.db` inside the checkout. Loggbok refuses to start while that file is there and `/var/lib/loggbok/notes.db` isn't, so it can't quietly start with no notes. The log then shows the commands to move it. With the unit above in place, move it once:
+
+```bash
+sudo systemctl stop loggbok
+sudo install -d -o diroadm -g diroadm -m 700 /var/lib/loggbok
+sudo mv /home/diroadm/axis-suite/loggbok/server/notes.db* /var/lib/loggbok/
+sudo chown diroadm:diroadm /var/lib/loggbok/notes.db* && sudo chmod 600 /var/lib/loggbok/notes.db*
+sudo systemctl start loggbok
+journalctl -u loggbok -n 5 --no-pager   # "Notes database: /var/lib/loggbok/notes.db", and no warning
+```
 
 ### 6. Add the Caddy site
 
@@ -192,15 +219,21 @@ Caddy serves two things from `loggbok.gansoazul.com.br`:
 - **Static files** (`/`): the built React app from `dist/`
 - **API requests** (`/api/`): proxied to the Express server on port 3001
 
+Run this from the `loggbok` folder of your checkout. It writes the site file with that checkout's real `dist/` path instead of the template's placeholder (`/home/diogo/loggbok/dist`):
+
 ```bash
-sudo cp deploy/loggbok.caddy /etc/caddy/sites.d/loggbok.caddy
-sudo nano /etc/caddy/sites.d/loggbok.caddy   # adjust the domain and the dist/ path
+cd ~/axis-suite/loggbok
+sed "s#/home/diogo/loggbok/dist#$PWD/dist#" deploy/loggbok.caddy | sudo tee /etc/caddy/sites.d/loggbok.caddy > /dev/null
+grep root /etc/caddy/sites.d/loggbok.caddy    # must show your checkout's dist/
 ```
 
-Caddy runs as the `caddy` user and needs execute permission on your home directory to reach `dist/`:
+If your domain isn't `loggbok.gansoazul.com.br`, also change the site address in that file.
+
+Caddy runs as the `caddy` user. It needs execute permission on **every** directory down to `dist/`, and read permission on the files. Debian 13 creates home directories as `700`, so open yours for traversal only:
 
 ```bash
-chmod o+x /home/<your-user>
+chmod o+x ~
+namei -l "$PWD/dist/index.html"    # every directory needs x for "other", index.html needs r
 ```
 
 Validate and reload:
@@ -212,16 +245,20 @@ sudo systemctl reload caddy
 
 Open `https://loggbok.gansoazul.com.br`. You are sent to Heimdall to sign in, then back to your notes.
 
+**Blank `403 Forbidden` on the page while `/api/me` answers?** Caddy can't read the files at the site's `root`. Usually the path is wrong (e.g. still the placeholder, which may point into another user's private home), or a directory on the way lacks `o+x`. Check with `grep root /etc/caddy/sites.d/loggbok.caddy` and `namei -l <that path>/index.html`.
+
 If the server was previously set up with nginx for Loggbok, stop it first (`sudo systemctl disable --now nginx`), because Caddy needs ports 80 and 443.
 
 ---
 
 ## Database backup
 
-The entire database is a single file:
+All users' notes are in one file, `/var/lib/loggbok/notes.db`. It holds everyone's private notes, so keep backups where only you can read them. Stop the service while copying so the file is consistent:
 
 ```bash
-cp ~/loggbok/server/notes.db ~/notes-backup-$(date +%Y%m%d).db
+sudo systemctl stop loggbok
+sudo install -m 600 -o "$USER" /var/lib/loggbok/notes.db ~/notes-backup-$(date +%Y%m%d).db
+sudo systemctl start loggbok
 ```
 
 ---

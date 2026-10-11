@@ -17,6 +17,7 @@ APP_USER="${SUDO_USER:-}"
 [[ -n $APP_USER && $APP_USER != root ]] || { echo "Run this with sudo from your normal user, not as root." >&2; exit 1; }
 APP_HOME="$(getent passwd "$APP_USER" | cut -d: -f6)"
 APP_DIR="$APP_HOME/loggbok"
+DATA_DIR=/var/lib/loggbok
 systemctl is-active --quiet heimdall || { echo "Heimdall isn't running. Install it first (see its README)." >&2; exit 1; }
 
 # Windows' own node/pnpm are on the WSL PATH; always use the Linux ones.
@@ -67,10 +68,31 @@ Environment=HEIMDALL_INTERNAL_URL=http://127.0.0.1:3000
 Environment=HEIMDALL_PUBLIC_URL=$HEIMDALL_PUBLIC_URL
 StandardOutput=journal
 StandardError=journal
+# Notes live in $DATA_DIR (passed to the app as STATE_DIRECTORY), readable only by $APP_USER.
+StateDirectory=loggbok
+StateDirectoryMode=0700
+UMask=0077
+
+# Hardening: the state directory is the only place the service can write.
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=read-only
 
 [Install]
 WantedBy=multi-user.target
 EOF
+
+# Installs from before StateDirectory kept the notes next to the code. Move them once.
+OLD_DB="$APP_DIR/server/notes.db"
+if [[ -f $OLD_DB && ! -f $DATA_DIR/notes.db ]]; then
+  echo "==> Moving the notes database to $DATA_DIR"
+  systemctl stop loggbok 2>/dev/null || true
+  install -d -o "$APP_USER" -g "$APP_USER" -m 700 "$DATA_DIR"
+  mv "$OLD_DB"* "$DATA_DIR/"
+  chown "$APP_USER:$APP_USER" "$DATA_DIR"/notes.db*
+  chmod 600 "$DATA_DIR"/notes.db*
+fi
 
 echo "==> Pointing Heimdall at Loggbok (drop-in; survives Heimdall reinstalls)"
 mkdir -p /etc/systemd/system/heimdall.service.d
