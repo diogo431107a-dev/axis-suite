@@ -35,8 +35,9 @@ export const FIELD_NAMES: readonly FieldName[] = ["content", "note", "completedA
 
 /**
  * A change to one node. Every op can be applied twice with the same result, so a batch whose
- * answer got lost can simply be sent again. A create of an id the user already has overwrites
- * that node (and brings it back if deleted); that also makes it the redo of an undone create.
+ * answer got lost can simply be sent again. A create of an id the user already has changes
+ * nothing: it was sent before, and the node may have been edited since. (Redoing an undone
+ * create is a restore.)
  */
 export type Op =
   | ({ op: "create"; id: string; parentId: string | null; rank: string } & Partial<NodeFields>)
@@ -52,9 +53,10 @@ export interface OpsRequest {
   ops: Op[];
 }
 
-/** The answer to POST /api/ops: the revision the batch was saved as, and the ops refused. */
+/** The answer to POST /api/ops: the ops refused, and the revision the batch was saved as. */
 export interface OpsResponse {
-  rev: number;
+  /** null if the batch changed nothing, e.g. because it was sent before and already applied. */
+  rev: number | null;
   rejected: { index: number; reason: string }[];
 }
 
