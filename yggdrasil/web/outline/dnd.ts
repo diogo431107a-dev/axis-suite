@@ -5,12 +5,11 @@ import type { PointerEvent as ReactPointerEvent } from "react";
 import type { Node } from "../../shared/protocol.ts";
 import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
+import { INDENT } from "./layout.ts";
 import { zoomTo } from "./nav.ts";
 
 /** Pixels to move before a press becomes a drag. */
 const DRAG_THRESHOLD = 5;
-/** How far a child's dot sits right of its parent's. */
-const INDENT = 24;
 /** Scroll when the pointer is this close to the top or bottom of the window. */
 const SCROLL_EDGE = 60;
 
@@ -22,14 +21,16 @@ interface Drop {
   y: number;
 }
 
-const rowOf = (id: string) => document.querySelector<HTMLElement>(`[data-row="${CSS.escape(id)}"]`);
 const dotLeft = (row: HTMLElement) => row.querySelector("[data-dot]")!.getBoundingClientRect().left;
 
 /** The best place to drop at (x, y), or null if there is none. */
 function findDrop(o: Outliner, dragged: ReadonlySet<string>, x: number, y: number): Drop | null {
   const ctx = o.ctx();
   const inDragged = (id: string) => [...dragged].some((d) => cmd.isAncestorOrSelf(ctx, d, id));
-  const rows = [...document.querySelectorAll<HTMLElement>("[data-row]")].filter((r) => !inDragged(r.dataset.row!));
+  // In the order shown (the bullet being edited may be drawn apart from the others, at its place).
+  const rows = [...document.querySelectorAll<HTMLElement>("[data-row]")]
+    .filter((r) => !inDragged(r.dataset.row!))
+    .sort((a, b) => a.getBoundingClientRect().top - b.getBoundingClientRect().top);
   if (rows.length === 0) return null;
 
   // The gap the pointer is in: between the last row whose middle is above it and the next one.
@@ -56,11 +57,11 @@ function findDrop(o: Outliner, dragged: ReadonlySet<string>, x: number, y: numbe
     const shownKids = ctx.expanded(upper) ? ctx.shown(upper).filter((k) => !dragged.has(k)) : [];
     candidates.push({ parentId: upper, afterId: null, x: left + INDENT, y: gapY });
     if (shownKids.length === 0) {
-      // After the row's bullet, or after any ancestor whose last shown descendant it is.
-      for (let cur: string | null = upper; cur !== null && cur !== ctx.root;) {
+      // After the row's bullet, or after any ancestor whose last shown descendant it is. An
+      // ancestor's row may be scrolled away (and not drawn), so its dot is found by depth.
+      for (let cur: string | null = upper, up = 0; cur !== null && cur !== ctx.root; up++) {
         const node: Node = o.store.get(cur)!;
-        const row = rowOf(cur);
-        if (row) candidates.push({ parentId: node.parentId, afterId: cur, x: dotLeft(row), y: gapY });
+        candidates.push({ parentId: node.parentId, afterId: cur, x: left - up * INDENT, y: gapY });
         const sibs = ctx.shown(node.parentId).filter((s) => !dragged.has(s));
         if (sibs.at(-1) !== cur) break;
         cur = node.parentId;
@@ -96,9 +97,10 @@ export function onDotPointerDown(o: Outliner, id: string, e: ReactPointerEvent<H
     line = document.body.appendChild(document.createElement("div"));
     line.className = "pointer-events-none fixed z-50 h-0.5 rounded bg-sky-500";
     document.body.classList.add("cursor-grabbing", "select-none");
-    for (const d of ids) {
-      const el = document.querySelector<HTMLElement>(`[data-bullet="${CSS.escape(d)}"]`);
-      if (el) {
+    // The dragged bullets and every row under them.
+    const ctx = o.ctx();
+    for (const el of document.querySelectorAll<HTMLElement>("[data-bullet]")) {
+      if (ids.some((d) => cmd.isAncestorOrSelf(ctx, d, el.dataset.bullet!))) {
         el.style.opacity = "0.4";
         faded.push(el);
       }

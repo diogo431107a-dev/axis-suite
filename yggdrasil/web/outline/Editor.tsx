@@ -15,6 +15,12 @@ function autoGrow(ta: HTMLTextAreaElement | null): void {
   ta.style.height = `${ta.scrollHeight}px`;
 }
 
+/**
+ * The last caret placement an editor applied. An editor that mounts again for the same placement
+ * (its row scrolled back into view) restores the caret without scrolling the page to it.
+ */
+let appliedSeq = -1;
+
 interface Props {
   id: string;
   field: Field;
@@ -37,11 +43,27 @@ export function Editor({ id, field, className = "", placeholder }: Props) {
     const c = o.ui.caret;
     if (!ta || !c || c.id !== id) return;
     autoGrow(ta);
-    ta.focus({ preventScroll: true });
+    const fresh = c.seq !== appliedSeq;
+    const active = document.activeElement;
+    // A remount takes focus back only if nothing else has it (the search box, say).
+    if (fresh || !active || active === document.body) ta.focus({ preventScroll: true });
     ta.setSelectionRange(c.start, c.end);
     selection.current = { start: c.start, end: c.end };
-    ta.scrollIntoView({ block: "nearest" });
+    if (fresh) {
+      appliedSeq = c.seq;
+      ta.scrollIntoView({ block: "nearest" });
+    }
   }, [caret?.seq, o, id]);
+
+  // If the row goes off screen and unmounts, it comes back with the caret where it was.
+  useLayoutEffect(
+    () => () => {
+      const ta = ref.current;
+      const c = o.ui.caret;
+      if (ta && c?.id === id && c.field === field) o.ui.rememberCaret(id, field, ta.selectionStart, ta.selectionEnd);
+    },
+    [o, id, field],
+  );
 
   useLayoutEffect(() => autoGrow(ref.current), [value]);
 
@@ -64,7 +86,7 @@ export function Editor({ id, field, className = "", placeholder }: Props) {
       value={value}
       placeholder={placeholder}
       spellCheck
-      className={`ygg-text block w-full resize-none overflow-hidden bg-transparent outline-none ${className}`}
+      className={`ygg-text block w-full scroll-mt-16 scroll-mb-4 resize-none overflow-hidden bg-transparent outline-none ${className}`}
       onChange={(e) => save(e.currentTarget)}
       onSelect={(e) => {
         const ta = e.currentTarget;

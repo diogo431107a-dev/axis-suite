@@ -25,3 +25,21 @@ body,
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+
+/* The vertical lines that join a bullet's children: one per ancestor, under each ancestor's dot
+   (dots are 22px wide, children 24px further right). Drawn per row, so the rows can be flat. */
+.ygg-guides {
+  position: absolute;
+  inset-block: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: linear-gradient(
+    to right,
+    transparent 10px,
+    var(--color-gray-200, #e5e7eb) 10px,
+    var(--color-gray-200, #e5e7eb) 11px,
+    transparent 11px
+  );
+  background-size: 24px 100%;
+  background-repeat: repeat-x;
+}

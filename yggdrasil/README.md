@@ -35,6 +35,8 @@ deploy/
 
 **Sync.** The queue goes out 300 ms after typing stops (1 s at most). While the server can't be reached it is retried with back-off (1 s up to 30 s) and the status line says "Offline — N changes waiting". The queue is kept in `localStorage`, so a tab closed while offline sends it on the next load, and leaving the page with unsent changes asks first. Each tab keeps an event stream (`GET /api/events`); when another tab or device saves something, its tabs fetch what changed. A field with a local change that hasn't been saved yet keeps the local value until it has.
 
+**Drawing.** The outline is drawn as a flat list of rows (one per visible bullet), and only the rows near the window are mounted, so a tree of any size opens quickly: with 20,000 bullets all expanded, the page draws in under a second and a search answers in under 100 ms. The bullet being edited stays mounted even when scrolled away.
+
 **Deleting.** A delete marks only the bullet itself; everything under it disappears with it and comes back with it, so undoing a delete is one op. Deleted bullets are purged for good after 30 days (at start-up and daily).
 
 **Signing out.** If the session ends while someone is writing, a banner asks them to sign in again in a new tab; their changes wait and go out when they come back. If a different user signs in (in another tab), the page starts over with that user's tree: every request names the user the page belongs to, and the API refuses it (409) if someone else is signed in.

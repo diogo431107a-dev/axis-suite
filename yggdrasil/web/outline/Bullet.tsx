@@ -1,5 +1,6 @@
-// One bullet and, unless it is collapsed, its children. Memoized and subscribed to its own node,
-// so typing re-renders one bullet; children of collapsed bullets aren't mounted at all.
+// One bullet's row. Rows are flat (the outline is a list of them, see VirtualRows): depth sets the
+// indent, and the guide lines of its ancestors are drawn per row. Memoized and subscribed to its
+// own node, so typing re-renders one row.
 import { memo, useCallback, useRef, useState, type MouseEvent } from "react";
 import { ChevronRight, Ellipsis, Star } from "lucide-react";
 import * as cmd from "../model/commands.ts";
@@ -10,8 +11,9 @@ import { BulletMenu } from "./BulletMenu.tsx";
 import { onDotPointerDown } from "./dnd.ts";
 import { Editor } from "./Editor.tsx";
 import { useCaret, useNode, useOutliner, useSelected, useShownChildren, useView } from "./hooks.ts";
+import { INDENT } from "./layout.ts";
 
-export const Bullet = memo(function Bullet({ id }: { id: string }) {
+export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: number }) {
   const o = useOutliner();
   const node = useNode(id);
   const kids = useShownChildren(id);
@@ -28,7 +30,8 @@ export const Bullet = memo(function Bullet({ id }: { id: string }) {
   const completed = node.completedAt !== null;
 
   return (
-    <div data-bullet={id}>
+    <div data-bullet={id} className="relative" style={{ paddingLeft: depth * INDENT }}>
+      {depth > 0 && <span aria-hidden className="ygg-guides" style={{ width: depth * INDENT }} />}
       <div
         data-row={id}
         className={`group relative flex items-start rounded-sm ${selected ? "bg-sky-100 ring-1 ring-sky-300" : ""}`}
@@ -90,13 +93,6 @@ export const Bullet = memo(function Bullet({ id }: { id: string }) {
         </button>
         {menu && <BulletMenu id={id} onClose={closeMenu} />}
       </div>
-      {expanded && (
-        <div className="ml-[10px] border-l border-gray-200 pl-[13px]">
-          {kids.map((k) => (
-            <Bullet key={k} id={k} />
-          ))}
-        </div>
-      )}
     </div>
   );
 });

@@ -40,6 +40,8 @@ export class Store {
   #kidsListeners = new Map<string, Set<Listener>>();
   #listeners = new Set<Listener>();
   #version = 0;
+  #structure = 0;
+  #shapeChanged = false;
   // Notifications wait until the outermost batch() ends.
   #depth = 0;
   #changedNodes = new Set<string>();
@@ -62,6 +64,14 @@ export class Store {
   /** Counts every change, for views that depend on the whole tree (search, sidebar). */
   get version(): number {
     return this.#version;
+  }
+
+  /**
+   * Counts changes to the tree's shape: child lists, which children are shown (deleted,
+   * completed) and collapsing. Typing in a bullet doesn't change it.
+   */
+  get structure(): number {
+    return this.#structure;
   }
 
   get size(): number {
@@ -199,6 +209,7 @@ export class Store {
     const prev = this.#nodes.get(next.id);
     this.#nodes.set(next.id, next);
     this.#changedNodes.add(next.id);
+    if (prev && prev.collapsed !== next.collapsed) this.#shapeChanged = true;
     if (!prev) {
       this.#insertChild(next);
     } else if (prev.parentId !== next.parentId || prev.rank !== next.rank) {
@@ -239,6 +250,8 @@ export class Store {
   #notify(): void {
     if (!this.#changedAll && this.#changedNodes.size === 0 && this.#changedKids.size === 0) return;
     this.#version++;
+    if (this.#changedAll || this.#changedKids.size > 0 || this.#shapeChanged) this.#structure++;
+    this.#shapeChanged = false;
     const all = this.#changedAll;
     const nodes = all ? [...this.#nodeListeners.keys()] : [...this.#changedNodes];
     const kids = all ? [...this.#kidsListeners.keys()] : [...this.#changedKids];

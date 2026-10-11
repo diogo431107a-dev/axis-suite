@@ -1,15 +1,17 @@
 // The page's main column: breadcrumbs, the zoomed-in bullet as the title, and its children.
-import { useEffect } from "react";
+import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react";
 import { looksLikeOpml, parseOpml } from "../io/opml.ts";
 import { parsePlainText, toHtml, toPlainText } from "../io/plaintext.ts";
 import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
+import { visibleRows } from "../model/rows.ts";
 import { Breadcrumbs } from "./Breadcrumbs.tsx";
-import { Bullet, Text } from "./Bullet.tsx";
+import { Text } from "./Bullet.tsx";
 import { Editor } from "./Editor.tsx";
 import { useCaret, useNode, useOutliner, useShownChildren, useView } from "./hooks.ts";
 import { selectionKeyDown } from "./keymap.ts";
 import { zoomTo } from "./nav.ts";
+import { VirtualRows } from "./VirtualRows.tsx";
 
 const isTyping = (target: EventTarget | null) =>
   target instanceof HTMLElement && (target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(target.tagName));
@@ -66,9 +68,17 @@ function useSelectionEvents(o: Outliner) {
 
 export function Outline() {
   const o = useOutliner();
-  const { zoom } = useView();
+  const view = useView();
+  const { zoom } = view;
   const root = useNode(zoom);
   const kids = useShownChildren(zoom);
+  // The rows change with the tree's shape and the view, not with typing.
+  const structure = useSyncExternalStore(
+    useCallback((cb: () => void) => o.store.subscribe(cb), [o]),
+    () => o.store.structure,
+  );
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
+  const rows = useMemo(() => visibleRows(o.store, view), [o, view, structure]);
   useSelectionEvents(o);
 
   if (zoom !== null && (!root || root.deletedAt !== null)) {
@@ -101,9 +111,7 @@ export function Outline() {
       <Breadcrumbs />
       {zoom !== null && <RootTitle id={zoom} />}
       <div className="pl-5">
-        {kids.map((k) => (
-          <Bullet key={k} id={k} />
-        ))}
+        <VirtualRows rows={rows} />
       </div>
       <div className="min-h-[50vh] cursor-text" onClick={clickBelow}>
         {kids.length === 0 && <p className="pl-[42px] pt-1 text-gray-400">Click here to add a bullet.</p>}
