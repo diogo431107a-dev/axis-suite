@@ -12,7 +12,7 @@
 #
 # A module is built from this checkout into /opt/<module>, runs as the systemd service
 # <module>/deploy/<module>.service, keeps its data in /var/lib/<module>, and is served by Caddy
-# through <module>/deploy/<module>.caddy. An optional <module>/deploy/hooks.sh can add steps.
+# through <module>/deploy/<module>.caddy.
 set -euo pipefail
 
 die() {
@@ -87,10 +87,6 @@ fi
 
 # ---- Packages and toolchain ------------------------------------------------------------------
 
-if [[ $MODULE != heimdall ]] && grep -qs "Managed by Heimdall" /etc/caddy/Caddyfile; then
-  die "Heimdall was installed with its old installer. Install it again with this one first: sudo bash $0 heimdall $DOMAIN"
-fi
-
 echo "==> Packages (caddy, rsync, curl)"
 apt-get update -q
 apt-get install -y -q caddy rsync curl ca-certificates
@@ -122,15 +118,8 @@ pnpm --filter "$MODULE..." run build
 rm -rf "$APP_DIR.new"
 pnpm --filter "$MODULE" deploy --prod "$APP_DIR.new" >/dev/null
 chmod -R u=rwX,go=rX "$APP_DIR.new"
-
-if [[ -f $MODULE_DIR/deploy/hooks.sh ]]; then
-  # shellcheck source=/dev/null
-  source "$MODULE_DIR/deploy/hooks.sh"
-  if declare -F before_install >/dev/null; then
-    echo "==> $MODULE's own install steps"
-    before_install
-  fi
-fi
+cd /
+rm -rf "$BUILD_DIR"
 
 # ---- Configuration ---------------------------------------------------------------------------
 
@@ -191,7 +180,7 @@ fi
 
 echo "==> Caddy site $URL"
 CADDYFILE=/etc/caddy/Caddyfile
-if [[ -f $CADDYFILE ]] && ! grep -qE "Managed by (axis-suite/deploy/install.sh|Heimdall)" "$CADDYFILE"; then
+if [[ -f $CADDYFILE ]] && ! grep -q "Managed by axis-suite/deploy/install.sh" "$CADDYFILE"; then
   cp "$CADDYFILE" "$CADDYFILE.bak.$(date +%Y%m%d%H%M%S)"
   echo "    The existing Caddyfile is backed up next to it."
 fi

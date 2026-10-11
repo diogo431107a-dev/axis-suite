@@ -19,7 +19,6 @@ web/
 deploy/
   loggbok.service systemd unit (sandboxed)
   loggbok.caddy   Caddy site: /api to the service, everything else from dist/web
-  hooks.sh        moves installs from before the suite installer
 ```
 
 ## How sign-in works

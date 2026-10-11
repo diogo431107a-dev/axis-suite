@@ -70,8 +70,6 @@ function loadSessions(): Map<string, StoredSession> {
   try {
     const entries = JSON.parse(readFileSync(SESSIONS_FILE, "utf8")) as [string, StoredSession][];
     const now = Date.now();
-    // Sessions saved before the idle timeout existed start their idle clock now.
-    for (const [, s] of entries) s.lastSeenAt ??= now;
     const valid = entries.filter(([, s]) => !endReason(s, now));
     const dropped = entries.length - valid.length;
     if (dropped > 0) {

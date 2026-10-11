@@ -24,12 +24,10 @@ const COOKIE_SECURE = process.env.COOKIE_SECURE === "1";
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN?.trim() || undefined;
 // Origins (e.g. https://loggbok.example.com) that may send users here with ?next= and get them
 // back after signing in. Anything else is ignored, so this can't be an open redirect. Each module
-// adds its own RETURN_ORIGIN_<MODULE> (the installer writes one systemd drop-in per module), and
-// RETURN_ORIGINS may hold a comma-separated list.
+// adds its own RETURN_ORIGIN_<MODULE> (the installer writes one systemd drop-in per module).
 const RETURN_ORIGINS = Object.entries(process.env)
-  .filter(([key]) => key === "RETURN_ORIGINS" || key.startsWith("RETURN_ORIGIN_"))
-  .flatMap(([, value]) => (value ?? "").split(","))
-  .map((o) => o.trim())
+  .filter(([key]) => key.startsWith("RETURN_ORIGIN_"))
+  .map(([, value]) => (value ?? "").trim())
   .filter(Boolean);
 const COOKIE_NAME = "heimdall_sid";
 const MAX_BODY_BYTES = 4096;
@@ -57,15 +55,8 @@ function readCookie(req: IncomingMessage, name: string): string | undefined {
   return undefined;
 }
 
-function sessionCookie(value: string, maxAgeSeconds: number, domain = COOKIE_DOMAIN): string {
-  return `${COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${domain ? `; Domain=${domain}` : ""}${COOKIE_SECURE ? "; Secure" : ""}`;
-}
-
-/** Set-Cookie values for the session. With COOKIE_DOMAIN set, any older host-only cookie is cleared too. */
-function sessionCookies(value: string, maxAgeSeconds: number): string[] {
-  const cookies = [sessionCookie(value, maxAgeSeconds)];
-  if (COOKIE_DOMAIN) cookies.push(sessionCookie("", 0, ""));
-  return cookies;
+function sessionCookie(value: string, maxAgeSeconds: number): string {
+  return `${COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${COOKIE_DOMAIN ? `; Domain=${COOKIE_DOMAIN}` : ""}${COOKIE_SECURE ? "; Secure" : ""}`;
 }
 
 /** The URL to send the user back to, if it belongs to an allowed app. */
@@ -147,7 +138,7 @@ async function handleLogin(req: IncomingMessage, res: ServerResponse, nonce: str
   destroySession(readCookie(req, COOKIE_NAME)); // never reuse a pre-login session id
   const { token } = createSession(user);
   console.log(`${user.username} logged in from ${ip}`);
-  redirect(res, next ?? "/", { "Set-Cookie": sessionCookies(token, SESSION_MAX_MS / 1000) });
+  redirect(res, next ?? "/", { "Set-Cookie": sessionCookie(token, SESSION_MAX_MS / 1000) });
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -160,11 +151,9 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     const session = getSession(sid);
     if (session) touchSession(sid);
     const next = returnTo(searchParams.get("next"));
-    if (session && sid && next) {
-      // Already signed in: go straight back to the app. Re-issuing the cookie moves a session
-      // that predates COOKIE_DOMAIN onto the shared domain, so the app can see it.
-      const maxAge = Math.floor((session.expiresAt - Date.now()) / 1000);
-      redirect(res, next, { "Set-Cookie": sessionCookies(sid, maxAge) });
+    if (session && next) {
+      // Already signed in: go straight back to the app.
+      redirect(res, next);
     } else if (session) {
       sendHtml(res, 200, nonce, renderDashboard({ nonce, session }));
     } else {
@@ -234,7 +223,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
       console.log(`${session.username} logged out`);
     }
     destroySession(sid);
-    redirect(res, "/", { "Set-Cookie": sessionCookies("", 0) });
+    redirect(res, "/", { "Set-Cookie": sessionCookie("", 0) });
     return;
   }
 

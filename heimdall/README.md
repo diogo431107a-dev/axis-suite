@@ -29,23 +29,18 @@ pnpm --filter heimdall dev
 
 Open http://127.0.0.1:3000. The demo accounts are `odin` / `allfather-demo`, `freya` / `folkvangr-demo` and `john` / `john-demo`. Sessions are saved in `./data/`.
 
-## Set your own users (do this before deploying)
+## Users and passwords
 
-1. Generate a hash for each password. It prompts twice and doesn't echo what you type:
+The accounts are part of the code, in `server/users.ts`, so replace the demo ones before relying on the suite. To add, remove or change a user:
+
+1. Generate a hash for the password. It prompts twice and doesn't echo what you type:
 
    ```bash
    pnpm --filter heimdall hash-password
    ```
 
-2. Edit `server/users.ts`. Replace the demo entries with your own `{ username, name, passwordHash }` objects.
-
-## Changing credentials
-
-Credentials are part of the code, so a change means a redeploy:
-
-1. Run `pnpm --filter heimdall hash-password` and enter the new password.
-2. In `server/users.ts`, replace that user's `passwordHash` with the new hash. Add or remove users the same way.
-3. Copy the suite up and run `sudo bash axis-suite/deploy/install.sh heimdall` (see the [suite README](../README.md#installing-on-a-server)).
+2. Edit `server/users.ts`: each user is a `{ username, name, passwordHash }` object.
+3. Commit and push, then on the server: `cd ~/axis-suite && git pull && sudo bash deploy/install.sh heimdall`.
 
 After the redeploy, **that user is asked to log in again on every device**. Everyone else stays logged in. Removing or renaming a user ends their sessions the same way. Changing only the display `name` does not. Nobody is locked out by the change, and the service restart clears any lockouts in progress.
 
@@ -66,7 +61,7 @@ sudo rm /var/lib/private/heimdall/sessions.json && sudo systemctl restart heimda
 - **Lockout is per client IP.** It is not per username, so an attacker can't lock a real user out of their account. Three failures in a row lock that IP for 5 minutes. During the lockout, even the correct password is refused. A countdown on the page re-enables the form when the lockout ends.
 - **One user per browser.** While a browser is signed in, any new login from it is refused until **Close session** is clicked. A "Close session" button left open in an old tab never logs out a different user. Separate browsers, browser profiles and private windows keep their own cookies, so they count as separate devices. No website can tell they are on the same computer.
 - **One account can be logged in on several devices at once.** Each login gets its own session, and **Close session** only ends the session on the device where it was clicked.
-- **Sessions end after 48 hours unused, and 14 days after login at the latest.** Using any module, or opening Heimdall's page, restarts the 48 hours, so someone who uses the suite daily signs in about twice a month. A session forgotten on a shared or public computer ends two days after its last use. Clicking **Close session** still ends it at once, and is the right thing to do there. A credentials change also ends it (see _Changing credentials_). The dashboard shows both times.
+- **Sessions end after 48 hours unused, and 14 days after login at the latest.** Using any module, or opening Heimdall's page, restarts the 48 hours, so someone who uses the suite daily signs in about twice a month. A session forgotten on a shared or public computer ends two days after its last use. Clicking **Close session** still ends it at once, and is the right thing to do there. A credentials change also ends it (see _Users and passwords_). The dashboard shows both times.
 - **Sessions survive restarts and reboots.** They are saved to `/var/lib/heimdall/sessions.json`, which holds only hashes of the session tokens, never the cookie values themselves. Lockouts stay in memory, so a restart clears them.
 
 ## Configuration
@@ -81,7 +76,6 @@ Environment variables. On a server, `deploy/install.sh` writes them to `/etc/axi
 | `COOKIE_SECURE=1`        | Only send the cookie over HTTPS.                                                                             |
 | `COOKIE_DOMAIN`          | Scope the cookie to this parent domain so every module's subdomain receives it. Empty: this host only.       |
 | `RETURN_ORIGIN_<MODULE>` | An origin that may send users here with `?next=` and get them back. One per module; the installer adds them. |
-| `RETURN_ORIGINS`         | The same, as a comma-separated list.                                                                         |
 
 ## The contract with other modules
 
@@ -90,5 +84,3 @@ Modules use [`@axis-suite/heimdall-client`](../packages/heimdall-client/README.m
 - **`GET /whoami`** returns `200 {"username","name","expiresAt"}` for the session in the request's `heimdall_sid` cookie, or `401`. A module's server forwards the browser's `Cookie` header here on every request, so closing a session in Heimdall signs the user out of every module immediately. Each call counts as use and restarts the session's 48-hour idle clock. `expiresAt` is when the session ends unless it is used again.
 - **`COOKIE_DOMAIN`** makes `loggbok.example.com` receive the cookie as well as `heimdall.example.com`. Trade-off: the browser now sends it to _every_ subdomain (mail included). It stays HttpOnly, Secure and SameSite=Lax, so page scripts on those sites can't read it, but any server on a subdomain could.
 - **`/?next=<url>`**: after signing in, or right away if they already are, the user goes back to that URL if its origin is registered. A `next` from any other origin is ignored, so this can't be used as an open redirect.
-
-Sessions opened before `COOKIE_DOMAIN` was set use a cookie that only the Heimdall host receives. The first time a module sends that user to `/?next=`, Heimdall moves the session onto the shared domain, without asking them to sign in again.

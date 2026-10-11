@@ -18,4 +18,4 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm check
       - run: pnpm build
-      - run: bash -n deploy/install.sh deploy/node.sh */deploy/hooks.sh
+      - run: bash -n deploy/install.sh deploy/node.sh

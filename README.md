@@ -54,7 +54,6 @@ Every module has the same shape:
   deploy/
     <module>.service systemd unit: runs /opt/<module>/dist/server/index.js as a throwaway user
     <module>.caddy   Caddy site template (@SITE@, @PORT@, @APP_DIR@ are filled in by the installer)
-    hooks.sh         optional: before_install(), for steps only this module needs
   README.md
 ```
 
@@ -104,22 +103,15 @@ sudo ufw status verbose   # check the list, then:
 sudo ufw enable
 ```
 
-**3. Copy the suite up from Windows (PowerShell)**, from the folder that _contains_ `axis-suite`:
-
-```powershell
-tar --exclude=node_modules --exclude=dist --exclude=data --exclude=*.db --exclude=.git -czf axis-suite.tgz axis-suite
-scp axis-suite.tgz youruser@your-vps:~
-```
-
-**4. On the VPS, unpack and install:**
+**3. Clone and install**, in your home directory on the VPS:
 
 ```bash
-tar -xzf axis-suite.tgz
-sudo bash axis-suite/deploy/install.sh heimdall gansoazul.com.br
+git clone https://github.com/diogo431107a-dev/axis-suite.git
+sudo bash axis-suite/deploy/install.sh heimdall example.com
 sudo bash axis-suite/deploy/install.sh loggbok
 ```
 
-To update, repeat steps 3 and 4.
+To update: `cd ~/axis-suite && git pull`, then re-run the installer for each module that changed.
 
 > The installer owns `/etc/caddy/Caddyfile` and rewrites it on every run (an unrelated one is backed up first). Anything else Caddy should serve goes in its own file in `/etc/caddy/sites.d/`; those are kept.
 
@@ -133,13 +125,6 @@ sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh loggbok
 ```
 
 Heimdall is then at https://localhost and Loggbok at https://localhost:8443. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
-
-### Moving from the old per-module installers
-
-Before this layout, Heimdall had its own `heimdall/deploy/install.sh`, and Loggbok ran from a checkout in your home directory as your user. Re-running the installer as above moves both over: Heimdall first (the installer insists), then Loggbok. Loggbok's notes stay where they are (`/var/lib/loggbok`) and systemd hands them to the new service user. Then, when everything works:
-
-- delete the old Loggbok checkout the installer names (`~/loggbok` in WSL),
-- and if nothing else on the server needs it, take back the home-directory access Caddy needed: `chmod o-x ~`.
 
 ## Operating it
 
@@ -194,8 +179,6 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
 
 ## Runtime
 
-The whole suite runs on **one Node.js version**, because a server has a single `/usr/bin/node`. It is set in [`deploy/node.sh`](deploy/node.sh) (currently 22, from NodeSource, which `node:sqlite` needs), along with `.node-version` and the `engines` fields. To move to a newer Node, change all three and re-run the installer for every module. pnpm's version is the `packageManager` field of the root `package.json`.
+The whole suite runs on **one Node.js version**, because a server has a single `/usr/bin/node`. It is set in [`deploy/node.sh`](deploy/node.sh) (currently 22, from NodeSource, which `node:sqlite` needs), along with `.node-version` and the `engines` fields. To move to a newer Node, change all three and re-run the installer for every module. pnpm's version is the `packageManager` field of the root `package.json`. Node 22 is supported until April 2027.
 
-Node 22 is supported until April 2027. Moving to Node 24 is a one-line change in each of those places.
-
-This repository is private: `heimdall/server/users.ts` holds the account list and password hashes.
+This repository is public, and so is `heimdall/server/users.ts` with every account's username and password hash.

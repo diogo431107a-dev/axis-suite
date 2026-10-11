@@ -22,14 +22,8 @@ db.exec("PRAGMA foreign_keys = ON");
 //     PRIMARY KEY (note_id, username)
 //   );
 const migrations: (() => void)[] = [
-  // v1: notes belong to a Heimdall user. Notes from before accounts existed have no owner and are discarded.
+  // v1: notes, each owned by a Heimdall user.
   () => {
-    const old = db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'notes'").get();
-    if (old) {
-      const { n } = db.prepare("SELECT COUNT(*) AS n FROM notes").get() as { n: number };
-      db.exec("DROP TABLE notes");
-      console.log(`Discarded ${n} note(s) from before user accounts`);
-    }
     db.exec(`
       CREATE TABLE notes (
         id         TEXT PRIMARY KEY,
