@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Trash2, Plus, Search, Clock, UserRound } from "lucide-react";
 import {
   SignedOutError,
@@ -10,16 +10,23 @@ import {
   type Me,
 } from "@axis-suite/heimdall-client/browser";
 
-interface Note {
+/** A note as the list shows it (GET /api/notes). */
+interface NoteSummary {
   id: string;
   /** Heimdall username of the note's owner. */
   owner: string;
   /** The signed-in user's role on this note. Sharing will add 'editor' and 'viewer'. */
   role: "owner";
   title: string;
-  content: string;
+  /** The start of the content. The list doesn't get all of it. */
+  preview: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/** A whole note, as GET /api/notes/:id, POST and PUT answer. */
+interface Note extends NoteSummary {
+  content: string;
 }
 
 interface Draft {
@@ -27,27 +34,53 @@ interface Draft {
   title: string;
   content: string;
   createdAt?: string;
+  /** Changed since it was opened or last saved. */
+  dirty: boolean;
 }
 
 const API = "/api/notes";
+const NEW_DRAFT: Draft = { id: null, title: "", content: "", dirty: false };
+
+// One formatter for the whole page. toLocaleString() builds a new one on every call, which is
+// slow when the list formats a date for every note.
+const dateFormat = new Intl.DateTimeFormat("en-US", {
+  year: "numeric",
+  month: "short",
+  day: "numeric",
+  hour: "2-digit",
+  minute: "2-digit",
+});
+const fmt = (iso: string) => dateFormat.format(new Date(iso));
+
+// What the list keeps of a note it just saved.
+function summaryOf({ content: _content, ...summary }: Note): NoteSummary {
+  return summary;
+}
 
 export default function Loggbok() {
   const [me, setMe] = useState<Me | null>(null);
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [draft, setDraft] = useState<Draft>({ id: null, title: "", content: "" });
+  const [notes, setNotes] = useState<NoteSummary[]>([]);
+  const [draft, setDraft] = useState<Draft>(NEW_DRAFT);
   const [search, setSearch] = useState("");
-  const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
-  const [dirty, setDirty] = useState(false);
   // Set when the session ends mid-use. Holds the sign-in URL; the draft is kept.
   const [signedOut, setSignedOut] = useState<string | null>(null);
+  // The search the list shows, so the same one isn't fetched again.
+  const listedQuery = useRef("");
+  // The note being opened. A later click, or New Entry, makes its answer stale.
+  const opening = useRef<string | null>(null);
+
+  const handleError = useCallback((e: unknown) => {
+    if (e instanceof SignedOutError) setSignedOut(signInUrl(e.loginUrl));
+    else console.error(e);
+  }, []);
 
   useEffect(() => {
-    fetchMe()
-      .then(async (user) => {
+    // Both at once. If nobody is signed in, either one fails with SignedOutError.
+    Promise.all([fetchMe(), apiFetch<NoteSummary[]>(API)])
+      .then(([user, list]) => {
+        setNotes(list ?? []);
         setMe(user);
-        setNotes((await apiFetch<Note[]>(API)) ?? []);
-        setLoading(false);
       })
       .catch((e) => {
         if (e instanceof SignedOutError) goToSignIn(e);
@@ -57,17 +90,24 @@ export default function Loggbok() {
 
   // Debounced search — re-queries the server
   useEffect(() => {
-    if (!me) return;
+    const q = search.trim();
+    if (!me || q === listedQuery.current) return;
+    let stale = false;
     const t = setTimeout(async () => {
       try {
-        const url = search.trim() ? `${API}?q=${encodeURIComponent(search.trim())}` : API;
-        setNotes((await apiFetch<Note[]>(url)) ?? []);
+        const list = await apiFetch<NoteSummary[]>(q ? `${API}?q=${encodeURIComponent(q)}` : API);
+        if (stale) return; // the search changed while this one was on its way
+        setNotes(list ?? []);
+        listedQuery.current = q;
       } catch (e) {
         handleError(e); // otherwise leave notes as-is on network error
       }
     }, 250);
-    return () => clearTimeout(t);
-  }, [search, me]);
+    return () => {
+      stale = true;
+      clearTimeout(t);
+    };
+  }, [search, me, handleError]);
 
   // While signed out, check again whenever the user comes back to this tab (e.g. after
   // signing in from the banner's link). Someone else signing in gets a fresh page.
@@ -75,11 +115,6 @@ export default function Loggbok() {
     if (!signedOut || !me) return;
     return watchForSignIn(me.username, () => setSignedOut(null));
   }, [signedOut, me]);
-
-  function handleError(e: unknown) {
-    if (e instanceof SignedOutError) setSignedOut(signInUrl(e.loginUrl));
-    else console.error(e);
-  }
 
   const saveNote = async () => {
     if (!draft.title.trim() && !draft.content.trim()) return;
@@ -91,11 +126,8 @@ export default function Loggbok() {
           body: JSON.stringify({ title, content: draft.content }),
         });
         if (updated) {
-          setNotes((prev) =>
-            prev
-              .map((n) => (n.id === draft.id ? updated : n))
-              .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
-          );
+          // Just saved, so it's now the most recently updated note.
+          setNotes((prev) => [summaryOf(updated), ...prev.filter((n) => n.id !== updated.id)]);
         }
       } else {
         const created = await apiFetch<Note>(API, {
@@ -103,53 +135,57 @@ export default function Loggbok() {
           body: JSON.stringify({ title, content: draft.content }),
         });
         if (created) {
-          setNotes((prev) => [created, ...prev]);
+          setNotes((prev) => [summaryOf(created), ...prev]);
           setDraft((d) => ({ ...d, id: created.id, createdAt: created.createdAt }));
         }
       }
-      setDirty(false);
+      setDraft((d) => ({ ...d, dirty: false }));
       setSignedOut(null);
     } catch (e) {
       handleError(e);
     }
   };
 
-  const deleteNote = async (noteId: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    try {
-      await apiFetch(`${API}/${noteId}`, { method: "DELETE" });
-      setNotes((prev) => prev.filter((n) => n.id !== noteId));
-      if (draft.id === noteId) newNote();
-    } catch (e) {
-      handleError(e);
-    }
-  };
+  // The list only has a preview of each note, so opening one fetches all of it.
+  const openNote = useCallback(
+    async (noteId: string) => {
+      opening.current = noteId;
+      try {
+        const note = await apiFetch<Note>(`${API}/${noteId}`);
+        if (note && opening.current === noteId) {
+          setDraft({ id: note.id, title: note.title, content: note.content, createdAt: note.createdAt, dirty: false });
+        }
+      } catch (e) {
+        handleError(e);
+      }
+    },
+    [handleError],
+  );
 
-  const fmt = (iso: string) =>
-    new Date(iso).toLocaleString("en-US", {
-      year: "numeric",
-      month: "short",
-      day: "numeric",
-      hour: "2-digit",
-      minute: "2-digit",
-    });
+  const deleteNote = useCallback(
+    async (noteId: string) => {
+      try {
+        await apiFetch(`${API}/${noteId}`, { method: "DELETE" });
+        setNotes((prev) => prev.filter((n) => n.id !== noteId));
+        setDraft((d) => (d.id === noteId ? NEW_DRAFT : d));
+      } catch (e) {
+        handleError(e);
+      }
+    },
+    [handleError],
+  );
 
   const savedVersion = draft.id ? notes.find((n) => n.id === draft.id) : null;
 
   function newNote() {
-    setDraft({ id: null, title: "", content: "" });
-    setDirty(false);
-  }
-  function editNote(note: Note) {
-    setDraft({ id: note.id, title: note.title, content: note.content, createdAt: note.createdAt });
-    setDirty(false);
+    opening.current = null;
+    setDraft(NEW_DRAFT);
   }
   function patch(field: "title" | "content", value: string) {
-    setDraft((d) => ({ ...d, [field]: value }));
-    setDirty(true);
+    setDraft((d) => ({ ...d, [field]: value, dirty: true }));
   }
 
-  if (loading || !me) {
+  if (!me) {
     return (
       <div className="flex items-center justify-center h-screen bg-gray-50 text-gray-400 text-sm">
         {loadError || "Loading…"}
@@ -200,37 +236,13 @@ export default function Loggbok() {
         </div>
 
         <div className="flex-1 overflow-y-auto">
-          {notes.length === 0 ? (
-            <p className="p-6 text-center text-sm text-gray-400">
-              {search ? "No matching entries." : "No entries yet."}
-            </p>
-          ) : (
-            notes.map((note) => (
-              <div
-                key={note.id}
-                onClick={() => editNote(note)}
-                className={`group p-4 border-b border-gray-100 cursor-pointer transition-colors
-                ${draft.id === note.id ? "bg-indigo-50 border-l-2 border-l-indigo-500" : "hover:bg-gray-50"}`}
-              >
-                <div className="flex justify-between items-start gap-2 mb-1">
-                  <h3 className="font-medium text-sm text-gray-800 truncate leading-snug">{note.title}</h3>
-                  <button
-                    onClick={(e) => deleteNote(note.id, e)}
-                    title="Delete entry"
-                    className="text-gray-200 hover:text-red-400 transition-colors shrink-0
-                             opacity-0 group-hover:opacity-100"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-                <p className="text-xs text-gray-400 truncate mb-2 leading-snug">{note.content || "No content"}</p>
-                <div className="flex items-center gap-1 text-xs text-gray-300">
-                  <Clock className="w-3 h-3" />
-                  {fmt(note.updatedAt)}
-                </div>
-              </div>
-            ))
-          )}
+          <NoteList
+            notes={notes}
+            selectedId={draft.id}
+            searching={search !== ""}
+            onOpen={openNote}
+            onDelete={deleteNote}
+          />
         </div>
       </div>
 
@@ -270,7 +282,7 @@ export default function Loggbok() {
 
         <div className="px-6 py-3 border-t border-gray-200 bg-white flex justify-between items-center">
           <span className="text-xs text-gray-400">
-            {dirty
+            {draft.dirty
               ? "Unsaved changes"
               : savedVersion
                 ? `Saved ${fmt(savedVersion.updatedAt)}`
@@ -290,3 +302,48 @@ export default function Loggbok() {
     </div>
   );
 }
+
+interface NoteListProps {
+  notes: NoteSummary[];
+  selectedId: string | null;
+  searching: boolean;
+  onOpen: (noteId: string) => void;
+  onDelete: (noteId: string) => void;
+}
+
+// Memoized, so typing in the editor doesn't redraw every note in the list.
+const NoteList = memo(function NoteList({ notes, selectedId, searching, onOpen, onDelete }: NoteListProps) {
+  if (notes.length === 0) {
+    return (
+      <p className="p-6 text-center text-sm text-gray-400">{searching ? "No matching entries." : "No entries yet."}</p>
+    );
+  }
+  return notes.map((note) => (
+    <div
+      key={note.id}
+      onClick={() => onOpen(note.id)}
+      className={`group p-4 border-b border-gray-100 cursor-pointer transition-colors
+      ${selectedId === note.id ? "bg-indigo-50 border-l-2 border-l-indigo-500" : "hover:bg-gray-50"}`}
+    >
+      <div className="flex justify-between items-start gap-2 mb-1">
+        <h3 className="font-medium text-sm text-gray-800 truncate leading-snug">{note.title}</h3>
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(note.id);
+          }}
+          title="Delete entry"
+          className="text-gray-200 hover:text-red-400 transition-colors shrink-0
+                   opacity-0 group-hover:opacity-100"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+        </button>
+      </div>
+      <p className="text-xs text-gray-400 truncate mb-2 leading-snug">{note.preview || "No content"}</p>
+      <div className="flex items-center gap-1 text-xs text-gray-300">
+        <Clock className="w-3 h-3" />
+        {fmt(note.updatedAt)}
+      </div>
+    </div>
+  ));
+});

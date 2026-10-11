@@ -45,14 +45,15 @@ Every endpoint requires a Heimdall session (`401 { error, loginUrl }` without on
 | Method | Path           | Description                                            |
 | ------ | -------------- | ------------------------------------------------------ |
 | GET    | /api/me        | The signed-in user: `{ username, name, accountUrl }`   |
-| GET    | /api/notes     | List the notes you can see                             |
+| GET    | /api/notes     | List the notes you can see, with a preview of each     |
 | GET    | /api/notes?q=  | Search them (title + body)                             |
+| GET    | /api/notes/:id | Read a whole note                                      |
 | POST   | /api/notes     | Create a note: `{ title, content }`                    |
 | PUT    | /api/notes/:id | Update a note: `{ title, content }`                    |
 | DELETE | /api/notes/:id | Delete a note                                          |
 | GET    | /healthz       | `ok` while the service runs (not served through Caddy) |
 
-The server assigns note ids and timestamps. Each note comes back with `owner` (a Heimdall username) and `role` (your access to it, currently always `owner`). A note you can't see answers `404`, the same as one that doesn't exist.
+The server assigns note ids and timestamps. Each note comes back with `owner` (a Heimdall username), `role` (your access to it, currently always `owner`) and `preview` (the first 160 characters of its content). Lists leave out `content`, so they stay small however long the notes are. A note you can't see answers `404`, the same as one that doesn't exist.
 
 ## Installing and data
 

@@ -38,10 +38,17 @@ function noteFields(body: unknown): NoteFields | null {
 // The signed-in user
 app.get("/api/me", auth.me);
 
-// List / search
+// List / search. Each note comes with a preview of its content; GET /api/notes/:id has all of it.
 app.get("/api/notes", (req, res) => {
   const q = typeof req.query.q === "string" ? req.query.q.trim() : "";
   res.json(listNotes(auth.user(req), q));
+});
+
+// Read one note
+app.get("/api/notes/:id", (req, res) => {
+  const found = findNote(req.params.id, auth.user(req));
+  if (!found) return void res.status(404).json(NOT_FOUND);
+  res.json(found.note);
 });
 
 // Create
