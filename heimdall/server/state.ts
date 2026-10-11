@@ -7,7 +7,11 @@ import { USERS, type User } from "./users.ts";
 export const MAX_ATTEMPTS = 3;
 export const LOCKOUT_MS = 5 * 60_000;
 /** Users must log in again this long after logging in, however active they are. */
-export const SESSION_TTL_MS = 14 * 24 * 60 * 60_000;
+export const SESSION_MAX_MS = 14 * 24 * 60 * 60_000;
+/** A session nobody has used for this long ends, e.g. one left open on a shared computer. */
+export const SESSION_IDLE_MS = 48 * 60 * 60_000;
+// Use is recorded at most this often, so the sessions file isn't rewritten on every request.
+const TOUCH_INTERVAL_MS = 5 * 60_000;
 
 // ---- Sessions -------------------------------------------------------------
 
@@ -20,6 +24,9 @@ interface StoredSession {
   /** Fingerprint of the user's password hash at login; see credentialStamp(). */
   stamp: string;
   loginAt: number;
+  /** Last use, by Heimdall's own page or a module asking /whoami. Accurate to TOUCH_INTERVAL_MS. */
+  lastSeenAt: number;
+  /** The hard limit: loginAt + SESSION_MAX_MS. */
   expiresAt: number;
 }
 
@@ -40,19 +47,36 @@ function credentialStamp(user: User): string {
   return createHash("sha256").update(user.passwordHash).digest("base64url").slice(0, 22);
 }
 
-/** The session's user, if the session hasn't expired and their credentials are unchanged. */
-function currentUser(stored: StoredSession): User | null {
-  if (stored.expiresAt <= Date.now()) return null;
-  const user = USERS.find((u) => u.username === stored.username);
-  return user && stored.stamp === credentialStamp(user) ? user : null;
+function findUser(s: StoredSession): User | undefined {
+  return USERS.find((u) => u.username === s.username);
+}
+
+/** Why a stored session can no longer be used, or null if it still can. */
+function endReason(s: StoredSession, now = Date.now()): string | null {
+  if (s.expiresAt <= now) return `${SESSION_MAX_MS / 86_400_000} days since sign-in`;
+  if (now - s.lastSeenAt >= SESSION_IDLE_MS) return `idle for ${SESSION_IDLE_MS / 3_600_000} hours`;
+  const user = findUser(s);
+  if (!user) return "user removed";
+  if (s.stamp !== credentialStamp(user)) return "credentials changed";
+  return null;
+}
+
+/** When the session ends unless it is used again. */
+export function idleEndsAt(s: StoredSession): number {
+  return Math.min(s.lastSeenAt + SESSION_IDLE_MS, s.expiresAt);
 }
 
 function loadSessions(): Map<string, StoredSession> {
   try {
     const entries = JSON.parse(readFileSync(SESSIONS_FILE, "utf8")) as [string, StoredSession][];
-    const valid = entries.filter(([, s]) => currentUser(s));
+    const now = Date.now();
+    // Sessions saved before the idle timeout existed start their idle clock now.
+    for (const [, s] of entries) s.lastSeenAt ??= now;
+    const valid = entries.filter(([, s]) => !endReason(s, now));
     const dropped = entries.length - valid.length;
-    if (dropped > 0) console.log(`Dropped ${dropped} saved session(s): expired, user removed or credentials changed`);
+    if (dropped > 0) {
+      console.log(`Dropped ${dropped} saved session(s): expired, idle, user removed or credentials changed`);
+    }
     return new Map(valid);
   } catch (err) {
     if ((err as NodeJS.ErrnoException).code !== "ENOENT") {
@@ -76,8 +100,14 @@ function saveSessions(): void {
 export function createSession(user: User): { token: string; expiresAt: number } {
   const token = randomBytes(32).toString("base64url");
   const now = Date.now();
-  const expiresAt = now + SESSION_TTL_MS;
-  sessions.set(tokenKey(token), { username: user.username, stamp: credentialStamp(user), loginAt: now, expiresAt });
+  const expiresAt = now + SESSION_MAX_MS;
+  sessions.set(tokenKey(token), {
+    username: user.username,
+    stamp: credentialStamp(user),
+    loginAt: now,
+    lastSeenAt: now,
+    expiresAt,
+  });
   saveSessions();
   return { token, expiresAt };
 }
@@ -87,16 +117,24 @@ export function getSession(token: string | undefined): Session | null {
   const key = tokenKey(token);
   const stored = sessions.get(key);
   if (!stored) return null;
-  const user = currentUser(stored);
-  if (!user) {
-    if (stored.expiresAt > Date.now()) {
-      console.log(`Ended a session for ${stored.username}: user removed or credentials changed`);
-    }
+  const reason = endReason(stored);
+  const user = findUser(stored);
+  if (reason || !user) {
+    console.log(`Ended a session for ${stored.username}: ${reason}`);
     sessions.delete(key);
     saveSessions();
     return null;
   }
   return { ...stored, name: user.name };
+}
+
+/** Records that the session was used, which restarts its idle clock. */
+export function touchSession(token: string | undefined): void {
+  const stored = token ? sessions.get(tokenKey(token)) : undefined;
+  const now = Date.now();
+  if (!stored || now - stored.lastSeenAt < TOUCH_INTERVAL_MS) return;
+  stored.lastSeenAt = now;
+  saveSessions();
 }
 
 export function destroySession(token: string | undefined): void {
@@ -142,12 +180,12 @@ export function clearFailures(key: string): void {
   attempts.delete(key);
 }
 
-// Drop expired sessions and stale attempt records so memory stays bounded.
+// Drop ended sessions and stale attempt records so memory stays bounded.
 setInterval(() => {
   const now = Date.now();
   let expired = false;
   for (const [key, s] of sessions) {
-    if (s.expiresAt <= now) expired = sessions.delete(key);
+    if (endReason(s, now)) expired = sessions.delete(key);
   }
   if (expired) saveSessions();
   for (const [key, r] of attempts) {

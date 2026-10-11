@@ -9,7 +9,7 @@ The suite's sign-in service. Users sign in with hardcoded credentials. After sig
 server/
   index.ts          HTTP routes: GET /, POST /login, POST /logout, GET /whoami, GET /healthz
   users.ts          ← the hardcoded accounts live here
-  state.ts          14-day sessions (saved to disk) + 3-strikes / 5-minute lockout
+  state.ts          sessions (48 h idle / 14 days, saved to disk) + 3-strikes / 5-minute lockout
   views.ts          HTML pages (login, dashboard)
   password.ts       scrypt hashing
   hash-password.ts  CLI to create a hash for a new password
@@ -66,7 +66,7 @@ sudo rm /var/lib/private/heimdall/sessions.json && sudo systemctl restart heimda
 - **Lockout is per client IP.** It is not per username, so an attacker can't lock a real user out of their account. Three failures in a row lock that IP for 5 minutes. During the lockout, even the correct password is refused. A countdown on the page re-enables the form when the lockout ends.
 - **One user per browser.** While a browser is signed in, any new login from it is refused until **Close session** is clicked. A "Close session" button left open in an old tab never logs out a different user. Separate browsers, browser profiles and private windows keep their own cookies, so they count as separate devices. No website can tell they are on the same computer.
 - **One account can be logged in on several devices at once.** Each login gets its own session, and **Close session** only ends the session on the device where it was clicked.
-- **Sessions last 14 days** from login, whether the user is active or not. They end early when the user clicks **Close session**, or when that user's credentials change (see _Changing credentials_). The dashboard shows when the next re-login is due.
+- **Sessions end after 48 hours unused, and 14 days after login at the latest.** Using any module, or opening Heimdall's page, restarts the 48 hours, so someone who uses the suite daily signs in about twice a month. A session forgotten on a shared or public computer ends two days after its last use. Clicking **Close session** still ends it at once, and is the right thing to do there. A credentials change also ends it (see _Changing credentials_). The dashboard shows both times.
 - **Sessions survive restarts and reboots.** They are saved to `/var/lib/heimdall/sessions.json`, which holds only hashes of the session tokens, never the cookie values themselves. Lockouts stay in memory, so a restart clears them.
 
 ## Configuration
@@ -87,7 +87,7 @@ Environment variables. On a server, `deploy/install.sh` writes them to `/etc/axi
 
 Modules use [`@axis-suite/heimdall-client`](../packages/heimdall-client/README.md) rather than talking to these endpoints themselves. Change the two together.
 
-- **`GET /whoami`** returns `200 {"username","name","expiresAt"}` for the session in the request's `heimdall_sid` cookie, or `401`. A module's server forwards the browser's `Cookie` header here on every request, so closing a session in Heimdall signs the user out of every module immediately.
+- **`GET /whoami`** returns `200 {"username","name","expiresAt"}` for the session in the request's `heimdall_sid` cookie, or `401`. A module's server forwards the browser's `Cookie` header here on every request, so closing a session in Heimdall signs the user out of every module immediately. Each call counts as use and restarts the session's 48-hour idle clock. `expiresAt` is when the session ends unless it is used again.
 - **`COOKIE_DOMAIN`** makes `loggbok.example.com` receive the cookie as well as `heimdall.example.com`. Trade-off: the browser now sends it to _every_ subdomain (mail included). It stays HttpOnly, Secure and SameSite=Lax, so page scripts on those sites can't read it, but any server on a subdomain could.
 - **`/?next=<url>`**: after signing in, or right away if they already are, the user goes back to that URL if its origin is registered. A `next` from any other origin is ignored, so this can't be used as an open redirect.
 

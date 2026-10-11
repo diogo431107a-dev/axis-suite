@@ -2,13 +2,15 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import { randomBytes } from "node:crypto";
 import { authenticate } from "./users.ts";
 import {
-  SESSION_TTL_MS,
+  SESSION_MAX_MS,
   clearFailures,
   createSession,
   destroySession,
   getSession,
+  idleEndsAt,
   lockedFor,
   recordFailure,
+  touchSession,
 } from "./state.ts";
 import { formatCountdown, renderDashboard, renderLogin } from "./views.ts";
 
@@ -145,7 +147,7 @@ async function handleLogin(req: IncomingMessage, res: ServerResponse, nonce: str
   destroySession(readCookie(req, COOKIE_NAME)); // never reuse a pre-login session id
   const { token } = createSession(user);
   console.log(`${user.username} logged in from ${ip}`);
-  redirect(res, next ?? "/", { "Set-Cookie": sessionCookies(token, SESSION_TTL_MS / 1000) });
+  redirect(res, next ?? "/", { "Set-Cookie": sessionCookies(token, SESSION_MAX_MS / 1000) });
 }
 
 async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> {
@@ -156,6 +158,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
 
   if (pathname === "/" && (req.method === "GET" || req.method === "HEAD")) {
     const session = getSession(sid);
+    if (session) touchSession(sid);
     const next = returnTo(searchParams.get("next"));
     if (session && sid && next) {
       // Already signed in: go straight back to the app. Re-issuing the cookie moves a session
@@ -177,9 +180,11 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   }
 
   // For sibling apps (e.g. Loggbok): their server forwards the browser's Cookie header here
-  // to learn who is signed in.
+  // to learn who is signed in. Each call counts as use of the session. expiresAt is when the
+  // session ends unless it is used again.
   if (pathname === "/whoami" && req.method === "GET") {
     const session = getSession(sid);
+    if (session) touchSession(sid);
     res.writeHead(session ? 200 : 401, {
       "Content-Type": "application/json; charset=utf-8",
       "Cache-Control": "no-store",
@@ -188,7 +193,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
     res.end(
       JSON.stringify(
         session
-          ? { username: session.username, name: session.name, expiresAt: session.expiresAt }
+          ? { username: session.username, name: session.name, expiresAt: idleEndsAt(session) }
           : { error: "Not signed in" },
       ),
     );

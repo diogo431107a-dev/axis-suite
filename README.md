@@ -25,7 +25,7 @@ browser ──https──▶ Caddy ──▶ heimdall  127.0.0.1:3000   accounts
 ```
 
 - **Shared cookie.** Heimdall sets the session cookie `heimdall_sid`. On a real domain it is scoped to the parent domain (`COOKIE_DOMAIN`), so browsers send it to every module's subdomain. On `localhost` or an IP address all modules share one host, so the cookie needs no domain.
-- **Who is signed in.** Each module's API runs `requireUser` from `@axis-suite/heimdall-client/server`, which forwards the browser's cookie to Heimdall's `GET /whoami` on every request. Closing the session in Heimdall therefore signs the user out of every module at once.
+- **Who is signed in.** Each module's API runs `requireUser` from `@axis-suite/heimdall-client/server`, which forwards the browser's cookie to Heimdall's `GET /whoami` on every request. Closing the session in Heimdall therefore signs the user out of every module at once. Each of those requests also counts as use: a session ends after 48 hours without any, and 14 days after sign-in at the latest.
 - **Return after sign-in.** When nobody is signed in, the module's page sends the browser to Heimdall's `/?next=<page>`. Heimdall only sends users back to origins that were registered with it: the installer gives each module a systemd drop-in, `/etc/systemd/system/heimdall.service.d/origin-<module>.conf`, setting `RETURN_ORIGIN_<MODULE>`.
 - **Keep them in step.** `/whoami`, the cookie and the `?next=` flow are the contract between Heimdall and `packages/heimdall-client`. Change both in the same commit.
 

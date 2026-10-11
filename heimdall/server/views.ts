@@ -1,4 +1,4 @@
-import type { Session } from "./state.ts";
+import { idleEndsAt, type Session } from "./state.ts";
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c] ?? c);
@@ -147,7 +147,8 @@ ${notice ? `<p class="alert" role="alert">${esc(notice)}</p>` : ""}
 <dl class="who">
 <dt>Signed in as</dt><dd>${esc(session.name)} <span class="muted">(${esc(session.username)})</span></dd>
 <dt>Session started</dt><dd class="ts" data-ts="${session.loginAt}">${new Date(session.loginAt).toLocaleString("en-GB")}</dd>
-<dt>Re-login required</dt><dd class="ts" data-ts="${session.expiresAt}">${new Date(session.expiresAt).toLocaleString("en-GB")}</dd>
+<dt>Ends if unused</dt><dd class="ts" data-ts="${idleEndsAt(session)}">${new Date(idleEndsAt(session)).toLocaleString("en-GB")}</dd>
+<dt>Sign-in required by</dt><dd class="ts" data-ts="${session.expiresAt}">${new Date(session.expiresAt).toLocaleString("en-GB")}</dd>
 </dl>
 <form method="post" action="/logout">
 <input type="hidden" name="user" value="${esc(session.username)}">
