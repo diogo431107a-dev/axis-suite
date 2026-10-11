@@ -20,6 +20,8 @@ Work happens on one module at a time, on its own branch (e.g. `odin`), merged in
 
 The VPS updates from its own clone in `~/axis-suite`: `git pull`, then `sudo bash deploy/install.sh <module>`.
 
+The editor of choice is `vim`. When a step means editing a file by hand (e.g. `sudo vim /etc/caddy/sites.d/mail.caddy`), use it, not `nano`.
+
 ## Git
 
 The owner is new to Git, so Claude runs it: branches, commits, merges, and cleaning up merged branches. Explain the result in plain words. The repository is public: confirm before every push.
