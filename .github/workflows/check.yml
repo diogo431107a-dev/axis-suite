@@ -16,6 +16,7 @@ jobs:
           node-version-file: .node-version
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      # Formatting, lint, type-check and every module's tests.
       - run: pnpm check
       - run: pnpm build
       - run: bash -n deploy/install.sh deploy/node.sh

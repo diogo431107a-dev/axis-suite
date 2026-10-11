@@ -10,9 +10,10 @@
     "dev": "pnpm --recursive --parallel dev",
     "build": "pnpm --recursive build",
     "typecheck": "pnpm --recursive typecheck",
+    "test": "pnpm --recursive test",
     "lint": "oxlint",
     "format": "prettier --write .",
-    "check": "prettier --check . && oxlint && pnpm --recursive typecheck"
+    "check": "prettier --check . && oxlint && pnpm --recursive typecheck && pnpm --recursive test"
   },
   "devDependencies": {
     "oxlint": "catalog:",
