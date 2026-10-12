@@ -15,7 +15,7 @@ shared/
   protocol.ts        API types and limits: the wire format, used by the server and the page
   totp.ts            TOTP codes (RFC 6238), otpauth:// links, base32; used by both sides
 server/
-  index.ts           routes, /healthz, recycle-bin purge, graceful shutdown
+  index.ts           routes, /healthz, removed users' vaults, recycle-bin purge, graceful shutdown
   keys.ts            loads the encryption key
   seal.ts            encrypts and decrypts what is stored
   db.ts              SQLite schema and migrations (PRAGMA user_version)
@@ -137,4 +137,4 @@ sudo systemctl start janus
 
 Keep database backups and the key apart: together they open every vault.
 
-Vaults belong to a Heimdall **username**. Renaming a user in Heimdall's `users.ts` leaves their old vault behind under the old name, and it can't be opened under the new one (each value is bound to its owner).
+Vaults belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their vault (recycle bin included) is deleted the next time Janus starts (the installer restarts it when the list of users changes). Renaming a user counts as removing them: the vault under the old name is deleted, and it couldn't be moved to the new name anyway (each value is bound to its owner). Export it before the rename and import it afterwards.

@@ -1,5 +1,5 @@
 import express, { type ErrorRequestHandler } from "express";
-import { heimdallAuth } from "@axis-suite/heimdall-client/server";
+import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
 import { USER_HEADER, type ApiError } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { KeyError, loadKey } from "./keys.ts";
@@ -24,6 +24,17 @@ function openVault(): VaultStore {
   }
 }
 const vault = openVault();
+
+// The vaults of users removed from Heimdall go for good at start-up; the installer restarts this
+// service when Heimdall's list of users changes. VACUUM gives the space back to the disk.
+const known = knownUsers();
+if (known) {
+  const removed = vault.removeUnknownOwners(known);
+  for (const { owner, entries, groups } of removed) {
+    console.log(`Deleted ${entries} entries and ${groups} groups of ${owner}, who is no longer a Heimdall user`);
+  }
+  if (removed.length > 0) db.exec("VACUUM");
+}
 
 // Entries in the recycle bin go for good after 30 days: checked now and once a day.
 function purge() {

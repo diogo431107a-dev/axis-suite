@@ -164,6 +164,18 @@ export function createVault(db: DatabaseSync, sealer: Sealer) {
   );
   const deleteEntryRow = db.prepare("DELETE FROM entries WHERE id = ? AND owner = ?");
   const purgeBin = db.prepare("DELETE FROM entries WHERE deleted_at IS NOT NULL AND deleted_at < ?");
+  // $known: a JSON array of usernames.
+  const UNKNOWN_OWNER = "owner NOT IN (SELECT value FROM json_each($known))";
+  const countUnknownOwners = db.prepare(`
+    SELECT owner, sum(entry) AS entries, sum(1 - entry) AS groups FROM (
+      SELECT owner, 1 AS entry FROM entries WHERE ${UNKNOWN_OWNER}
+      UNION ALL
+      SELECT owner, 0 AS entry FROM groups WHERE ${UNKNOWN_OWNER}
+    ) GROUP BY owner ORDER BY owner`);
+  // Entries first: they point at the groups. Each group points only at groups of its own owner,
+  // and the foreign keys are checked once the whole statement is done.
+  const deleteUnknownEntries = db.prepare(`DELETE FROM entries WHERE ${UNKNOWN_OWNER}`);
+  const deleteUnknownGroups = db.prepare(`DELETE FROM groups WHERE ${UNKNOWN_OWNER}`);
 
   /** Runs `fn` in one transaction. */
   function transaction<T>(fn: () => T): T {
@@ -407,6 +419,21 @@ export function createVault(db: DatabaseSync, sealer: Sealer) {
     purge(now: number = Date.now()): number {
       const before = new Date(now - BIN_DAYS * 24 * 60 * 60_000).toISOString();
       return Number(purgeBin.run(before).changes);
+    },
+
+    /**
+     * Deletes for good the vault (groups and entries, recycle bin included) of every owner who
+     * isn't in `known` (Heimdall's usernames), i.e. of users removed from Heimdall. Returns how
+     * much each of them had.
+     */
+    removeUnknownOwners(known: ReadonlySet<string>): { owner: string; entries: number; groups: number }[] {
+      const $known = JSON.stringify([...known]);
+      return transaction(() => {
+        const removed = countUnknownOwners.all({ $known }) as { owner: string; entries: number; groups: number }[];
+        deleteUnknownEntries.run({ $known });
+        deleteUnknownGroups.run({ $known });
+        return removed;
+      });
     },
 
     /** The whole vault in plain text (recycle bin left out). */

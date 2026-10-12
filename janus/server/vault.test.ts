@@ -215,6 +215,25 @@ describe("vault", () => {
     });
   });
 
+  describe("removeUnknownOwners", () => {
+    it("deletes the whole vault of users no longer in Heimdall, and nobody else's", () => {
+      const top = vault.createGroup("bob", { name: "Top", parentId: null });
+      const sub = vault.createGroup("bob", { name: "Sub", parentId: top.id });
+      newEntry("bob", { groupId: sub.id, title: "in sub" });
+      vault.deleteEntry("bob", newEntry("bob", { groupId: top.id, title: "in bin" }).id);
+      newEntry("bob", { title: "at top" });
+      const mine = vault.createGroup("alice", { name: "Mine", parentId: null });
+      newEntry("alice", { groupId: mine.id, title: "kept" });
+
+      expect(vault.removeUnknownOwners(new Set(["alice"]))).toEqual([{ owner: "bob", entries: 3, groups: 2 }]);
+      expect(vault.load("bob")).toEqual({ groups: [], entries: [] });
+      const alice = vault.load("alice");
+      expect(alice.groups.map((g) => g.name)).toEqual(["Mine"]);
+      expect(alice.entries.map((e: EntrySummary) => e.title)).toEqual(["kept"]);
+      expect(vault.removeUnknownOwners(new Set(["alice"]))).toEqual([]);
+    });
+  });
+
   describe("groups", () => {
     it("renames and moves, but never into itself", () => {
       const a = vault.createGroup("alice", { name: " A ", parentId: null });
