@@ -7,6 +7,7 @@ Small self-hosted web apps ("modules") that share one sign-in. Everything runs o
 | [Heimdall](heimdall/README.md)   | The sign-in service. It holds the user accounts and sessions; the other modules ask it who is signed in. | 3000 | 443        |
 | [Loggbok](loggbok/README.md)     | A notes manager. Each signed-in user sees only their own notes.                                          | 3001 | 8443       |
 | [Yggdrasil](yggdrasil/README.md) | An outliner like Workflowy and Dynalist: one tree of bullets per user, with OPML in and out.             | 3002 | 8444       |
+| [Janus](janus/README.md)         | A password manager like KeePass, with TOTP codes: one encrypted vault per user.                          | 3003 | 8445       |
 
 Shared code lives in `packages/`:
 
@@ -21,7 +22,8 @@ Every module is TypeScript on Node.js 22, built with pnpm, installed by the same
 ```
 browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   accounts, sessions, sign-in page
                         ├──▶ loggbok    127.0.0.1:3001   notes API + static frontend
-                        └──▶ yggdrasil  127.0.0.1:3002   outliner API, live updates + static frontend
+                        ├──▶ yggdrasil  127.0.0.1:3002   outliner API, live updates + static frontend
+                        └──▶ janus      127.0.0.1:3003   password manager API + static frontend
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 ```
@@ -44,6 +46,7 @@ packages/
 heimdall/            sign-in service
 loggbok/             notes
 yggdrasil/           outliner
+janus/               password manager
 ```
 
 Every module has the same shape:
@@ -68,7 +71,7 @@ Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in 
 
 ```bash
 pnpm install
-pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil
+pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus
 ```
 
 Use `127.0.0.1`, not `localhost`: browsers send Heimdall's cookie (`127.0.0.1:3000`) to the other modules only on the same host. Demo accounts: `odin` / `allfather-demo`, `freya` / `folkvangr-demo`, `john` / `john-demo`. Local data goes in each module's `data/` folder, which git ignores.
@@ -114,7 +117,10 @@ git clone https://github.com/diogo431107a-dev/axis-suite.git
 sudo bash axis-suite/deploy/install.sh heimdall example.com
 sudo bash axis-suite/deploy/install.sh loggbok
 sudo bash axis-suite/deploy/install.sh yggdrasil
+sudo bash axis-suite/deploy/install.sh janus
 ```
+
+Janus's first install makes its encryption key, `/etc/axis-suite/janus.key`. Back it up right away, apart from the server: without it, nobody can read the vaults (see [Janus](janus/README.md#installing-and-data)).
 
 To update: `cd ~/axis-suite && git pull`, then re-run the installer for each module that changed.
 
@@ -128,14 +134,15 @@ From inside WSL, as your normal user:
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh heimdall localhost
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh loggbok
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh yggdrasil
+sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh janus
 ```
 
-Heimdall is then at https://localhost, Loggbok at https://localhost:8443 and Yggdrasil at https://localhost:8444. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
+Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444 and Janus at https://localhost:8445. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
 
 ## Operating it
 
 ```bash
-systemctl status heimdall loggbok yggdrasil   # running?
+systemctl status heimdall loggbok yggdrasil janus   # running?
 journalctl -u loggbok -f                      # a module's log
 sudo systemctl restart loggbok                # restart one module
 cat /etc/axis-suite/suite.env                 # the domain and URLs every module was given
@@ -143,11 +150,12 @@ cat /etc/axis-suite/suite.env                 # the domain and URLs every module
 
 Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<module>`, outside `/opt` and readable only by that module's service:
 
-| Module    | Data                 | Location                     |
-| --------- | -------------------- | ---------------------------- |
-| Heimdall  | sessions             | `/var/lib/heimdall/`         |
-| Loggbok   | every user's notes   | `/var/lib/loggbok/notes.db`  |
-| Yggdrasil | every user's outline | `/var/lib/yggdrasil/tree.db` |
+| Module    | Data                                                                   | Location                     |
+| --------- | ---------------------------------------------------------------------- | ---------------------------- |
+| Heimdall  | sessions                                                               | `/var/lib/heimdall/`         |
+| Loggbok   | every user's notes                                                     | `/var/lib/loggbok/notes.db`  |
+| Yggdrasil | every user's outline                                                   | `/var/lib/yggdrasil/tree.db` |
+| Janus     | every user's vault (encrypted; the key is `/etc/axis-suite/janus.key`) | `/var/lib/janus/janus.db`    |
 
 Back up a module's data with its service stopped, and keep the copies where only you can read them:
 
