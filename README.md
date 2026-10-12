@@ -194,6 +194,7 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
    - `package.json` with `dev`, `build`, `typecheck` and `start` scripts, `"files": ["dist"]`, and `"@axis-suite/heimdall-client": "workspace:*"` in `dependencies`. Shared tools (`typescript`, `@types/node`) use `"catalog:"`. Anything only the frontend uses goes in `devDependencies`, since the build bundles it.
    - `server/index.ts`: put `sameOriginWrites` and `requireUser` in front of `/api`, serve `GET /api/me` with `me`, answer `GET /healthz`, and keep data under `STATE_DIRECTORY`. Store users by `username`, and at startup delete the data of owners not in `knownUsers()` (see Loggbok's `removeUnknownOwners`).
    - `web/`: use `apiFetch`, `fetchMe` and `goToSignIn` from `@axis-suite/heimdall-client/browser`.
+   - Narrow windows (below Tailwind's `md`, 768px, e.g. a window snapped to half the screen): the sidebar becomes a slide-in drawer over a dimmed backdrop. A menu button opens it; the backdrop, an X, or picking something closes it. Copy the drawer from Loggbok or Papyrus.
    - `deploy/<module>.service` (copy Loggbok's, change the names) and `deploy/<module>.caddy`.
 3. For local development, add its dev-server origin to `heimdall/dev.env` as `RETURN_ORIGIN_<MODULE>`.
 4. Add it to the module table at the top of this file, then `pnpm install && pnpm check && pnpm build`.
