@@ -81,7 +81,15 @@ app.get("/api/events", (req, res) => {
   events.subscribe(auth.user(req).username, req, res);
 });
 
-const server = app.listen(PORT, HOST, () => console.log(`Listening on http://${HOST}:${PORT}`));
+// Express 5 hands a failure to listen (e.g. the port is taken) to this callback. Exiting with an
+// error lets systemd see it (Restart=on-failure) instead of a quiet, successful exit.
+const server = app.listen(PORT, HOST, (err) => {
+  if (err) {
+    console.error(`Could not listen on ${HOST}:${PORT}: ${err.message}`);
+    process.exit(1);
+  }
+  console.log(`Listening on http://${HOST}:${PORT}`);
+});
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
