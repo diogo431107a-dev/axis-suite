@@ -5,6 +5,7 @@ packages:
   - loggbok
   - yggdrasil
   - janus
+  - papyrus
   - packages/*
 
 # One version of each shared tool for the whole suite. Packages ask for these with "catalog:".

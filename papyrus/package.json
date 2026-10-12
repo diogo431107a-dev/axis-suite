@@ -1,0 +1,43 @@
+{
+  "name": "papyrus",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Papyrus — a journal, one page per day, for every signed-in user",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "start": "node dist/server/index.js",
+    "dev": "concurrently -k -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
+    "dev:web": "vite",
+    "dev:server": "node --conditions=development --watch server/index.ts"
+  },
+  "dependencies": {
+    "@axis-suite/heimdall-client": "workspace:*",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.1.11",
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^9.1.2",
+    "happy-dom": "^20.14.0",
+    "lucide-react": "^0.525.0",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "tailwindcss": "^4.1.11",
+    "typescript": "catalog:",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.11"
+  }
+}
