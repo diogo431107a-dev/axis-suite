@@ -84,6 +84,12 @@ const updateNoteRow = db.prepare(
   `UPDATE notes SET title = ?, content = ?, updated_at = ? WHERE id = ? RETURNING *, ${PREVIEW}`,
 );
 const deleteNoteRow = db.prepare("DELETE FROM notes WHERE id = ?");
+// $known: a JSON array of usernames.
+const UNKNOWN_OWNER = "owner NOT IN (SELECT value FROM json_each($known))";
+const countUnknownOwners = db.prepare(
+  `SELECT owner, count(*) AS rows FROM notes WHERE ${UNKNOWN_OWNER} GROUP BY owner ORDER BY owner`,
+);
+const deleteUnknownOwners = db.prepare(`DELETE FROM notes WHERE ${UNKNOWN_OWNER}`);
 
 export function listNotes(user: HeimdallUser, q: string): NoteSummary[] {
   const rows = (q
@@ -116,4 +122,22 @@ export function updateNote(id: string, user: HeimdallUser, { title, content }: N
 
 export function deleteNote(id: string): void {
   deleteNoteRow.run(id);
+}
+
+/**
+ * Deletes for good the notes of every owner who isn't in `known` (Heimdall's usernames), i.e.
+ * of users removed from Heimdall. Returns how many notes each of them had.
+ */
+export function removeUnknownOwners(known: ReadonlySet<string>): { owner: string; rows: number }[] {
+  const $known = JSON.stringify([...known]);
+  db.exec("BEGIN IMMEDIATE");
+  try {
+    const removed = countUnknownOwners.all({ $known }) as { owner: string; rows: number }[];
+    deleteUnknownOwners.run({ $known });
+    db.exec("COMMIT");
+    return removed;
+  } catch (err) {
+    db.exec("ROLLBACK");
+    throw err;
+  }
 }

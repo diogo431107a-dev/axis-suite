@@ -1,5 +1,5 @@
 import express from "express";
-import { heimdallAuth } from "@axis-suite/heimdall-client/server";
+import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
 import {
   canDelete,
   canEdit,
@@ -7,6 +7,7 @@ import {
   deleteNote,
   findNote,
   listNotes,
+  removeUnknownOwners,
   updateNote,
   type NoteFields,
 } from "./access.ts";
@@ -14,6 +15,17 @@ import { db } from "./db.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3001);
+
+// Notes of users removed from Heimdall go for good at start-up; the installer restarts this
+// service when Heimdall's list of users changes. VACUUM gives the space back to the disk.
+const known = knownUsers();
+if (known) {
+  const removed = removeUnknownOwners(known);
+  for (const { owner, rows } of removed) {
+    console.log(`Deleted ${rows} notes of ${owner}, who is no longer a Heimdall user`);
+  }
+  if (removed.length > 0) db.exec("VACUUM");
+}
 
 const auth = heimdallAuth();
 const app = express();

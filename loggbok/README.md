@@ -27,7 +27,7 @@ deploy/
 2. If nobody is signed in, the API answers `401 { loginUrl }`. The page then sends the browser to Heimdall's `/?next=<this page>`, and Heimdall sends it back after sign-in.
 3. If the session ends while someone is writing, a banner asks them to sign in again in a new tab. The draft stays. If a _different_ user signs in, the page reloads with that user's notes.
 
-Notes belong to a Heimdall **username**. Renaming a user in Heimdall's `users.ts` leaves their old notes behind under the old name. Changing only the display name is fine.
+Notes belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their notes are deleted the next time Loggbok starts (the installer restarts it when the list of users changes). Renaming a user counts as removing them: the notes under the old name are deleted. Changing only the display name is fine.
 
 ## Local development
 
