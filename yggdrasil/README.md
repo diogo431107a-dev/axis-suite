@@ -12,9 +12,9 @@ An outliner in the style of Workflowy and Dynalist. Each signed-in user has one 
 ```
 shared/protocol.ts   nodes, ops and limits: the wire format, used by the server and the page
 server/
-  index.ts           routes, /healthz, purge timer, graceful shutdown
+  index.ts           routes, /healthz, removed users' trees, purge timer, graceful shutdown
   db.ts              SQLite schema and migrations (PRAGMA user_version)
-  tree.ts            the only place nodes are read and written: load, changes, ops, purge
+  tree.ts            the only place nodes are read and written: load, changes, ops, purge, removed users
   events.ts          server-sent events, one stream per open tab
 web/
   model/             the tree in the browser (store), editing commands, undo, sync, UI state
@@ -108,4 +108,4 @@ sudo install -m 600 -o "$USER" /var/lib/yggdrasil/tree.db ~/tree-backup-$(date +
 sudo systemctl start yggdrasil
 ```
 
-Bullets belong to a Heimdall **username**. Renaming a user in Heimdall's `users.ts` leaves their old tree behind under the old name.
+Bullets belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their tree is deleted the next time Yggdrasil starts (the installer restarts it when the list of users changes). Renaming a user counts as removing them: the tree under the old name is deleted.

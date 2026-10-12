@@ -1,5 +1,5 @@
 import express from "express";
-import { heimdallAuth } from "@axis-suite/heimdall-client/server";
+import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
 import { LIMITS, USER_HEADER } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { createEvents } from "./events.ts";
@@ -12,6 +12,17 @@ const db = openDatabase(DB_FILE);
 console.log(`Tree database: ${DB_FILE}`);
 const tree = createTree(db);
 const events = createEvents();
+
+// The trees of users removed from Heimdall go for good at start-up; the installer restarts this
+// service when Heimdall's list of users changes. VACUUM gives the space back to the disk.
+const known = knownUsers();
+if (known) {
+  const removed = tree.removeUnknownOwners(known);
+  for (const { owner, rows } of removed) {
+    console.log(`Deleted ${rows} bullets of ${owner}, who is no longer a Heimdall user`);
+  }
+  if (removed.length > 0) db.exec("VACUUM");
+}
 
 // Deleted bullets go for good after 30 days: checked now and once a day.
 function purge() {

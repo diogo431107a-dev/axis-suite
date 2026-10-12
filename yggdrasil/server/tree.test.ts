@@ -215,3 +215,32 @@ describe("changesSince", () => {
     expect(visible()).toBe("keep");
   });
 });
+
+describe("removeUnknownOwners", () => {
+  it("deletes every bullet of users no longer in Heimdall, and nobody else's", () => {
+    const [a, b, c, f1, f2, f3] = [randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID(), randomUUID()];
+    apply([
+      { op: "create", id: a, parentId: null, rank: "a0", content: "A" },
+      { op: "create", id: b, parentId: a, rank: "a0", content: "B" },
+      { op: "create", id: c, parentId: null, rank: "a1", content: "C" },
+    ]);
+    apply([{ op: "delete", id: c }]);
+    apply(
+      [
+        { op: "create", id: f1, parentId: null, rank: "a0", content: "F1" },
+        { op: "create", id: f2, parentId: f1, rank: "a0", content: "F2" },
+        { op: "create", id: f3, parentId: null, rank: "a1", content: "F3" },
+      ],
+      FREYA,
+    );
+    apply([{ op: "delete", id: f3 }], FREYA);
+    const rev = tree.currentRev();
+
+    expect(tree.removeUnknownOwners(new Set([ODIN]))).toEqual([{ owner: FREYA, rows: 3 }]);
+    expect(visible(FREYA)).toBe("");
+    expect(tree.changesSince(FREYA, 0)).toEqual({ rev, nodes: [] });
+    expect(visible()).toBe("A(B)");
+    expect(apply([{ op: "restore", id: c }]).rejected).toEqual([]);
+    expect(tree.removeUnknownOwners(new Set([ODIN]))).toEqual([]);
+  });
+});

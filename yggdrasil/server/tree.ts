@@ -87,6 +87,12 @@ export function createTree(db: DatabaseSync) {
     )
     UPDATE nodes SET rev = $rev WHERE id IN (SELECT id FROM sub)`);
   const purgeDeleted = db.prepare("DELETE FROM nodes WHERE deleted_at IS NOT NULL AND deleted_at < ?");
+  // $known: a JSON array of usernames.
+  const UNKNOWN_OWNER = "owner NOT IN (SELECT value FROM json_each($known))";
+  const countUnknownOwners = db.prepare(
+    `SELECT owner, count(*) AS rows FROM nodes WHERE ${UNKNOWN_OWNER} GROUP BY owner ORDER BY owner`,
+  );
+  const deleteUnknownOwners = db.prepare(`DELETE FROM nodes WHERE ${UNKNOWN_OWNER}`);
   // One statement per set of changed fields, compiled the first time it is needed.
   const updateStatements = new Map<string, ReturnType<DatabaseSync["prepare"]>>();
 
@@ -249,6 +255,20 @@ export function createTree(db: DatabaseSync) {
           setMeta.run(rev, "purged_rev");
         }
         return Number(changes);
+      });
+    },
+
+    /**
+     * Deletes for good the bullets of every owner who isn't in `known` (Heimdall's usernames),
+     * i.e. of users removed from Heimdall. Returns how many bullets each of them had. No
+     * revision is needed: nobody left can see those bullets.
+     */
+    removeUnknownOwners(known: ReadonlySet<string>): { owner: string; rows: number }[] {
+      const $known = JSON.stringify([...known]);
+      return transaction(() => {
+        const removed = countUnknownOwners.all({ $known }) as { owner: string; rows: number }[];
+        deleteUnknownOwners.run({ $known });
+        return removed;
       });
     },
   };
