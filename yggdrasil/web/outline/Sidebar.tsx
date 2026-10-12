@@ -1,11 +1,12 @@
-// The file pane: starred bullets, top-level bullets and every tag with its count. Built from the
-// whole tree, so it updates a moment after typing (useDeferredValue) rather than on every key.
+// The file pane: starred bullets, top-level bullets, and the tags inside the zoomed-in bullet with
+// their counts. Built from the whole tree, so it updates a moment after typing (useDeferredValue)
+// rather than on every key.
 import { useDeferredValue, useMemo, useRef, type ReactNode } from "react";
 import { Download, Hash, Star, Upload } from "lucide-react";
 import type { Node } from "../../shared/protocol.ts";
 import { importFile } from "../io/importer.ts";
 import type { Store } from "../model/store.ts";
-import { derived } from "../search/match.ts";
+import { tagCounts } from "../search/run.ts";
 import { plainText } from "../text/plain.ts";
 import { useOutliner, useTreeVersion, useView } from "./hooks.ts";
 import { pathOf, zoomTo } from "./nav.ts";
@@ -13,19 +14,16 @@ import { pathOf, zoomTo } from "./nav.ts";
 interface Overview {
   starred: Node[];
   top: Node[];
-  tags: [string, number][];
 }
 
 /** Walks the visible tree once: deleted bullets and what is under them don't count. */
 function overview(store: Store): Overview {
   const starred: Node[] = [];
-  const counts = new Map<string, number>();
   const walk = (parentId: string | null) => {
     for (const id of store.children(parentId)) {
       const node = store.get(id)!;
       if (node.deletedAt !== null) continue;
       if (node.starred) starred.push(node);
-      for (const tag of new Set(derived(node).tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
       walk(id);
     }
   };
@@ -34,18 +32,21 @@ function overview(store: Store): Overview {
     .children(null)
     .map((id) => store.get(id)!)
     .filter((n) => n.deletedAt === null);
-  const tags = [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
-  return { starred, top, tags };
+  return { starred, top };
 }
 
 export function Sidebar({ onPick }: { onPick?: () => void }) {
   const o = useOutliner();
   const fileInput = useRef<HTMLInputElement>(null);
   const version = useDeferredValue(useTreeVersion());
-  const { zoom } = useView();
+  const { zoom, showCompleted } = useView();
   // version is what changes; the store itself is always the same object.
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   const data = useMemo(() => overview(o.store), [o, version]);
+  // Like search, the tags are those inside the zoomed-in bullet: Home lists them all.
+  // oxlint-disable-next-line react-hooks/exhaustive-deps
+  const tags = useMemo(() => tagCounts(o.store, zoom, showCompleted), [o, version, zoom, showCompleted]);
+  const zoomName = zoom && (plainText(o.store.get(zoom)?.content ?? "") || "Untitled");
 
   const go = (id: string) => {
     zoomTo(o, id);
@@ -80,9 +81,9 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
       <Section title="Top level">
         {data.top.length > 0 ? data.top.map((n) => link(n)) : <li className="px-2 text-gray-400">Nothing yet</li>}
       </Section>
-      {data.tags.length > 0 && (
-        <Section title="Tags">
-          {data.tags.map(([tag, count]) => (
+      {tags.length > 0 && (
+        <Section title={zoomName ? `Tags in ${zoomName}` : "Tags"}>
+          {tags.map(([tag, count]) => (
             <li key={tag}>
               <button
                 type="button"
@@ -139,7 +140,9 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
 function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section>
-      <h2 className="mb-1 px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">{title}</h2>
+      <h2 title={title} className="mb-1 truncate px-2 text-xs font-semibold uppercase tracking-wide text-gray-400">
+        {title}
+      </h2>
       <ul className="space-y-px">{children}</ul>
     </section>
   );

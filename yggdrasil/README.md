@@ -67,6 +67,8 @@ Click any text to edit it; the caret lands on the character you clicked. A bulle
 
 **Search** (Ctrl+F) looks inside the zoomed-in bullet and combines: words (all must match, ignoring case and accents), `"exact phrases"`, `-word` to exclude, `#tag`, `@who`, `is:completed`, `has:note`, `has:date`, `date:today`, `date:tomorrow`, `date:overdue`, `before:YYYY-MM-DD` and `after:YYYY-MM-DD`.
 
+The sidebar's **Tags** list follows the same scope: it shows the tags inside the zoomed-in bullet (collapsed bullets included, completed ones only while they are shown), with how many bullets carry each, and clicking one searches for it. Zoom out to Home for every tag in the tree. Starred and top-level bullets are always listed.
+
 **OPML.** Import an OPML file from the sidebar, or drop it on the outline. Everything lands under a new bullet "Imported <file> <date>" in the zoomed-in bullet, as one undo step. Dynalist exports keep their markdown; Workflowy's HTML formatting becomes markdown. Export (sidebar, or a bullet's menu) writes a bullet or the whole tree as OPML 2.0, plain indented text or Markdown.
 
 ## Local development

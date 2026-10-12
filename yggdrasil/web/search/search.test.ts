@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import type { Node } from "../../shared/protocol.ts";
-import { newNode } from "../model/store.ts";
+import { Store, newNode } from "../model/store.ts";
 import { dateLabel, localDate, nextDay } from "../text/dates.ts";
 import { matches } from "./match.ts";
 import { normalize, parseQuery } from "./query.ts";
+import { tagCounts } from "./run.ts";
 
 const node = (content: string, extra: Partial<Node> = {}): Node => ({ ...newNode("n", null, "a0"), content, ...extra });
 const TODAY = "2026-10-11";
@@ -89,5 +90,65 @@ describe("dates", () => {
       new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(new Date(2026, 9, 14)),
     );
     expect(dateLabel("2027-03-01", TODAY)).toContain("2027");
+  });
+});
+
+describe("tagCounts", () => {
+  const DONE = "2026-10-01T00:00:00Z";
+  // work
+  //   project #plan
+  //     deep #oddlyspecific (collapsed)
+  //       deeper #oddlyspecific #plan
+  //     finished #plan (completed)
+  //     gone #plan (deleted)
+  // home #plan
+  const tree = () => {
+    const s = new Store();
+    const n = (id: string, parentId: string | null, rank: string, content: string, extra: Partial<Node> = {}) => ({
+      ...newNode(id, parentId, rank),
+      content,
+      ...extra,
+    });
+    s.load([
+      n("work", null, "a0", "work"),
+      n("project", "work", "a0", "project #plan"),
+      n("deep", "project", "a0", "deep #OddlySpecific", { collapsed: true }),
+      n("deeper", "deep", "a0", "deeper #oddlyspecific #plan #plan"),
+      n("finished", "project", "a1", "finished #plan", { completedAt: DONE }),
+      n("gone", "project", "a2", "gone #plan", { deletedAt: DONE }),
+      n("home", null, "a1", "home #plan"),
+    ]);
+    return s;
+  };
+
+  it("counts every tag in the tree at the top level, once per bullet", () => {
+    expect(tagCounts(tree(), null, true)).toEqual([
+      ["plan", 4],
+      ["oddlyspecific", 2],
+    ]);
+  });
+
+  it("counts only inside the zoomed-in bullet, not the bullet itself, collapsed or not", () => {
+    const s = tree();
+    expect(tagCounts(s, "work", true)).toEqual([
+      ["plan", 3],
+      ["oddlyspecific", 2],
+    ]);
+    expect(tagCounts(s, "project", true)).toEqual([
+      ["oddlyspecific", 2],
+      ["plan", 2],
+    ]);
+    expect(tagCounts(s, "deep", true)).toEqual([
+      ["oddlyspecific", 1],
+      ["plan", 1],
+    ]);
+    expect(tagCounts(s, "home", true)).toEqual([]);
+  });
+
+  it("leaves out completed bullets while they are hidden, and deleted ones always", () => {
+    expect(tagCounts(tree(), "project", false)).toEqual([
+      ["oddlyspecific", 2],
+      ["plan", 1],
+    ]);
   });
 });

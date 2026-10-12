@@ -1,7 +1,7 @@
 // Runs a search over the tree inside the zoomed-in bullet: the bullets that match, and the
 // ones to show (the matches and their ancestors).
 import type { Store } from "../model/store.ts";
-import { matches } from "./match.ts";
+import { derived, matches } from "./match.ts";
 import { mentionsCompleted, type Term } from "./query.ts";
 
 export interface SearchResult {
@@ -41,6 +41,24 @@ export function runSearch(
   };
   walk(root);
   return { filter, matches: matched };
+}
+
+/**
+ * The tags inside root (not on root itself) and how many bullets carry each, most used first.
+ * It looks at the bullets a search does, so the list matches what clicking a tag finds.
+ */
+export function tagCounts(store: Store, root: string | null, showCompleted: boolean): [string, number][] {
+  const counts = new Map<string, number>();
+  const walk = (parentId: string | null) => {
+    for (const id of store.children(parentId)) {
+      const node = store.get(id)!;
+      if (node.deletedAt !== null || (!showCompleted && node.completedAt !== null)) continue;
+      for (const tag of new Set(derived(node).tags)) counts.set(tag, (counts.get(tag) ?? 0) + 1);
+      walk(id);
+    }
+  };
+  walk(root);
+  return [...counts].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1));
 }
 
 export function sameSet(a: ReadonlySet<string> | null, b: ReadonlySet<string> | null): boolean {
