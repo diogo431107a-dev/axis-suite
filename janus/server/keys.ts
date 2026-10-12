@@ -10,6 +10,9 @@ import { dirname, join } from "node:path";
 // In development it is data/janus.key, made on first run.
 
 export const KEY_BYTES = 32;
+
+/** The key is missing or malformed. */
+export class KeyError extends Error {}
 const CREDENTIAL = "janus-key";
 const DEV_KEY_FILE = join("data", "janus.key");
 
@@ -17,10 +20,11 @@ const DEV_KEY_FILE = join("data", "janus.key");
 export function loadKey(env: NodeJS.ProcessEnv = process.env): Buffer {
   if (env.CREDENTIALS_DIRECTORY) {
     const file = join(env.CREDENTIALS_DIRECTORY, CREDENTIAL);
+    if (!existsSync(file)) throw new KeyError(`No encryption key at ${file}: check LoadCredential= in janus.service`);
     return parseKey(readFileSync(file, "utf8"), file);
   }
   if (env.NODE_ENV === "production") {
-    throw new Error(
+    throw new KeyError(
       `No encryption key: the service must be started with LoadCredential=${CREDENTIAL}:/etc/axis-suite/janus.key`,
     );
   }
@@ -39,7 +43,7 @@ export function parseKey(text: string, source: string): Buffer {
   const key = Buffer.from(encoded, "base64");
   // Buffer.from skips characters that aren't base64, so check that nothing was skipped.
   if (key.length !== KEY_BYTES || key.toString("base64") !== encoded) {
-    throw new Error(
+    throw new KeyError(
       `${source} must hold ${KEY_BYTES} random bytes in base64 (e.g. from: head -c 32 /dev/urandom | base64)`,
     );
   }

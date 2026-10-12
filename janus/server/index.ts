@@ -2,17 +2,28 @@ import express, { type ErrorRequestHandler } from "express";
 import { heimdallAuth } from "@axis-suite/heimdall-client/server";
 import { USER_HEADER, type ApiError } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
-import { loadKey } from "./keys.ts";
+import { KeyError, loadKey } from "./keys.ts";
 import { createSealer } from "./seal.ts";
-import { VaultError, createVault } from "./vault.ts";
+import { KeyMismatchError, VaultError, createVault, type VaultStore } from "./vault.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3003);
 
 const db = openDatabase(DB_FILE);
 console.log(`Vault database: ${DB_FILE}`);
-// Refuses to start if the key is missing, or isn't the one the database was made with.
-const vault = createVault(db, createSealer(loadKey()));
+
+// Refuses to start if the key is missing, or isn't the one the database was made with. Those are
+// problems with the installation, not bugs: one line in the journal says what to do.
+function openVault(): VaultStore {
+  try {
+    return createVault(db, createSealer(loadKey()));
+  } catch (err) {
+    if (!(err instanceof KeyError || err instanceof KeyMismatchError)) throw err;
+    console.error(`Janus can't start: ${err.message}`);
+    process.exit(1);
+  }
+}
+const vault = openVault();
 
 // Entries in the recycle bin go for good after 30 days: checked now and once a day.
 function purge() {

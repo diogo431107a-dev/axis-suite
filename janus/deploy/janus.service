@@ -1,0 +1,43 @@
+[Unit]
+Description=Janus, the Axis Suite password manager API
+After=network.target heimdall.service
+
+[Service]
+Type=simple
+# A throwaway system user is created for each run; it can only write to its StateDirectory.
+DynamicUser=yes
+WorkingDirectory=/opt/janus
+# Every user's vault lives in /var/lib/janus (passed to the app as STATE_DIRECTORY), encrypted.
+StateDirectory=janus
+StateDirectoryMode=0700
+UMask=0077
+# The encryption key, kept apart from the vaults. axis-suite/deploy/install.sh makes it on the first
+# install and never replaces it. systemd copies it where only this service can read it
+# ($CREDENTIALS_DIRECTORY/janus-key); the service refuses to start without it, or with another key.
+LoadCredential=janus-key:/etc/axis-suite/janus.key
+# Written by axis-suite/deploy/install.sh: the suite's domain and Heimdall's URLs,
+# then this module's HOST, PORT and PUBLIC_URL.
+EnvironmentFile=/etc/axis-suite/suite.env
+EnvironmentFile=/etc/axis-suite/janus.env
+Environment=NODE_ENV=production
+ExecStart=/usr/bin/node /opt/janus/dist/server/index.js
+Restart=on-failure
+RestartSec=2
+
+# Hardening. Keep this block the same in every module's unit.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=yes
+LockPersonality=yes
+CapabilityBoundingSet=
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target
