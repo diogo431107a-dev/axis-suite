@@ -143,6 +143,17 @@ printf '%s\n' "# Written by axis-suite/deploy/install.sh from deploy/modules.con
   "HOST=127.0.0.1" "PORT=$PORT" "PUBLIC_URL=$URL" >"$CONF_DIR/$MODULE.env"
 chmod 644 "$CONF_DIR/suite.env" "$CONF_DIR/$MODULE.env"
 
+# A module whose unit loads $CONF_DIR/<module>.key (LoadCredential=) gets that key on its first
+# install: 32 random bytes, readable by root only; systemd hands it to the service. An existing
+# key is never replaced, since what was encrypted with it can't be read with another one.
+KEY_FILE="$CONF_DIR/$MODULE.key"
+if grep -q "^LoadCredential=.*:$KEY_FILE$" "$MODULE_DIR/deploy/$MODULE.service" && [[ ! -e $KEY_FILE ]]; then
+  echo "==> Making $MODULE's key: $KEY_FILE"
+  echo "    Back it up now, somewhere safe and apart from the server: without it, $MODULE's data can't be read."
+  (umask 077 && head -c 32 /dev/urandom | base64 >"$KEY_FILE.new")
+  mv "$KEY_FILE.new" "$KEY_FILE"
+fi
+
 # ---- Service ---------------------------------------------------------------------------------
 
 echo "==> Installing to $APP_DIR and (re)starting the $MODULE service"
