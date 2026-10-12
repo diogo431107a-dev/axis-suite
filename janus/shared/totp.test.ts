@@ -64,10 +64,11 @@ describe("totp (RFC 6238 appendix B)", () => {
     expect((await totp(params("SHA256"), time * 1000)).code).toBe(sha256);
     expect((await totp(params("SHA512"), time * 1000)).code).toBe(sha512);
   });
-  it("counts down the seconds left in the period", async () => {
+  it("counts down the time left in the period, to the millisecond", async () => {
     expect((await totp(params("SHA1"), 59_000)).remaining).toBe(1);
+    expect((await totp(params("SHA1"), 59_999)).remaining).toBeCloseTo(0.001);
     expect((await totp(params("SHA1"), 60_000)).remaining).toBe(30);
-    expect((await totp(params("SHA1"), 60_999)).remaining).toBe(30);
+    expect((await totp(params("SHA1"), 60_999)).remaining).toBeCloseTo(29.001);
   });
   it("pads short codes with zeros", async () => {
     // 07081804 has a leading zero at 8 digits; at 6 it is the last six digits.

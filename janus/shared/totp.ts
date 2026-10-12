@@ -93,16 +93,16 @@ export interface TotpCode {
   code: string;
   /** seconds each code lasts */
   period: number;
-  /** seconds until this code is replaced (1 to period) */
+  /** seconds until this code is replaced, to the millisecond (just above 0 to period) */
   remaining: number;
 }
 
 /** The code at `now` (milliseconds since 1970). */
 export async function totp(params: TotpParams, now: number = Date.now()): Promise<TotpCode> {
-  const seconds = Math.floor(now / 1000);
-  const counter = Math.floor(seconds / params.period);
+  const periodMs = params.period * 1000;
+  const counter = Math.floor(now / periodMs);
   const code = await hotp(decodeBase32(params.secret), counter, params.digits, params.algorithm);
-  return { code, period: params.period, remaining: params.period - (seconds % params.period) };
+  return { code, period: params.period, remaining: (periodMs - (now % periodMs)) / 1000 };
 }
 
 /** Checks parameters from anywhere (a form, an import). Returns them cleaned up, or what is wrong. */
