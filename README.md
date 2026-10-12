@@ -9,6 +9,7 @@ Small self-hosted web apps ("modules") that share one sign-in. Everything runs o
 | [Yggdrasil](yggdrasil/README.md) | An outliner like Workflowy and Dynalist: one tree of bullets per user, with OPML in and out.             | 3002 | 8444       |
 | [Janus](janus/README.md)         | A password manager like KeePass, with TOTP codes: one encrypted vault per user.                          | 3003 | 8445       |
 | [Papyrus](papyrus/README.md)     | A journal: a page for every day in each of a user's journals, with moods, #tags and "On this day".       | 3004 | 8446       |
+| [Vinr](vinr/README.md)           | A contacts manager: phones, emails, addresses, birthdays and groups, with vCard in and out.              | 3005 | 8447       |
 
 Shared code lives in `packages/`:
 
@@ -25,7 +26,8 @@ browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   account
                         ├──▶ loggbok    127.0.0.1:3001   notes API + static frontend
                         ├──▶ yggdrasil  127.0.0.1:3002   outliner API, live updates + static frontend
                         ├──▶ janus      127.0.0.1:3003   password manager API + static frontend
-                        └──▶ papyrus    127.0.0.1:3004   journal API + static frontend
+                        ├──▶ papyrus    127.0.0.1:3004   journal API + static frontend
+                        └──▶ vinr       127.0.0.1:3005   contacts API + static frontend
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 ```
@@ -51,6 +53,7 @@ loggbok/             notes
 yggdrasil/           outliner
 janus/               password manager
 papyrus/             journal
+vinr/                contacts
 ```
 
 Every module has the same shape:
@@ -75,7 +78,7 @@ Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in 
 
 ```bash
 pnpm install
-pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus
+pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr
 ```
 
 Use `127.0.0.1`, not `localhost`: browsers send Heimdall's cookie (`127.0.0.1:3000`) to the other modules only on the same host. Demo accounts: `odin` / `allfather-demo`, `freya` / `folkvangr-demo`, `john` / `john-demo`. Local data goes in each module's `data/` folder, which git ignores.
@@ -123,6 +126,7 @@ sudo bash axis-suite/deploy/install.sh loggbok
 sudo bash axis-suite/deploy/install.sh yggdrasil
 sudo bash axis-suite/deploy/install.sh janus
 sudo bash axis-suite/deploy/install.sh papyrus
+sudo bash axis-suite/deploy/install.sh vinr
 ```
 
 Janus's first install makes its encryption key, `/etc/axis-suite/janus.key`. Back it up right away, apart from the server: without it, nobody can read the vaults (see [Janus](janus/README.md#installing-and-data)).
@@ -141,17 +145,18 @@ sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh loggbok
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh yggdrasil
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh janus
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh papyrus
+sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh vinr
 ```
 
-Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445 and Papyrus at https://localhost:8446. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
+Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446 and Vinr at https://localhost:8447. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
 
 ## Operating it
 
 ```bash
-systemctl status heimdall loggbok yggdrasil janus papyrus   # running?
-journalctl -u loggbok -f                                    # a module's log
-sudo systemctl restart loggbok                              # restart one module
-cat /etc/axis-suite/suite.env                               # the domain, URLs and usernames every module was given
+systemctl status heimdall loggbok yggdrasil janus papyrus vinr   # running?
+journalctl -u loggbok -f                                         # a module's log
+sudo systemctl restart loggbok                                   # restart one module
+cat /etc/axis-suite/suite.env                                    # the domain, URLs and usernames every module was given
 ```
 
 Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<module>`, outside `/opt` and readable only by that module's service:
@@ -163,6 +168,7 @@ Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<modul
 | Yggdrasil | every user's outline                                                   | `/var/lib/yggdrasil/tree.db`  |
 | Janus     | every user's vault (encrypted; the key is `/etc/axis-suite/janus.key`) | `/var/lib/janus/janus.db`     |
 | Papyrus   | every user's journals                                                  | `/var/lib/papyrus/papyrus.db` |
+| Vinr      | every user's contacts                                                  | `/var/lib/vinr/vinr.db`       |
 
 Back up a module's data with its service stopped, and keep the copies where only you can read them:
 
