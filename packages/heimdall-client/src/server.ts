@@ -103,3 +103,17 @@ export function heimdallAuth(options: HeimdallOptions = {}) {
 
   return { requireUser, sameOriginWrites, user, me, publicUrl };
 }
+
+/**
+ * Every username in Heimdall, from $AXIS_USERS (comma-separated, written into suite.env by
+ * deploy/install.sh), or null when it isn't set. A module deletes the data of owners not in
+ * this set when it starts. Null means the list is unknown (development, or Heimdall not yet
+ * installed): delete nothing then.
+ */
+export function knownUsers(env: NodeJS.ProcessEnv = process.env): ReadonlySet<string> | null {
+  const names = (env.AXIS_USERS ?? "")
+    .split(",")
+    .map((name) => name.trim())
+    .filter(Boolean);
+  return names.length > 0 ? new Set(names) : null;
+}

@@ -31,6 +31,7 @@ each module's API ── GET /whoami ──▶ heimdall (server to server, with 
 - **Shared cookie.** Heimdall sets the session cookie `heimdall_sid`. On a real domain it is scoped to the parent domain (`COOKIE_DOMAIN`), so browsers send it to every module's subdomain. On `localhost` or an IP address all modules share one host, so the cookie needs no domain.
 - **Who is signed in.** Each module's API runs `requireUser` from `@axis-suite/heimdall-client/server`, which forwards the browser's cookie to Heimdall's `GET /whoami` on every request. Closing the session in Heimdall therefore signs the user out of every module at once. Each of those requests also counts as use: a session ends after 48 hours without any, and 14 days after sign-in at the latest.
 - **Return after sign-in.** When nobody is signed in, the module's page sends the browser to Heimdall's `/?next=<page>`. Heimdall only sends users back to origins that were registered with it: the installer gives each module a systemd drop-in, `/etc/systemd/system/heimdall.service.d/origin-<module>.conf`, setting `RETURN_ORIGIN_<MODULE>`.
+- **Removed users leave nothing behind.** The installer writes Heimdall's usernames into `/etc/axis-suite/suite.env` as `AXIS_USERS`, and restarts every module when that list changes. When a module starts, it deletes the data of every owner not on the list (`knownUsers()` from `@axis-suite/heimdall-client/server`), logs what it deleted, and compacts its database. So removing or renaming a user in Heimdall deletes their data everywhere on the next deploy. Without the list (development, or Heimdall not installed yet), nothing is deleted.
 - **Keep them in step.** `/whoami`, the cookie and the `?next=` flow are the contract between Heimdall and `packages/heimdall-client`. Change both in the same commit.
 
 ## Repository layout
@@ -145,7 +146,7 @@ Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdra
 systemctl status heimdall loggbok yggdrasil janus   # running?
 journalctl -u loggbok -f                      # a module's log
 sudo systemctl restart loggbok                # restart one module
-cat /etc/axis-suite/suite.env                 # the domain and URLs every module was given
+cat /etc/axis-suite/suite.env                 # the domain, URLs and usernames every module was given
 ```
 
 Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<module>`, outside `/opt` and readable only by that module's service:
@@ -185,7 +186,7 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
 1. Pick the next free ports and add a line to `deploy/modules.conf`. Add the folder to `pnpm-workspace.yaml`.
 2. Create the folder with the layout above. Loggbok is the template for a module with an API and a frontend:
    - `package.json` with `dev`, `build`, `typecheck` and `start` scripts, `"files": ["dist"]`, and `"@axis-suite/heimdall-client": "workspace:*"` in `dependencies`. Shared tools (`typescript`, `@types/node`) use `"catalog:"`. Anything only the frontend uses goes in `devDependencies`, since the build bundles it.
-   - `server/index.ts`: put `sameOriginWrites` and `requireUser` in front of `/api`, serve `GET /api/me` with `me`, answer `GET /healthz`, and keep data under `STATE_DIRECTORY`. Store users by `username`.
+   - `server/index.ts`: put `sameOriginWrites` and `requireUser` in front of `/api`, serve `GET /api/me` with `me`, answer `GET /healthz`, and keep data under `STATE_DIRECTORY`. Store users by `username`, and at startup delete the data of owners not in `knownUsers()` (see Loggbok's `removeUnknownOwners`).
    - `web/`: use `apiFetch`, `fetchMe` and `goToSignIn` from `@axis-suite/heimdall-client/browser`.
    - `deploy/<module>.service` (copy Loggbok's, change the names) and `deploy/<module>.caddy`.
 3. For local development, add its dev-server origin to `heimdall/dev.env` as `RETURN_ORIGIN_<MODULE>`.

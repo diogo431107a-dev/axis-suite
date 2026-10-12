@@ -13,6 +13,7 @@ server/
   views.ts          HTML pages (login, dashboard)
   password.ts       scrypt hashing
   hash-password.ts  CLI to create a hash for a new password
+  list-users.ts     prints every username, for the installer (modules delete everyone else's data)
 deploy/
   heimdall.service  systemd unit (sandboxed)
   heimdall.caddy    Caddy site
@@ -46,7 +47,14 @@ After the redeploy, **that user is asked to log in again on every device**. Ever
 
 Generating a new hash for the _same_ password also counts as a change. Use this to sign one user out everywhere, for example after they lose a device.
 
-Modules store their data under the **username**: renaming a user leaves their data behind under the old name.
+Modules store their data under the **username**. **Removing a user deletes their data in every module** (notes, outlines, vaults) on the next deploy. The installer gives the modules the new list of usernames, and each module deletes the data of anyone not on it when it restarts. There is no undo apart from a backup. **Renaming a user is a removal too:** the old name's data is deleted, and the new name starts empty. To keep the data in Loggbok and Yggdrasil, do the steps in this order:
+
+1. Stop the module.
+2. Deploy Heimdall. A stopped module isn't restarted.
+3. Change the `owner` column in the module's database to the new name.
+4. Start the module.
+
+Janus can't be moved that way. Export the vault before the rename and import it under the new name afterwards.
 
 ## Operating it
 

@@ -25,6 +25,15 @@ app.get("/api/things", (req, res) => res.json(listThings(auth.user(req).username
 
 The middleware takes Node's own request and response, so it works with Express, Connect or plain `node:http`.
 
+`knownUsers()` is separate from `heimdallAuth()`. It returns every Heimdall username as a `Set`, read from `AXIS_USERS`, which the installer writes into `/etc/axis-suite/suite.env`. When it isn't set it returns `null`: in development, or before Heimdall is installed. A module calls it at startup and deletes the data of every owner that isn't in the set, so a user removed from Heimdall leaves nothing behind after the next deploy. When it gets `null`, it deletes nothing:
+
+```ts
+const known = knownUsers();
+if (known) {
+  for (const { owner, rows } of store.removeUnknownOwners(known)) console.log(`Deleted ${rows} rows of ${owner}`);
+}
+```
+
 ## Browser: `@axis-suite/heimdall-client/browser`
 
 | Export                         | What it does                                                                                                                                |

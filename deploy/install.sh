@@ -121,19 +121,48 @@ chmod -R u=rwX,go=rX "$APP_DIR.new"
 cd /
 rm -rf "$BUILD_DIR"
 
+# ---- Heimdall's users ------------------------------------------------------------------------
+
+# When a module starts, it deletes the data of every owner who is not a Heimdall user (see
+# knownUsers() in packages/heimdall-client), so a removed user leaves nothing behind. The list
+# comes from the Heimdall that is running, or about to run when this installs Heimdall.
+echo "==> Heimdall's users"
+users_script=/opt/heimdall/dist/server/list-users.js
+[[ $MODULE == heimdall ]] && users_script="$APP_DIR.new/dist/server/list-users.js"
+users_line=""
+if [[ -f $users_script ]]; then
+  users=$(/usr/bin/node "$users_script") || die "Could not list Heimdall's users with $users_script."
+  [[ -n $users ]] || die "Heimdall has no users. Refusing to hand the modules an empty list."
+  while read -r name; do
+    [[ $name =~ ^[A-Za-z0-9._-]+$ ]] || die "Not a username the installer accepts, in Heimdall's users.ts: '$name'"
+  done <<<"$users"
+  users_line="AXIS_USERS=$(paste -sd, - <<<"$users")"
+  echo "    ${users_line#AXIS_USERS=}"
+elif [[ $MODULE == heimdall ]]; then
+  die "The build has no $users_script."
+else
+  echo "    Heimdall isn't installed (or is too old to list its users): modules keep every owner's data."
+fi
+
 # ---- Configuration ---------------------------------------------------------------------------
 
 echo "==> Configuration in $CONF_DIR"
 mkdir -p "$CONF_DIR"
 cookie_domain=""
 [[ -z $LOCAL_MODE ]] && cookie_domain=$DOMAIN
-suite_env="# Written by axis-suite/deploy/install.sh from the domain it was given. Read by every module's service.
+suite_env="# Written by axis-suite/deploy/install.sh from the domain it was given and Heimdall's users.
+# Read by every module's service.
 AXIS_DOMAIN=$DOMAIN
 HEIMDALL_INTERNAL_URL=http://127.0.0.1:$HEIMDALL_PORT
 HEIMDALL_PUBLIC_URL=$(public_url heimdall "$HEIMDALL_LOCAL_PORT")
 # Heimdall shares its session cookie with every subdomain of this. Empty on localhost or an IP
 # address, where all modules share one host and the cookie needs no domain.
 COOKIE_DOMAIN=$cookie_domain"
+if [[ -n $users_line ]]; then
+  suite_env+="
+# Every Heimdall username. When a module starts, it deletes the data of every owner not listed.
+$users_line"
+fi
 suite_changed=""
 if [[ ! -f $CONF_DIR/suite.env || $(<"$CONF_DIR/suite.env") != "$suite_env" ]]; then
   printf '%s\n' "$suite_env" >"$CONF_DIR/suite.env"
@@ -181,7 +210,8 @@ Environment=RETURN_ORIGIN_$(tr 'a-z-' 'A-Z_' <<<"$MODULE")=$URL"
   fi
 fi
 
-# Every running module reads suite.env, so a change there restarts them all.
+# Every running module reads suite.env, so a change there restarts them all. A change in
+# AXIS_USERS thereby makes each module delete the data of users removed from Heimdall.
 if [[ -n $suite_changed ]]; then
   # shellcheck disable=SC2046
   systemctl try-restart $(registry | awk -v m="$MODULE" '$1 != m { print $1 }')
