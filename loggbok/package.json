@@ -16,7 +16,7 @@
     "start": "node dist/server/index.js",
     "dev": "concurrently -k -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
     "dev:web": "vite",
-    "dev:server": "node --conditions=development --watch server/index.ts"
+    "dev:server": "node --env-file-if-exists=dev.env --conditions=development --watch server/index.ts"
   },
   "dependencies": {
     "@axis-suite/heimdall-client": "workspace:*",

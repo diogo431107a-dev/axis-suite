@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Search, Clock, UserRound } from "lucide-react";
+import { Trash2, Plus, Search, Clock, UserRound, Users, Share2, X } from "lucide-react";
 import {
   SignedOutError,
   apiFetch,
@@ -9,14 +9,27 @@ import {
   watchForSignIn,
   type Me,
 } from "@axis-suite/heimdall-client/browser";
+import ShareDialog from "./ShareDialog.tsx";
+
+/** The signed-in user's access to a note: theirs, shared with them to edit, or to read. */
+type Role = "owner" | "editor" | "viewer";
+
+export type Permission = "read" | "write";
+
+/** Someone a note is shared with. */
+export interface Share {
+  username: string;
+  permission: Permission;
+}
 
 /** A note as the list shows it (GET /api/notes). */
 interface NoteSummary {
   id: string;
   /** Heimdall username of the note's owner. */
   owner: string;
-  /** The signed-in user's role on this note. Sharing will add 'editor' and 'viewer'. */
-  role: "owner";
+  role: Role;
+  /** Shared with anyone at all. */
+  shared: boolean;
   title: string;
   /** The start of the content. The list doesn't get all of it. */
   preview: string;
@@ -27,19 +40,48 @@ interface NoteSummary {
 /** A whole note, as GET /api/notes/:id, POST and PUT answer. */
 interface Note extends NoteSummary {
   content: string;
+  /** Who it is shared with. Only its owner gets this. */
+  shares?: Share[];
 }
 
 interface Draft {
   id: string | null;
   title: string;
   content: string;
+  owner?: string;
+  role: Role;
+  shares: Share[];
   createdAt?: string;
+  /** The saved version this draft started from; the server refuses to save over a newer one. */
+  updatedAt?: string;
   /** Changed since it was opened or last saved. */
   dirty: boolean;
 }
 
 const API = "/api/notes";
-const NEW_DRAFT: Draft = { id: null, title: "", content: "", dirty: false };
+const NEW_DRAFT: Draft = { id: null, title: "", content: "", role: "owner", shares: [], dirty: false };
+
+const draftOf = (note: Note): Draft => ({
+  id: note.id,
+  title: note.title,
+  content: note.content,
+  owner: note.owner,
+  role: note.role,
+  shares: note.shares ?? [],
+  createdAt: note.createdAt,
+  updatedAt: note.updatedAt,
+  dirty: false,
+});
+
+// apiFetch throws an Error holding the response body, which is JSON for the API's own errors.
+function errorBody(e: unknown): { error?: string; note?: Note } | null {
+  if (!(e instanceof Error)) return null;
+  try {
+    return JSON.parse(e.message) as { error?: string; note?: Note };
+  } catch {
+    return null;
+  }
+}
 
 // One formatter for the whole page. toLocaleString() builds a new one on every call, which is
 // slow when the list formats a date for every note.
@@ -65,14 +107,20 @@ export default function Loggbok() {
   const [loadError, setLoadError] = useState("");
   // Set when the session ends mid-use. Holds the sign-in URL; the draft is kept.
   const [signedOut, setSignedOut] = useState<string | null>(null);
+  // Set when saving finds a newer version, saved by someone else; holds that version.
+  const [conflict, setConflict] = useState<Note | null>(null);
+  // The last thing that went wrong, shown until the next action succeeds.
+  const [problem, setProblem] = useState("");
+  const [sharing, setSharing] = useState(false);
   // The search the list shows, so the same one isn't fetched again.
   const listedQuery = useRef("");
   // The note being opened. A later click, or New Entry, makes its answer stale.
   const opening = useRef<string | null>(null);
 
   const handleError = useCallback((e: unknown) => {
-    if (e instanceof SignedOutError) setSignedOut(signInUrl(e.loginUrl));
-    else console.error(e);
+    if (e instanceof SignedOutError) return setSignedOut(signInUrl(e.loginUrl));
+    console.error(e);
+    setProblem(errorBody(e)?.error ?? "Something went wrong. Try again in a moment.");
   }, []);
 
   useEffect(() => {
@@ -116,18 +164,26 @@ export default function Loggbok() {
     return watchForSignIn(me.username, () => setSignedOut(null));
   }, [signedOut, me]);
 
-  const saveNote = async () => {
+  // Puts a just-saved note at the top of the list: it's now the most recently updated one.
+  const listSaved = (note: Note) => setNotes((prev) => [summaryOf(note), ...prev.filter((n) => n.id !== note.id)]);
+
+  // overwrite: save even if someone else has saved the note since this draft started.
+  const saveNote = async (overwrite = false) => {
     if (!draft.title.trim() && !draft.content.trim()) return;
     const title = draft.title.trim() || "Untitled";
     try {
       if (draft.id) {
         const updated = await apiFetch<Note>(`${API}/${draft.id}`, {
           method: "PUT",
-          body: JSON.stringify({ title, content: draft.content }),
+          body: JSON.stringify({
+            title,
+            content: draft.content,
+            ...(!overwrite && { baseUpdatedAt: draft.updatedAt }),
+          }),
         });
         if (updated) {
-          // Just saved, so it's now the most recently updated note.
-          setNotes((prev) => [summaryOf(updated), ...prev.filter((n) => n.id !== updated.id)]);
+          listSaved(updated);
+          setDraft((d) => ({ ...d, updatedAt: updated.updatedAt }));
         }
       } else {
         const created = await apiFetch<Note>(API, {
@@ -136,15 +192,32 @@ export default function Loggbok() {
         });
         if (created) {
           setNotes((prev) => [summaryOf(created), ...prev]);
-          setDraft((d) => ({ ...d, id: created.id, createdAt: created.createdAt }));
+          setDraft((d) => ({
+            ...d,
+            id: created.id,
+            owner: created.owner,
+            createdAt: created.createdAt,
+            updatedAt: created.updatedAt,
+          }));
         }
       }
       setDraft((d) => ({ ...d, dirty: false }));
       setSignedOut(null);
+      setConflict(null);
+      setProblem("");
     } catch (e) {
-      handleError(e);
+      const newer = errorBody(e)?.note;
+      if (newer) setConflict(newer);
+      else handleError(e);
     }
   };
+
+  // After a conflict: drop this draft's changes for the version someone else saved.
+  function loadTheirs(note: Note) {
+    listSaved(note);
+    setDraft(draftOf(note));
+    setConflict(null);
+  }
 
   // The list only has a preview of each note, so opening one fetches all of it.
   const openNote = useCallback(
@@ -153,7 +226,9 @@ export default function Loggbok() {
       try {
         const note = await apiFetch<Note>(`${API}/${noteId}`);
         if (note && opening.current === noteId) {
-          setDraft({ id: note.id, title: note.title, content: note.content, createdAt: note.createdAt, dirty: false });
+          setDraft(draftOf(note));
+          setConflict(null);
+          setProblem("");
         }
       } catch (e) {
         handleError(e);
@@ -162,24 +237,39 @@ export default function Loggbok() {
     [handleError],
   );
 
-  const deleteNote = useCallback(
-    async (noteId: string) => {
+  // Deletes the user's own note; a note shared with them just leaves their list.
+  const removeNote = useCallback(
+    async (note: NoteSummary) => {
+      if (!me) return;
+      const url =
+        note.role === "owner" ? `${API}/${note.id}` : `${API}/${note.id}/shares/${encodeURIComponent(me.username)}`;
       try {
-        await apiFetch(`${API}/${noteId}`, { method: "DELETE" });
-        setNotes((prev) => prev.filter((n) => n.id !== noteId));
-        setDraft((d) => (d.id === noteId ? NEW_DRAFT : d));
+        await apiFetch(url, { method: "DELETE" });
+        setNotes((prev) => prev.filter((n) => n.id !== note.id));
+        setDraft((d) => (d.id === note.id ? NEW_DRAFT : d));
       } catch (e) {
         handleError(e);
       }
     },
-    [handleError],
+    [me, handleError],
   );
 
+  function sharesSaved(noteId: string, shares: Share[]) {
+    setSharing(false);
+    setProblem("");
+    setNotes((prev) => prev.map((n) => (n.id === noteId ? { ...n, shared: shares.length > 0 } : n)));
+    setDraft((d) => (d.id === noteId ? { ...d, shares } : d));
+  }
+  const closeSharing = useCallback(() => setSharing(false), []);
+
   const savedVersion = draft.id ? notes.find((n) => n.id === draft.id) : null;
+  const readOnly = draft.role === "viewer";
 
   function newNote() {
     opening.current = null;
     setDraft(NEW_DRAFT);
+    setConflict(null);
+    setProblem("");
   }
   function patch(field: "title" | "content", value: string) {
     setDraft((d) => ({ ...d, [field]: value, dirty: true }));
@@ -241,7 +331,7 @@ export default function Loggbok() {
             selectedId={draft.id}
             searching={search !== ""}
             onOpen={openNote}
-            onDelete={deleteNote}
+            onRemove={removeNote}
           />
         </div>
       </div>
@@ -257,12 +347,31 @@ export default function Loggbok() {
             (opens a new tab), then come back here and save.
           </div>
         )}
+        {conflict && (
+          <div role="alert" className="px-10 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
+            Someone else changed this note after you opened it.{" "}
+            <button onClick={() => loadTheirs(conflict)} className="font-medium underline">
+              Load their version
+            </button>{" "}
+            (drops your changes) or{" "}
+            <button onClick={() => saveNote(true)} className="font-medium underline">
+              keep yours
+            </button>{" "}
+            (replaces theirs).
+          </div>
+        )}
+        {problem && (
+          <div role="alert" className="px-10 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700">
+            {problem}
+          </div>
+        )}
 
         <div className="px-10 py-6 border-b border-gray-200 bg-white">
           <input
             type="text"
             placeholder="Entry title"
             value={draft.title}
+            readOnly={readOnly}
             onChange={(e) => patch("title", e.target.value)}
             className="w-full text-3xl font-bold text-gray-800 bg-transparent
                        border-none outline-none placeholder-gray-200"
@@ -273,6 +382,7 @@ export default function Loggbok() {
           <textarea
             placeholder="Start writing…"
             value={draft.content}
+            readOnly={readOnly}
             onChange={(e) => patch("content", e.target.value)}
             className="w-full h-full text-gray-700 text-base leading-relaxed
                        bg-transparent resize-none border-none outline-none
@@ -282,23 +392,55 @@ export default function Loggbok() {
 
         <div className="px-6 py-3 border-t border-gray-200 bg-white flex justify-between items-center">
           <span className="text-xs text-gray-400">
-            {draft.dirty
-              ? "Unsaved changes"
-              : savedVersion
-                ? `Saved ${fmt(savedVersion.updatedAt)}`
-                : "New entry — not yet saved"}
+            {readOnly
+              ? `Read only, shared by ${draft.owner}`
+              : draft.dirty
+                ? "Unsaved changes"
+                : savedVersion
+                  ? `Saved ${fmt(savedVersion.updatedAt)}`
+                  : "New entry — not yet saved"}
+            {draft.role === "editor" && ` · Shared by ${draft.owner}`}
           </span>
-          <button
-            onClick={saveNote}
-            disabled={!draft.title.trim() && !draft.content.trim()}
-            className="bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg
-                       hover:bg-indigo-700 active:bg-indigo-800 transition-colors
-                       disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
-          >
-            {draft.id ? "Update" : "Save Entry"}
-          </button>
+          <div className="flex items-center gap-2">
+            {draft.role === "owner" && draft.id && (
+              <button
+                onClick={() => setSharing(true)}
+                title={
+                  draft.shares.length ? `Shared with ${draft.shares.map((s) => s.username).join(", ")}` : undefined
+                }
+                className="text-sm px-4 py-2 rounded-lg border border-gray-200 text-gray-600
+                           hover:bg-gray-50 transition-colors flex items-center gap-2"
+              >
+                <Share2 className="w-4 h-4" />
+                {draft.shares.length ? `Shared (${draft.shares.length})` : "Share"}
+              </button>
+            )}
+            {!readOnly && (
+              <button
+                onClick={() => saveNote()}
+                disabled={!draft.title.trim() && !draft.content.trim()}
+                className="bg-indigo-600 text-white text-sm px-5 py-2 rounded-lg
+                           hover:bg-indigo-700 active:bg-indigo-800 transition-colors
+                           disabled:bg-gray-200 disabled:text-gray-400 disabled:cursor-not-allowed"
+              >
+                {draft.id ? "Update" : "Save Entry"}
+              </button>
+            )}
+          </div>
         </div>
       </div>
+
+      {sharing && draft.id && (
+        <ShareDialog
+          key={draft.id}
+          noteId={draft.id}
+          title={draft.title}
+          shares={draft.shares}
+          onSaved={(shares) => sharesSaved(draft.id!, shares)}
+          onClose={closeSharing}
+          onError={handleError}
+        />
+      )}
     </div>
   );
 }
@@ -308,11 +450,12 @@ interface NoteListProps {
   selectedId: string | null;
   searching: boolean;
   onOpen: (noteId: string) => void;
-  onDelete: (noteId: string) => void;
+  /** Deletes the user's own note, or takes a shared one off their list. */
+  onRemove: (note: NoteSummary) => void;
 }
 
 // Memoized, so typing in the editor doesn't redraw every note in the list.
-const NoteList = memo(function NoteList({ notes, selectedId, searching, onOpen, onDelete }: NoteListProps) {
+const NoteList = memo(function NoteList({ notes, selectedId, searching, onOpen, onRemove }: NoteListProps) {
   if (notes.length === 0) {
     return (
       <p className="p-6 text-center text-sm text-gray-400">{searching ? "No matching entries." : "No entries yet."}</p>
@@ -330,19 +473,30 @@ const NoteList = memo(function NoteList({ notes, selectedId, searching, onOpen, 
         <button
           onClick={(e) => {
             e.stopPropagation();
-            onDelete(note.id);
+            onRemove(note);
           }}
-          title="Delete entry"
+          title={note.role === "owner" ? "Delete entry" : "Remove from my list"}
           className="text-gray-200 hover:text-red-400 transition-colors shrink-0
                    opacity-0 group-hover:opacity-100"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          {note.role === "owner" ? <Trash2 className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
         </button>
       </div>
       <p className="text-xs text-gray-400 truncate mb-2 leading-snug">{note.preview || "No content"}</p>
       <div className="flex items-center gap-1 text-xs text-gray-300">
         <Clock className="w-3 h-3" />
         {fmt(note.updatedAt)}
+        {note.role === "owner" ? (
+          note.shared && <Share2 className="w-3 h-3 ml-auto" aria-label="Shared" />
+        ) : (
+          <span
+            className="ml-auto flex items-center gap-1 truncate"
+            title={note.role === "viewer" ? `Shared by ${note.owner}, read only` : `Shared by ${note.owner}`}
+          >
+            <Users className="w-3 h-3 shrink-0" />
+            <span className="truncate">{note.owner}</span>
+          </span>
+        )}
       </div>
     </div>
   ));

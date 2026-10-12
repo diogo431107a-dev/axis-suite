@@ -14,13 +14,7 @@ console.log(`Notes database: ${DB_FILE}`);
 db.exec("PRAGMA foreign_keys = ON");
 
 // Each entry upgrades the schema by one version; PRAGMA user_version records how far we got.
-// Add new steps to the end, never edit old ones. Sharing will be the next step, e.g.:
-//   CREATE TABLE note_shares (
-//     note_id    TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
-//     username   TEXT NOT NULL,
-//     permission TEXT NOT NULL CHECK (permission IN ('read', 'write')),
-//     PRIMARY KEY (note_id, username)
-//   );
+// Add new steps to the end, never edit old ones.
 const migrations: (() => void)[] = [
   // v1: notes, each owned by a Heimdall user.
   () => {
@@ -34,6 +28,18 @@ const migrations: (() => void)[] = [
         updated_at TEXT NOT NULL
       );
       CREATE INDEX notes_owner_updated ON notes (owner, updated_at DESC);
+    `);
+  },
+  // v2: the people a note is shared with. Deleting a note deletes its shares.
+  () => {
+    db.exec(`
+      CREATE TABLE note_shares (
+        note_id    TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        username   TEXT NOT NULL,  -- Heimdall username of the person it's shared with
+        permission TEXT NOT NULL CHECK (permission IN ('read', 'write')),
+        PRIMARY KEY (note_id, username)
+      );
+      CREATE INDEX note_shares_username ON note_shares (username);
     `);
   },
 ];

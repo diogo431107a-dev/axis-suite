@@ -3,13 +3,17 @@ import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
 import {
   canDelete,
   canEdit,
+  canShare,
   createNote,
   deleteNote,
   findNote,
   listNotes,
+  removeShare,
   removeUnknownOwners,
+  setShares,
   updateNote,
   type NoteFields,
+  type Share,
 } from "./access.ts";
 import { db } from "./db.ts";
 
@@ -47,8 +51,36 @@ function noteFields(body: unknown): NoteFields | null {
   return typeof title === "string" && typeof content === "string" ? { title, content } : null;
 }
 
+// The people a note may be shared with: every Heimdall user but its owner.
+function sharableUsers(owner: string): string[] {
+  return [...(known ?? [])].filter((username) => username !== owner).sort();
+}
+
+// The share list from a request body, or the reason it can't be accepted.
+function shareList(body: unknown, owner: string): Share[] | string {
+  if (!known) return "Loggbok doesn't know the suite's users, so it can't share notes";
+  if (!Array.isArray(body)) return "Expected a list of { username, permission }";
+  const shares: Share[] = [];
+  const seen = new Set<string>();
+  for (const item of body as unknown[]) {
+    const { username, permission } = (item ?? {}) as Partial<Record<keyof Share, unknown>>;
+    if (typeof username !== "string" || !known.has(username)) return `Not a user: ${String(username)}`;
+    if (username === owner) return "A note can't be shared with its owner";
+    if (seen.has(username)) return `Listed twice: ${username}`;
+    if (permission !== "read" && permission !== "write") return "permission must be 'read' or 'write'";
+    seen.add(username);
+    shares.push({ username, permission });
+  }
+  return shares;
+}
+
 // The signed-in user
 app.get("/api/me", auth.me);
+
+// The users the signed-in user can share notes with
+app.get("/api/users", (req, res) => {
+  res.json(sharableUsers(auth.user(req).username));
+});
 
 // List / search. Each note comes with a preview of its content; GET /api/notes/:id has all of it.
 app.get("/api/notes", (req, res) => {
@@ -70,14 +102,23 @@ app.post("/api/notes", (req, res) => {
   res.status(201).json(createNote(auth.user(req), fields));
 });
 
-// Update
+// Update. With baseUpdatedAt (the version the editor started from), a note someone else has
+// saved since answers 409 with that newer version instead of overwriting it.
 app.put("/api/notes/:id", (req, res) => {
   const fields = noteFields(req.body);
   if (!fields) return void res.status(400).json({ error: "title and content must be strings" });
+  const { baseUpdatedAt } = req.body as { baseUpdatedAt?: unknown };
+  if (baseUpdatedAt !== undefined && typeof baseUpdatedAt !== "string") {
+    return void res.status(400).json({ error: "baseUpdatedAt must be a string" });
+  }
   const found = findNote(req.params.id, auth.user(req));
   if (!found) return void res.status(404).json(NOT_FOUND);
   if (!canEdit(found.role)) return void res.status(403).json({ error: "You can only read this note" });
-  res.json(updateNote(req.params.id, auth.user(req), fields));
+  const updated = updateNote(req.params.id, found.role, fields, baseUpdatedAt ?? null);
+  if (updated) return void res.json(updated);
+  const current = findNote(req.params.id, auth.user(req));
+  if (!current) return void res.status(404).json(NOT_FOUND);
+  res.status(409).json({ error: "Someone else has changed this note", note: current.note });
 });
 
 // Delete
@@ -86,6 +127,30 @@ app.delete("/api/notes/:id", (req, res) => {
   if (!found) return void res.status(404).json(NOT_FOUND);
   if (!canDelete(found.role)) return void res.status(403).json({ error: "Only the owner can delete this note" });
   deleteNote(req.params.id);
+  res.status(204).end();
+});
+
+// Share: replace everyone the note is shared with
+app.put("/api/notes/:id/shares", (req, res) => {
+  const found = findNote(req.params.id, auth.user(req));
+  if (!found) return void res.status(404).json(NOT_FOUND);
+  if (!canShare(found.role)) return void res.status(403).json({ error: "Only the owner can share this note" });
+  const shares = shareList(req.body, found.note.owner);
+  if (typeof shares === "string") return void res.status(400).json({ error: shares });
+  res.json(setShares(req.params.id, shares));
+});
+
+// Stop sharing with one person. The owner can remove anyone; anyone can remove themselves.
+app.delete("/api/notes/:id/shares/:username", (req, res) => {
+  const user = auth.user(req);
+  const found = findNote(req.params.id, user);
+  if (!found) return void res.status(404).json(NOT_FOUND);
+  if (!canShare(found.role) && req.params.username !== user.username) {
+    return void res.status(403).json({ error: "Only the owner can change who sees this note" });
+  }
+  if (!removeShare(req.params.id, req.params.username)) {
+    return void res.status(404).json({ error: "The note isn't shared with them" });
+  }
   res.status(204).end();
 });
 
