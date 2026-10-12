@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Search, Clock, UserRound, Users, Share2, X } from "lucide-react";
+import { Trash2, Plus, Search, Clock, UserRound, Users, Share2, X, Menu } from "lucide-react";
 import {
   SignedOutError,
   apiFetch,
@@ -112,6 +112,8 @@ export default function Loggbok() {
   // The last thing that went wrong, shown until the next action succeeds.
   const [problem, setProblem] = useState("");
   const [sharing, setSharing] = useState(false);
+  // On narrow screens the sidebar is a drawer over the editor.
+  const [navOpen, setNavOpen] = useState(false);
   // The search the list shows, so the same one isn't fetched again.
   const listedQuery = useRef("");
   // The note being opened. A later click, or New Entry, makes its answer stale.
@@ -261,12 +263,20 @@ export default function Loggbok() {
     setDraft((d) => (d.id === noteId ? { ...d, shares } : d));
   }
   const closeSharing = useCallback(() => setSharing(false), []);
+  const pickNote = useCallback(
+    (noteId: string) => {
+      setNavOpen(false);
+      openNote(noteId);
+    },
+    [openNote],
+  );
 
   const savedVersion = draft.id ? notes.find((n) => n.id === draft.id) : null;
   const readOnly = draft.role === "viewer";
 
   function newNote() {
     opening.current = null;
+    setNavOpen(false);
     setDraft(NEW_DRAFT);
     setConflict(null);
     setProblem("");
@@ -285,20 +295,38 @@ export default function Loggbok() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* ── Sidebar ── */}
-      <div className="w-72 bg-white border-r border-gray-200 flex flex-col shrink-0">
+      {navOpen && (
+        <div className="fixed inset-0 z-30 bg-gray-900/30 md:hidden" onClick={() => setNavOpen(false)} aria-hidden />
+      )}
+      {/* ── Sidebar: a drawer on narrow screens ── */}
+      <aside
+        className={`fixed inset-y-0 left-0 z-40 w-72 bg-white border-r border-gray-200 flex flex-col
+          transition-transform md:static md:z-auto md:translate-x-0 md:shrink-0
+          ${navOpen ? "translate-x-0 shadow-xl" : "-translate-x-full"}`}
+      >
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between gap-2 mb-4">
             <h1 className="text-xl font-bold text-gray-800 tracking-tight">📒 Loggbok</h1>
-            <a
-              href={me.accountUrl}
-              title={`Signed in as ${me.username}. Manage your session.`}
-              className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600
-                         transition-colors truncate"
-            >
-              <UserRound className="w-3.5 h-3.5 shrink-0" />
-              <span className="truncate">{me.name}</span>
-            </a>
+            <div className="flex items-center gap-2 min-w-0">
+              <a
+                href={me.accountUrl}
+                title={`Signed in as ${me.username}. Manage your session.`}
+                className="flex items-center gap-1 text-xs text-gray-400 hover:text-indigo-600
+                           transition-colors truncate"
+              >
+                <UserRound className="w-3.5 h-3.5 shrink-0" />
+                <span className="truncate">{me.name}</span>
+              </a>
+              <button
+                type="button"
+                aria-label="Close the menu"
+                onClick={() => setNavOpen(false)}
+                className="p-1 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-600
+                           transition-colors md:hidden"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
           </div>
 
           <div className="relative mb-3">
@@ -330,16 +358,27 @@ export default function Loggbok() {
             notes={notes}
             selectedId={draft.id}
             searching={search !== ""}
-            onOpen={openNote}
+            onOpen={pickNote}
             onRemove={removeNote}
           />
         </div>
-      </div>
+      </aside>
 
       {/* ── Editor ── */}
       <div className="flex-1 flex flex-col min-w-0">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200 bg-white md:hidden">
+          <button
+            type="button"
+            aria-label="Menu"
+            onClick={() => setNavOpen(true)}
+            className="p-1 rounded-lg text-gray-500 hover:bg-gray-100 hover:text-gray-700 transition-colors"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+          <span className="font-bold text-gray-800 tracking-tight">📒 Loggbok</span>
+        </div>
         {signedOut && (
-          <div role="alert" className="px-10 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
+          <div role="alert" className="px-4 md:px-10 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
             Your session has ended, so nothing can be saved right now. Your draft is kept.{" "}
             <a href={signedOut} target="_blank" rel="noopener" className="font-medium underline">
               Sign in again
@@ -348,7 +387,7 @@ export default function Loggbok() {
           </div>
         )}
         {conflict && (
-          <div role="alert" className="px-10 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
+          <div role="alert" className="px-4 md:px-10 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">
             Someone else changed this note after you opened it.{" "}
             <button onClick={() => loadTheirs(conflict)} className="font-medium underline">
               Load their version
@@ -361,12 +400,12 @@ export default function Loggbok() {
           </div>
         )}
         {problem && (
-          <div role="alert" className="px-10 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700">
+          <div role="alert" className="px-4 md:px-10 py-3 bg-red-50 border-b border-red-200 text-sm text-red-700">
             {problem}
           </div>
         )}
 
-        <div className="px-10 py-6 border-b border-gray-200 bg-white">
+        <div className="px-4 md:px-10 py-6 border-b border-gray-200 bg-white">
           <input
             type="text"
             placeholder="Entry title"
@@ -378,7 +417,7 @@ export default function Loggbok() {
           />
         </div>
 
-        <div className="flex-1 px-10 py-6 overflow-y-auto bg-white">
+        <div className="flex-1 px-4 md:px-10 py-6 overflow-y-auto bg-white">
           <textarea
             placeholder="Start writing…"
             value={draft.content}
@@ -390,7 +429,7 @@ export default function Loggbok() {
           />
         </div>
 
-        <div className="px-6 py-3 border-t border-gray-200 bg-white flex justify-between items-center">
+        <div className="px-4 md:px-6 py-3 border-t border-gray-200 bg-white flex justify-between items-center">
           <span className="text-xs text-gray-400">
             {readOnly
               ? `Read only, shared by ${draft.owner}`
@@ -477,7 +516,7 @@ const NoteList = memo(function NoteList({ notes, selectedId, searching, onOpen, 
           }}
           title={note.role === "owner" ? "Delete entry" : "Remove from my list"}
           className="text-gray-200 hover:text-red-400 transition-colors shrink-0
-                   opacity-0 group-hover:opacity-100"
+                   md:opacity-0 md:group-hover:opacity-100"
         >
           {note.role === "owner" ? <Trash2 className="w-3.5 h-3.5" /> : <X className="w-3.5 h-3.5" />}
         </button>
