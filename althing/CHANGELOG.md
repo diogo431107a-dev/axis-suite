@@ -4,6 +4,10 @@ What changed in Althing, newest first. Each version is tagged in git as `althing
 
 ## Unreleased
 
+## 0.0.2 — 2026-10-13
+
+The first version of Althing. Its 2 commits so far, this one included, give the number.
+
 - The suite's real-time chat: a lobby that is always open, rooms anyone can open and join (they close when everyone has left), and direct messages between two people.
 - Everyone has a profile: one of twelve fun pictures, a nickname and "About me". The profile says that personal information is forbidden.
 - "Online" means signed in to the suite, as Heimdall knows it.

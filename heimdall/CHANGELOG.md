@@ -4,6 +4,8 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+## 0.0.17 — 2026-10-13
+
 - Althing can ask Heimdall who is signed in anywhere in the suite, for its "online" list. Asking doesn't keep anyone's session open.
 
 ## 0.0.15 — 2026-10-13

@@ -1,6 +1,6 @@
 {
   "name": "heimdall",
-  "version": "0.0.15",
+  "version": "0.0.17",
   "private": true,
   "description": "Heimdall — the suite's sign-in service",
   "type": "module",
