@@ -570,6 +570,11 @@ export function createStore(db: DatabaseSync) {
     putPage(owner: string, journalId: string, day: string, input: unknown): PageSaved {
       liveJournal(owner, journalId);
       date(day);
+      // Today is the browser's, in a time zone the server doesn't know, but no zone is a whole day
+      // ahead of UTC.
+      if (day > addDays(new Date().toISOString().slice(0, 10), 1)) {
+        invalid("Pages can't be written for days that haven't come yet");
+      }
       const b = objectBody(input);
       const pageText = text(b.text, "text", LIMITS.pageChars);
       const pageMood = mood(b.mood);

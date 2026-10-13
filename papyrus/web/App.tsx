@@ -207,6 +207,11 @@ export default function App() {
     if (route.kind === "home" && current) go({ kind: "day", journalId: current.id, date: today }, true);
   }, [route.kind, current, today]);
 
+  // Days that haven't come yet can't be written: they open as today.
+  useEffect(() => {
+    if (route.kind === "day" && route.date > today) go({ ...route, date: today }, true);
+  }, [route, today]);
+
   useEffect(() => {
     document.title = route.kind === "day" ? `${longDate(route.date)} · Papyrus` : "Papyrus";
   }, [route]);
@@ -233,7 +238,8 @@ export default function App() {
         e.preventDefault();
         document.querySelector<HTMLInputElement>("[data-search]")?.focus();
       } else if (r.kind === "day" && (e.key === "ArrowLeft" || e.key === "ArrowRight")) {
-        go({ ...r, date: addDays(r.date, e.key === "ArrowLeft" ? -1 : 1) });
+        const day = addDays(r.date, e.key === "ArrowLeft" ? -1 : 1);
+        if (day <= today) go({ ...r, date: day });
       } else if (e.key.toLowerCase() === "t" && current) {
         go({ kind: "day", journalId: r.kind === "day" ? r.journalId : current.id, date: today });
       }
@@ -356,7 +362,7 @@ export default function App() {
         .
       </p>
     );
-  } else if (route.kind === "day") {
+  } else if (route.kind === "day" && route.date <= today) {
     view = (
       <DayView
         sync={sync}

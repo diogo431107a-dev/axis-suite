@@ -108,6 +108,7 @@ export function DayView({ sync, journal, journals, date, today, templates, promp
             className={iconButton}
             aria-label="Next day (→)"
             title="Next day (→)"
+            disabled={date >= today}
             onClick={() => goTo(addDays(date, 1))}
           >
             <ChevronRight className="h-5 w-5" />
@@ -126,7 +127,8 @@ export function DayView({ sync, journal, journals, date, today, templates, promp
               ref={datePicker}
               type="date"
               value={date}
-              onChange={(e) => isDate(e.target.value) && goTo(e.target.value)}
+              max={today}
+              onChange={(e) => isDate(e.target.value) && e.target.value <= today && goTo(e.target.value)}
               className="sr-only"
               tabIndex={-1}
               aria-hidden

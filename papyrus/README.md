@@ -49,7 +49,7 @@ deploy/
 
 ## Using it
 
-**A day.** The sidebar's calendar, the arrows and the calendar button move between days; the dot under a day is its mood's colour (grey: written, no mood). An empty page offers a writing prompt (the same one all day; "Another" shows the next) and your templates, the journal's own one first. Nothing is filled in by itself. Under the page, **On this day** shows the pages of the same day in earlier years, in every journal (on 28 February of a year without a 29th, the 29ths too).
+**A day.** The sidebar's calendar, the arrows and the calendar button move between days, up to today: days that haven't come yet can't be opened or written (the server also refuses them, allowing for time zones); the dot under a day is its mood's colour (grey: written, no mood). An empty page offers a writing prompt (the same one all day; "Another" shows the next) and your templates, the journal's own one first. Nothing is filled in by itself. Under the page, **On this day** shows the pages of the same day in earlier years, in every journal (on 28 February of a year without a 29th, the 29ths too).
 
 **Calendar** shows a month of pages with the start of each, **Year in moods** a square for every day of a year in the colour of its mood, both for one journal or all of them (a day's mood is then the average). The sidebar also counts the days in a row with a page in any journal, up to today or yesterday.
 
