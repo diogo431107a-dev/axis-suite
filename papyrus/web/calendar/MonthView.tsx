@@ -94,12 +94,9 @@ export function MonthView({
           const outside = day.slice(0, 7) !== month.slice(0, 7);
           const target =
             byId.get(list[0]?.journalId ?? "") ?? (journalId ? byId.get(journalId) : undefined) ?? defaultJournal;
-          return (
-            <Link
-              key={day}
-              to={{ kind: "day", journalId: target.id, date: day }}
-              className={`group flex min-h-16 flex-col gap-1 p-1.5 sm:min-h-28 sm:p-2 ${outside ? "bg-stone-50" : "bg-white"} hover:bg-amber-50/60`}
-            >
+          const cell = `flex min-h-16 flex-col gap-1 p-1.5 sm:min-h-28 sm:p-2 ${outside ? "bg-stone-50" : "bg-white"}`;
+          const contents = (
+            <>
               <span className="flex items-center gap-1.5">
                 <span
                   className={`text-xs ${
@@ -136,6 +133,23 @@ export function MonthView({
               {list.length > 2 && (
                 <span className="hidden text-[10px] text-stone-400 sm:block">+{list.length - 2} more</span>
               )}
+            </>
+          );
+          // Days that haven't come yet can't be opened.
+          if (day > today) {
+            return (
+              <div key={day} className={`${cell} opacity-60`}>
+                {contents}
+              </div>
+            );
+          }
+          return (
+            <Link
+              key={day}
+              to={{ kind: "day", journalId: target.id, date: day }}
+              className={`group ${cell} hover:bg-amber-50/60`}
+            >
+              {contents}
             </Link>
           );
         })}

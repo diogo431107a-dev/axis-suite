@@ -106,8 +106,10 @@ export function YearView({ journals, journalId, year, today, defaultJournal, rev
                         type="button"
                         title={label}
                         aria-label={label}
+                        disabled={date > today}
                         onClick={() => go({ kind: "day", journalId: target.id, date })}
-                        className={`block h-4 w-5 rounded-[3px] sm:h-5 sm:w-8 ${color} hover:ring-2 hover:ring-stone-500
+                        className={`block h-4 w-5 rounded-[3px] sm:h-5 sm:w-8 ${color} enabled:hover:ring-2 enabled:hover:ring-stone-500
+                          ${date > today ? "opacity-50" : ""}
                           ${date === today ? "ring-2 ring-amber-700" : ""}`}
                       />
                     </td>

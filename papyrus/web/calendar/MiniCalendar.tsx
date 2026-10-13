@@ -80,14 +80,15 @@ export function MiniCalendar({ journalId, date, today, weekStart, revision, onPi
             <button
               key={day}
               type="button"
+              disabled={day > today}
               onClick={() => {
                 onPick?.();
                 go({ kind: "day", journalId, date: day });
               }}
               aria-label={day}
               aria-current={day === date ? "date" : undefined}
-              className={`relative flex h-7 flex-col items-center justify-center rounded-md hover:bg-stone-200/70
-                ${day === date ? "bg-amber-100 font-semibold text-amber-900" : outside ? "text-stone-300" : "text-stone-600"}
+              className={`relative flex h-7 flex-col items-center justify-center rounded-md enabled:hover:bg-stone-200/70
+                ${day === date ? "bg-amber-100 font-semibold text-amber-900" : outside || day > today ? "text-stone-300" : "text-stone-600"}
                 ${day === today && day !== date ? "font-semibold text-amber-800" : ""}`}
             >
               {Number(day.slice(8))}

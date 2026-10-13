@@ -184,6 +184,14 @@ describe("pages", () => {
     expect(put({ text: "x", mood: null })).toBe("invalid");
     expect(put({ text: "x".repeat(200_001), mood: null, rev: 0 })).toBe("invalid");
   });
+
+  it("refuses days that haven't come yet, wherever today is", () => {
+    const utcToday = new Date().toISOString().slice(0, 10);
+    // Tomorrow in UTC is already today east of it.
+    expect(write("alice", diary.id, addDays(utcToday, 1), "early in Auckland").rev).toBeGreaterThan(0);
+    expect(refusal(() => write("alice", diary.id, addDays(utcToday, 2), "too soon")).code).toBe("invalid");
+    expect(refusal(() => write("alice", diary.id, "2999-01-01", "far off")).code).toBe("invalid");
+  });
 });
 
 describe("days, on this day, streak and tags", () => {
