@@ -9,7 +9,7 @@ import { useOutliner } from "./hooks.ts";
 
 type Format = "opml" | "text" | "markdown";
 const FORMATS: { id: Format; label: string; ext: string; type: string }[] = [
-  { id: "opml", label: "OPML (Dynalist, Workflowy)", ext: "opml", type: "text/x-opml" },
+  { id: "opml", label: "OPML", ext: "opml", type: "text/x-opml" },
   { id: "text", label: "Plain text", ext: "txt", type: "text/plain" },
   { id: "markdown", label: "Markdown", ext: "md", type: "text/markdown" },
 ];
