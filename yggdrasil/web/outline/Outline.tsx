@@ -6,7 +6,7 @@ import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
 import { visibleRows } from "../model/rows.ts";
 import { Breadcrumbs } from "./Breadcrumbs.tsx";
-import { Text } from "./Bullet.tsx";
+import { NOTE_LOOK, Text } from "./Bullet.tsx";
 import { Editor } from "./Editor.tsx";
 import { useCaret, useNode, useOutliner, useShownChildren, useView } from "./hooks.ts";
 import { selectionKeyDown } from "./keymap.ts";
@@ -130,7 +130,7 @@ function RootTitle({ id }: { id: string }) {
         {caret?.field === "content" ? <Editor id={id} field="content" /> : <Text id={id} text={node.content} />}
       </h1>
       {caret?.field === "note" ? (
-        <Editor id={id} field="note" className="mt-1 text-sm text-gray-500" placeholder="Note" />
+        <Editor id={id} field="note" className={`mt-1 ${NOTE_LOOK}`} placeholder="Note" />
       ) : (
         node.note && <Text id={id} text={node.note} field="note" className="mt-1" />
       )}

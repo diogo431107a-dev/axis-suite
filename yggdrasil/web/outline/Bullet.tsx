@@ -13,6 +13,9 @@ import { Editor } from "./Editor.tsx";
 import { useCaret, useNode, useOutliner, useSelected, useShownChildren, useView } from "./hooks.ts";
 import { INDENT } from "./layout.ts";
 
+/** A note: smaller and greyer than the bullet's text, so the two are easy to tell apart. */
+export const NOTE_LOOK = "text-[13px] leading-[1.5] text-gray-500";
+
 export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: number }) {
   const o = useOutliner();
   const node = useNode(id);
@@ -72,7 +75,7 @@ export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: n
             <Text id={id} text={node.content} highlight={highlight} />
           )}
           {caret?.field === "note" ? (
-            <Editor id={id} field="note" className="text-sm text-gray-500" placeholder="Note" />
+            <Editor id={id} field="note" className={NOTE_LOOK} placeholder="Note" />
           ) : (
             node.note && <Text id={id} text={node.note} field="note" highlight={highlight} />
           )}
@@ -123,7 +126,7 @@ export function Text({ id, text, field = "content", className = "", highlight = 
     const offset = sourceOffsetAt(ref.current!, e.clientX, e.clientY, text.length) ?? text.length;
     o.ui.setCaret(id, offset, field);
   };
-  const look = field === "note" ? "line-clamp-3 text-sm text-gray-500" : "min-h-[1.6em]";
+  const look = field === "note" ? `line-clamp-3 ${NOTE_LOOK}` : "min-h-[1.6em]";
   return (
     <div
       ref={ref}

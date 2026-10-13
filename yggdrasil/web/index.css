@@ -13,17 +13,20 @@ body,
 }
 
 /* The rendered text of a bullet and the textarea that replaces it while editing look the same,
-   so the line doesn't move when editing starts. */
-.ygg-text {
-  font: inherit;
-  letter-spacing: inherit;
-  line-height: inherit;
-  color: inherit;
-  margin: 0;
-  padding: 0;
-  border: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
+   so the line doesn't move when editing starts. In a layer, so utilities (a note's size and
+   colour) still win over it. */
+@layer components {
+  .ygg-text {
+    font: inherit;
+    letter-spacing: inherit;
+    line-height: inherit;
+    color: inherit;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
 }
 
 /* The vertical lines that join a bullet's children: one per ancestor, under each ancestor's dot
