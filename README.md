@@ -167,6 +167,7 @@ systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie 
 journalctl -u loggbok -f                                                          # a module's log
 sudo systemctl restart loggbok                                                    # restart one module
 cat /etc/axis-suite/suite.env                                                     # the domain, URLs and usernames every module was given
+grep '"version"' /opt/*/package.json                                             # the version of each installed module
 ```
 
 Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<module>`, outside `/opt` and readable only by that module's service:
@@ -175,7 +176,7 @@ Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<modul
 | --------- | ---------------------------------------------------------------------- | ------------------------------- |
 | Heimdall  | sessions                                                               | `/var/lib/heimdall/`            |
 | Loggbok   | every user's notes                                                     | `/var/lib/loggbok/notes.db`     |
-| Yggdrasil | every user's outline                                                   | `/var/lib/yggdrasil/tree.db`    |
+| Yggdrasil | every user's outline, and the files uploaded into it                   | `/var/lib/yggdrasil/`           |
 | Janus     | every user's vault (encrypted; the key is `/etc/axis-suite/janus.key`) | `/var/lib/janus/janus.db`       |
 | Papyrus   | every user's journals                                                  | `/var/lib/papyrus/papyrus.db`   |
 | Vinr      | every user's contacts                                                  | `/var/lib/vinr/vinr.db`         |
@@ -189,6 +190,36 @@ sudo systemctl stop loggbok
 sudo install -m 600 -o "$USER" /var/lib/loggbok/notes.db ~/notes-backup-$(date +%Y%m%d).db
 sudo systemctl start loggbok
 ```
+
+## Versions and changelogs
+
+Each module has its own version, kept in its `package.json`, and its own `CHANGELOG.md`, which says in plain words what changed and what to do when upgrading. The suite as a whole has one too: the root `package.json` and [`CHANGELOG.md`](CHANGELOG.md), which lists the version of every module in each suite version. Versions started on 2026-10-13.
+
+**While a module is being built, its version is 0.0.N**, where N is how many commits have changed the module's folder, the one that makes the version included. Merge commits aren't counted: they only repeat the work of the branch they bring in. So the number says how much work has gone into the module, and nothing it doesn't know. To see a module's count now:
+
+```bash
+git rev-list --count --no-merges main -- loggbok
+```
+
+**Once the owner declares a module's development map complete, it becomes 1.0.0** (Yggdrasil did on 2026-10-13). From then on, each change is classified by the owner when it is merged, and a new version raises the number for the largest kind among its changes:
+
+| Kind      | Meaning                                         | Example       |
+| --------- | ----------------------------------------------- | ------------- |
+| **Major** | a big step: a new capability, a new way to work | 1.4.2 → 2.0.0 |
+| **Minor** | an improvement                                  | 1.4.2 → 1.5.0 |
+| **Fix**   | only bugs fixed                                 | 1.4.2 → 1.4.3 |
+
+**The suite's version is 0.0.N** by the same count over the whole repository (`git rev-list --count --no-merges main`). It is raised with every module's release, and only the owner moves it past 0.0.
+
+A changelog says **By hand:** before any step an upgrade needs besides the installer (a new backup procedure, a setting to change), so read it before deploying.
+
+How changes become a version:
+
+1. Work happens on a branch, as always. Its changes are added to the module's changelog under **Unreleased** (for a module at 1.0.0 or later, each starting with **Major:**, **Minor:** or **Fix:**), and it is merged into `main`.
+2. Several merges can wait there. When the module is deployed, one commit turns **Unreleased** into the new version with the date, sets `package.json` to it, and does the same for the suite. That commit is tagged `<module>-v<version>` and `axis-suite-v<version>` (for example `yggdrasil-v1.1.0` and `axis-suite-v0.0.70`), and pushed with its tags.
+3. The VPS pulls and installs as before. The installer prints the version it installed.
+
+A tag marks the exact code of a version, so `git log yggdrasil-v1.0.0..yggdrasil-v1.1.0 -- yggdrasil` lists everything that changed in Yggdrasil between two versions. `packages/heimdall-client` has no version of its own: it is part of the modules that use it, and its changes are written in their changelogs.
 
 ## Sharing the server with certbot
 
@@ -215,7 +246,7 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
    - Narrow windows (below Tailwind's `md`, 768px, e.g. a window snapped to half the screen): the sidebar becomes a slide-in drawer over a dimmed backdrop. A menu button opens it; the backdrop, an X, or picking something closes it. Copy the drawer from Loggbok or Papyrus.
    - `deploy/<module>.service` (copy Loggbok's, change the names) and `deploy/<module>.caddy`.
 3. For local development, add its dev-server origin to `heimdall/dev.env` as `RETURN_ORIGIN_<MODULE>`.
-4. Add it to the module table at the top of this file, then `pnpm install && pnpm check && pnpm build`.
+4. Add it to the module table at the top of this file, start its `CHANGELOG.md` (copy Loggbok's header), then `pnpm install && pnpm check && pnpm build`.
 5. Install it: `sudo bash deploy/install.sh <module>`. With a real domain, add its DNS record first.
 
 ## Runtime

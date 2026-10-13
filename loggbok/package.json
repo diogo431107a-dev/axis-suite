@@ -1,6 +1,6 @@
 {
   "name": "loggbok",
-  "version": "1.0.0",
+  "version": "0.0.12",
   "private": true,
   "description": "Loggbok — notes, private to each signed-in user",
   "type": "module",

@@ -47,6 +47,8 @@ read -r HEIMDALL_PORT HEIMDALL_LOCAL_PORT < <(registry | awk '$1 == "heimdall" {
 for f in "$MODULE.service" "$MODULE.caddy"; do
   [[ -f $MODULE_DIR/deploy/$f ]] || die "Missing $MODULE/deploy/$f."
 done
+# The module's version, from its package.json (what CHANGELOG.md and the git tag call it).
+VERSION=$(sed -n 's/^  "version": "\([^"]*\)".*/\1/p' "$MODULE_DIR/package.json")
 
 # ---- The suite's domain ----------------------------------------------------------------------
 
@@ -185,7 +187,7 @@ fi
 
 # ---- Service ---------------------------------------------------------------------------------
 
-echo "==> Installing to $APP_DIR and (re)starting the $MODULE service"
+echo "==> Installing $MODULE ${VERSION:-(no version)} to $APP_DIR and (re)starting the $MODULE service"
 install -m 644 "$MODULE_DIR/deploy/$MODULE.service" "/etc/systemd/system/$MODULE.service"
 rm -rf "$APP_DIR.old"
 if [[ -d $APP_DIR ]]; then mv "$APP_DIR" "$APP_DIR.old"; fi
@@ -244,7 +246,7 @@ for _ in $(seq 10); do
     host=${host%%:*}
     code=$(curl -sk -o /dev/null -w '%{http_code}' --resolve "$host:$PUBLIC_PORT:127.0.0.1" "$URL/" || true)
     if [[ $code =~ ^[23] ]]; then
-      echo "$MODULE is running. Open: $URL"
+      echo "$MODULE ${VERSION:-} is running. Open: $URL"
     else
       # With a real domain, the certificate may still be on its way (or DNS not set up yet).
       echo "$MODULE is running on port $PORT, but $URL answered '$code' through Caddy. Check: journalctl -u caddy -n 50" >&2

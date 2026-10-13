@@ -1,6 +1,6 @@
 {
   "name": "janus",
-  "version": "1.0.0",
+  "version": "0.0.5",
   "private": true,
   "description": "Janus — a password manager with TOTP codes, one vault per signed-in user",
   "type": "module",

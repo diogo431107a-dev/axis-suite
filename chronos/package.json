@@ -1,6 +1,6 @@
 {
   "name": "chronos",
-  "version": "1.0.0",
+  "version": "0.0.5",
   "private": true,
   "description": "Chronos — calendars for every signed-in user",
   "type": "module",
