@@ -2,7 +2,8 @@
 // (never innerHTML). Every piece of text sits in an element with data-offset, where it starts in
 // the source, so a click can put the caret on the character that was clicked; chips that show
 // something else (a date as "Today") have data-end instead.
-import { memo, useMemo, useRef, type ReactNode } from "react";
+import { memo, useMemo, useRef, useState, type ReactNode } from "react";
+import { Paperclip } from "lucide-react";
 import type { Field } from "../model/ui.ts";
 import { useOutliner } from "../outline/hooks.ts";
 import { dateLabel, localDate } from "./dates.ts";
@@ -107,8 +108,58 @@ function render(tokens: Token[], ctx: RenderCtx): ReactNode[] {
         );
       case "date":
         return <DateChip key={t.start} token={t} ctx={ctx} />;
+      case "image":
+        return <FileImage key={t.start} token={t} />;
+      case "file":
+        return (
+          <a
+            key={t.start}
+            href={t.url}
+            download={t.name}
+            data-end={t.end}
+            title={`Download ${t.name}`}
+            className="inline-flex max-w-full items-center gap-1 rounded bg-gray-100 px-1.5 align-baseline text-[0.9em] text-gray-700 hover:bg-gray-200"
+          >
+            <Paperclip aria-hidden className="h-3.5 w-3.5 shrink-0 text-gray-500" />
+            <span className="truncate">{t.name}</span>
+          </a>
+        );
     }
   });
+}
+
+/**
+ * An uploaded image: its preview, which opens the original in a new tab. One the user may not
+ * see (or that is gone) says so instead.
+ */
+function FileImage({ token }: { token: Extract<Token, { type: "image" }> }) {
+  const [failed, setFailed] = useState(false);
+  if (failed) {
+    return (
+      <span data-end={token.end} className="rounded bg-gray-100 px-1 text-[0.9em] text-gray-500">
+        {token.alt || "Image"} (not available)
+      </span>
+    );
+  }
+  return (
+    <a
+      href={token.url}
+      target="_blank"
+      rel="noopener"
+      data-end={token.end}
+      className="my-1 inline-block max-w-full align-top"
+    >
+      <img
+        src={`${token.url}/preview`}
+        alt={token.alt}
+        title={token.alt}
+        loading="lazy"
+        decoding="async"
+        onError={() => setFailed(true)}
+        className="max-h-80 max-w-full rounded border border-gray-100"
+      />
+    </a>
+  );
 }
 
 /** A date as a chip. A click opens the browser's date picker, and the choice goes into the text. */

@@ -287,8 +287,13 @@ export function setCollapsed(ctx: Ctx, id: string, collapsed: boolean): Result |
   return { ops: [{ op: "update", id, collapsed }] };
 }
 
-export function toggleStar(ctx: Ctx, id: string): Result {
-  return { ops: [{ op: "update", id, starred: !get(ctx, id).starred }] };
+/** Alt+S: stars the bullets, or unstars them if all are starred already. */
+export function toggleStar(ctx: Ctx, ids: readonly string[]): Result {
+  const nodes = ids.map((id) => get(ctx, id));
+  const allStarred = nodes.every((n) => n.starred);
+  return {
+    ops: nodes.filter((n) => allStarred || !n.starred).map((n) => ({ op: "update", id: n.id, starred: !allStarred })),
+  };
 }
 
 // ---- Inserting whole subtrees (paste, import) -----------------------------------------------

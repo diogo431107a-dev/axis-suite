@@ -1,6 +1,7 @@
 // The one textarea: the bullet being edited shows its raw text here, every other bullet shows
 // formatted text. It grows with its content, so it looks like the text it replaces.
 import { useLayoutEffect, useRef } from "react";
+import { attachFiles } from "../files/upload.ts";
 import { looksLikeOpml, parseOpml } from "../io/opml.ts";
 import { parsePlainText } from "../io/plaintext.ts";
 import * as cmd from "../model/commands.ts";
@@ -99,6 +100,15 @@ export function Editor({ id, field, className = "", placeholder }: Props) {
         editorKeyDown(o, e, e.currentTarget, id, field);
       }}
       onPaste={(e) => {
+        // Pasted files, or an image (a screenshot): uploaded. Copied text that also comes as a
+        // picture of itself (from Word or Excel, say) is pasted as text.
+        const files = [...e.clipboardData.files];
+        if (files.length > 0 && !e.clipboardData.types.includes("text/plain")) {
+          e.preventDefault();
+          const ta = e.currentTarget;
+          void attachFiles(o, id, field, files, ta.selectionStart);
+          return;
+        }
         if (field !== "content") return;
         const text = e.clipboardData.getData("text/plain").replace(/\r\n?/g, "\n");
         const trimmed = text.replace(/\n+$/, "");

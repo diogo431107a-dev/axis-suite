@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { datesOf, isSafeUrl, tagsOf, tokenize } from "./inline.ts";
+import { datesOf, fileMarkup, isSafeUrl, tagsOf, tokenize } from "./inline.ts";
 
 describe("tokenize", () => {
   it("keeps plain text as one run", () => {
@@ -77,5 +77,27 @@ describe("tokenize", () => {
     ]);
     expect(datesOf("**!(2026-01-02)**")).toEqual([{ date: "2026-01-02", time: null }]);
     expect(tokenize("!(2026-1-2)")[0]!.type).toBe("text");
+  });
+
+  it("reads uploaded images and files, and only Yggdrasil's own", () => {
+    const url = "/api/files/0f8fad5b-d9cb-469f-a165-70867728950e";
+    expect(tokenize(`see ![cat.png](${url}) and [plan.pdf](${url})`)).toEqual([
+      { type: "text", start: 0, text: "see " },
+      { type: "image", start: 4, end: 63, alt: "cat.png", url },
+      { type: "text", start: 63, text: " and " },
+      { type: "file", start: 68, end: 127, name: "plan.pdf", url },
+    ]);
+    // Other images stay links; other relative addresses aren't links at all.
+    expect(tokenize("![x](https://e.com/a.png)").map((t) => t.type)).toEqual(["text", "link"]);
+    expect(tokenize(`[x](${url}/../../me)`).map((t) => t.type)).toEqual(["text"]);
+    expect(isSafeUrl(url)).toBe(true);
+    expect(isSafeUrl("/api/tree")).toBe(false);
+  });
+
+  it("writes markup for a file whatever its name", () => {
+    const url = "/api/files/0f8fad5b-d9cb-469f-a165-70867728950e";
+    expect(fileMarkup("a [draft]\n.png", url, true)).toBe(`![a (draft) .png](${url})`);
+    expect(fileMarkup("", url, false)).toBe(`[file](${url})`);
+    expect(tokenize(fileMarkup("a [b].pdf", url, false))[0]!.type).toBe("file");
   });
 });

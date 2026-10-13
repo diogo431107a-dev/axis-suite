@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { Copy, Download, X } from "lucide-react";
 import { toOpml } from "../io/opml.ts";
-import { toIndentedText, toMarkdown } from "../io/plaintext.ts";
+import { toIndentedText, toMarkdown, withFileOrigin } from "../io/plaintext.ts";
 import { plainText } from "../text/plain.ts";
 import { useOutliner } from "./hooks.ts";
 
@@ -31,7 +31,7 @@ export function ExportDialog({ root, onClose }: { root: string | null; onClose: 
 
   const targetName = target ? plainText(o.store.get(target)?.content ?? "") || "Untitled" : "";
   const { output, title } = useMemo(() => {
-    const source = o.textSource();
+    const source = withFileOrigin(o.textSource(), location.origin);
     const ids = scope === "bullet" && target ? [target] : [...source.children(null)];
     const title = scope === "bullet" && target ? targetName : "Yggdrasil";
     const output =

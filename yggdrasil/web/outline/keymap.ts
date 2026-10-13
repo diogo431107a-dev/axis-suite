@@ -8,7 +8,16 @@ import { makeLink, toggleWrap, type Edit } from "../text/format.ts";
 import { caretClientX, onFirstLine, onLastLine, sourceOffsetOnLine } from "./caret.ts";
 import { zoomTo } from "./nav.ts";
 
-type Keys = Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey" | "preventDefault">;
+type Keys = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey" | "preventDefault">;
+
+/**
+ * The key pressed, letters in lowercase. With Alt, a letter is read from the key's place on the
+ * keyboard: on a Mac, Option+S types "ß", and Alt+S should still be Alt+S.
+ */
+function keyOf(e: Keys): string {
+  if (e.altKey && /^Key[A-Z]$/.test(e.code)) return e.code.slice(3).toLowerCase();
+  return e.key.length === 1 ? e.key.toLowerCase() : e.key;
+}
 
 /** The rendered text of a bullet: <Text> marks it with data-text. */
 export const textElement = (id: string) => document.querySelector<HTMLElement>(`[data-text="${CSS.escape(id)}"]`);
@@ -65,7 +74,7 @@ export function editorKeyDown(o: Outliner, e: Keys, ta: HTMLTextAreaElement, id:
   // Commands that remount the bullet bring the caret back where it is now.
   o.ui.rememberCaret(id, field, start, end);
   const handled = () => e.preventDefault();
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const key = keyOf(e);
 
   switch (key) {
     case "Enter":
@@ -192,6 +201,12 @@ export function editorKeyDown(o: Outliner, e: Keys, ta: HTMLTextAreaElement, id:
       return handled();
     }
 
+    case "s":
+      // Alt+S: star or unstar. Starring a bullet shared to read only is allowed: it is theirs alone.
+      if (!e.altKey || mod || e.shiftKey) return;
+      o.run((ctx) => cmd.toggleStar(ctx, [id]));
+      return handled();
+
     case "Escape":
       selectBlock(o, id);
       return handled();
@@ -215,7 +230,7 @@ export function selectionKeyDown(o: Outliner, e: Keys): void {
   const mod = e.ctrlKey || e.metaKey;
   const ids = sel.ids;
   const handled = () => e.preventDefault();
-  const key = e.key.length === 1 ? e.key.toLowerCase() : e.key;
+  const key = keyOf(e);
   const selectOne = (id: string) => o.ui.select({ parentId: o.store.get(id)!.parentId, anchor: id, head: id }, [id]);
 
   switch (key) {
@@ -248,6 +263,11 @@ export function selectionKeyDown(o: Outliner, e: Keys): void {
     case "Tab":
       if (mod || e.altKey) return;
       o.run((ctx) => (e.shiftKey ? cmd.outdent(ctx, ids) : cmd.indent(ctx, ids)));
+      return handled();
+
+    case "s":
+      if (!e.altKey || mod || e.shiftKey) return;
+      o.run((ctx) => cmd.toggleStar(ctx, ids));
       return handled();
 
     case "Backspace":

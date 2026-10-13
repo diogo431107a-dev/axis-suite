@@ -7,12 +7,18 @@ import { tokenize, type Token } from "../text/inline.ts";
 import { normalize, type Term } from "./query.ts";
 
 interface Derived {
-  /** content and note, normalized */
+  /** content and note, normalized, without the addresses of files */
   text: string;
   tags: string[];
   mentions: string[];
   dates: string[];
+  images: number;
+  /** Uploaded files that aren't images. */
+  files: number;
 }
+
+/** A file's address in its markup: searching for "api" shouldn't find every bullet with a file. */
+const FILE_URLS = /\(\/api\/files\/[0-9a-f-]{36}\)/g;
 
 const cache = new WeakMap<Node, Derived>();
 
@@ -21,15 +27,18 @@ function collect(tokens: Token[], out: Derived): void {
     if (t.type === "tag") out.tags.push(t.name.toLowerCase());
     else if (t.type === "mention") out.mentions.push(t.name.toLowerCase());
     else if (t.type === "date") out.dates.push(t.date);
+    else if (t.type === "image") out.images++;
+    else if (t.type === "file") out.files++;
     else if (t.type === "bold" || t.type === "italic" || t.type === "strike") collect(t.children, out);
   }
 }
 
-/** The tags, mentions and dates in a node's text and note. */
+/** The tags, mentions, dates and files in a node's text and note. */
 export function derived(node: Node): Derived {
   let d = cache.get(node);
   if (!d) {
-    d = { text: normalize(`${node.content}\n${node.note}`), tags: [], mentions: [], dates: [] };
+    const text = normalize(`${node.content}\n${node.note}`).replace(FILE_URLS, "");
+    d = { text, tags: [], mentions: [], dates: [], images: 0, files: 0 };
     collect(tokenize(node.content), d);
     if (node.note) collect(tokenize(node.note), d);
     cache.set(node, d);
@@ -53,7 +62,16 @@ function test(node: Node, t: Term, today: string): boolean {
     case "is":
       return node.completedAt !== null;
     case "has":
-      return t.value === "note" ? node.note !== "" : d.dates.length > 0;
+      switch (t.value) {
+        case "note":
+          return node.note !== "";
+        case "date":
+          return d.dates.length > 0;
+        case "image":
+          return d.images > 0;
+        case "file":
+          return d.files > 0;
+      }
     case "date":
       if (t.value === "today") return d.dates.includes(today);
       if (t.value === "tomorrow") return d.dates.includes(nextDay(today));

@@ -508,3 +508,121 @@ describe("sharing", () => {
     expect(tree.load(FREYA).nodes).toHaveLength(5004);
   });
 });
+
+describe("files", () => {
+  // Odin's tree: Home(Shared(Inside) Private); Shared is shared with Freya.
+  let ids: Record<"home" | "shared" | "inside" | "private", string>;
+  beforeEach(() => {
+    ids = { home: randomUUID(), shared: randomUUID(), inside: randomUUID(), private: randomUUID() };
+    apply([
+      { op: "create", id: ids.home, parentId: null, rank: "a0", content: "Home" },
+      { op: "create", id: ids.shared, parentId: ids.home, rank: "a0", content: "Shared" },
+      { op: "create", id: ids.inside, parentId: ids.shared, rank: "a0", content: "Inside" },
+      { op: "create", id: ids.private, parentId: ids.home, rank: "a1", content: "Private" },
+    ]);
+  });
+  const upload = (user: string, nodeId: string, name = "photo.png") => {
+    const id = randomUUID();
+    tree.addFile({ id, owner: tree.uploadOwner(user, nodeId), uploader: user, name, type: "image/png", size: 10 });
+    return id;
+  };
+  const image = (id: string) => `![photo.png](/api/files/${id})`;
+  const status = (fn: () => unknown) => {
+    try {
+      fn();
+    } catch (err) {
+      return err instanceof AccessError ? err.status : "other";
+    }
+    return "ok";
+  };
+  const in31Days = () => new Date(Date.now() + 31 * 86_400_000);
+
+  it("lets only those who may change a bullet upload into it, for its owner's tree", () => {
+    expect(status(() => tree.uploadOwner(FREYA, ids.inside))).toBe(404);
+    tree.setShares(ODIN, ids.shared, [{ username: FREYA, permission: "read" }], USERS);
+    expect(status(() => tree.uploadOwner(FREYA, ids.inside))).toBe(403);
+    tree.setShares(ODIN, ids.shared, [{ username: FREYA, permission: "write" }], USERS);
+    expect(tree.uploadOwner(FREYA, ids.inside)).toBe(ODIN);
+    expect(status(() => tree.uploadOwner(FREYA, ids.private))).toBe(404);
+    apply([{ op: "delete", id: ids.private }]);
+    expect(status(() => tree.uploadOwner(ODIN, ids.private))).toBe(404);
+  });
+
+  it("shows a file to whoever sees a bullet that refers to it, and to nobody else", () => {
+    const file = upload(ODIN, ids.inside);
+    expect(tree.fileFor(ODIN, file)?.name).toBe("photo.png");
+    expect(tree.fileFor(FREYA, file)).toBeNull();
+
+    tree.setShares(ODIN, ids.shared, [{ username: FREYA, permission: "read" }], USERS);
+    expect(tree.fileFor(FREYA, file)).toBeNull(); // nothing refers to it yet
+    apply([{ op: "update", id: ids.inside, content: `Look ${image(file)}` }]);
+    expect(tree.fileFor(FREYA, file)?.id).toBe(file);
+    expect(tree.fileFor(THOR, file)).toBeNull();
+
+    // Only from inside what is shared with them.
+    apply([{ op: "update", id: ids.inside, content: "" }]);
+    apply([{ op: "update", id: ids.private, note: image(file) }]);
+    expect(tree.fileFor(FREYA, file)).toBeNull();
+    apply([{ op: "update", id: ids.inside, note: image(file) }]);
+    expect(tree.fileFor(FREYA, file)?.id).toBe(file);
+
+    // Not once the bullet is deleted, or no longer shared.
+    apply([{ op: "delete", id: ids.inside }]);
+    expect(tree.fileFor(FREYA, file)).toBeNull();
+    apply([{ op: "restore", id: ids.inside }]);
+    expect(tree.fileFor(FREYA, file)?.id).toBe(file);
+    tree.removeShare(FREYA, ids.shared, FREYA);
+    expect(tree.fileFor(FREYA, file)).toBeNull();
+  });
+
+  it("ignores a reference from someone else's tree", () => {
+    const file = upload(ODIN, ids.private);
+    const mine = randomUUID();
+    apply([{ op: "create", id: mine, parentId: null, rank: "a0", content: image(file) }], FREYA);
+    expect(tree.fileFor(FREYA, file)).toBeNull();
+    // ...so it doesn't keep the file either.
+    expect(tree.purgeFiles(in31Days())).toEqual([file]);
+  });
+
+  it("lets an editor see what they uploaded, which belongs to the tree's owner", () => {
+    tree.setShares(ODIN, ids.shared, [{ username: FREYA, permission: "write" }], USERS);
+    const file = upload(FREYA, ids.inside);
+    tree.removeShare(ODIN, ids.shared, FREYA);
+    expect(tree.fileFor(FREYA, file)?.owner).toBe(ODIN);
+    expect(tree.fileFor(ODIN, file)?.uploader).toBe(FREYA);
+  });
+
+  it("gives a preview only once, and only from who uploaded it", () => {
+    const file = upload(ODIN, ids.inside);
+    expect(status(() => tree.previewTarget(FREYA, file))).toBe(404);
+    expect(status(() => tree.previewTarget(ODIN, file))).toBe("ok");
+    tree.setPreview(file);
+    expect(status(() => tree.previewTarget(ODIN, file))).toBe(409);
+    expect(tree.fileFor(ODIN, file)?.has_preview).toBe(1);
+  });
+
+  it("purges files nothing has referred to for 30 days", () => {
+    const [kept, dropped, never] = [upload(ODIN, ids.inside), upload(ODIN, ids.inside), upload(ODIN, ids.inside)];
+    apply([{ op: "update", id: ids.inside, content: `${image(kept)} ${image(dropped)}` }]);
+    apply([{ op: "update", id: ids.inside, content: image(kept) }]);
+    expect(tree.purgeFiles()).toEqual([]); // all too recent
+    expect(tree.purgeFiles(in31Days()).sort()).toEqual([dropped, never].sort());
+    expect(tree.fileIds()).toEqual(new Set([kept]));
+
+    // A file in a deleted bullet stays while the bullet can be restored, and goes with it.
+    apply([{ op: "delete", id: ids.inside }]);
+    expect(tree.purgeFiles(in31Days())).toEqual([]);
+    tree.purge(in31Days());
+    expect(tree.purgeFiles(in31Days())).toEqual([kept]);
+  });
+
+  it("deletes the files of users no longer in Heimdall", () => {
+    const own = randomUUID();
+    apply([{ op: "create", id: own, parentId: null, rank: "a0", content: "F" }], FREYA);
+    const odins = upload(ODIN, ids.inside);
+    const freyas = upload(FREYA, own);
+    tree.removeUnknownOwners(new Set([ODIN]));
+    expect(tree.fileIds()).toEqual(new Set([odins]));
+    expect(tree.fileFor(FREYA, freyas)).toBeNull();
+  });
+});

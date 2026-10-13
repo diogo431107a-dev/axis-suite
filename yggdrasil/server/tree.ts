@@ -7,6 +7,7 @@ import type { DatabaseSync } from "node:sqlite";
 import {
   FIELD_NAMES,
   LIMITS,
+  fileIdsIn,
   parseOp,
   type ChangesResponse,
   type Node,
@@ -33,8 +34,22 @@ export class AccessError extends Error {
   }
 }
 
-/** Deleted bullets are kept this long, then purged for good. */
+/**
+ * Deleted bullets are kept this long, then purged for good. So are uploaded files that no
+ * bullet's text refers to any more, so undoing or redoing an insert keeps working that long.
+ */
 export const PURGE_AFTER_DAYS = 30;
+
+/** An uploaded file, as the database knows it (the bytes are on disk; see files.ts). */
+export interface FileRow {
+  id: string;
+  owner: string;
+  uploader: string;
+  name: string;
+  type: string;
+  size: number;
+  has_preview: number;
+}
 
 interface Row {
   id: string;
@@ -145,6 +160,30 @@ export function createTree(db: DatabaseSync) {
     UPDATE nodes SET rev = $rev WHERE id IN (SELECT id FROM sub)`);
   const purgeDeleted = db.prepare("DELETE FROM nodes WHERE deleted_at IS NOT NULL AND deleted_at < ?");
 
+  // Files
+  const FILE_COLUMNS = "id, owner, uploader, name, type, size, has_preview";
+  const selectFile = db.prepare(`SELECT ${FILE_COLUMNS} FROM files WHERE id = ?`);
+  const insertFile = db.prepare(`
+    INSERT INTO files (id, owner, uploader, name, type, size, created_at)
+    VALUES ($id, $owner, $uploader, $name, $type, $size, $now)`);
+  const setHasPreview = db.prepare("UPDATE files SET has_preview = 1 WHERE id = ?");
+  const selectNodeRefs = db.prepare("SELECT file_id FROM file_refs WHERE node_id = ?");
+  const selectFileRefs = db.prepare("SELECT node_id FROM file_refs WHERE file_id = ?");
+  const insertRef = db.prepare("INSERT OR IGNORE INTO file_refs (file_id, node_id) VALUES (?, ?)");
+  const deleteRef = db.prepare("DELETE FROM file_refs WHERE file_id = ? AND node_id = ?");
+  const setUnref = db.prepare(`
+    UPDATE files SET unref_at = $now
+    WHERE id = $id AND NOT EXISTS (SELECT 1 FROM file_refs WHERE file_id = $id)`);
+  const clearUnref = db.prepare("UPDATE files SET unref_at = NULL WHERE id = ?");
+  // When a deleted bullet is purged, its references go with it (ON DELETE CASCADE) and its files
+  // count from when they were uploaded, which by then is long enough ago.
+  const selectUnusedFiles = db.prepare(`
+    SELECT id FROM files f
+    WHERE NOT EXISTS (SELECT 1 FROM file_refs r WHERE r.file_id = f.id)
+      AND COALESCE(unref_at, created_at) < ?`);
+  const deleteFile = db.prepare("DELETE FROM files WHERE id = ?");
+  const selectFileIds = db.prepare("SELECT id FROM files");
+
   // Sharing
   const SHARE_COLUMNS = "s.node_id, n.owner, s.username, s.permission FROM shares s JOIN nodes n ON n.id = s.node_id";
   const selectSharesWith = db.prepare(`SELECT ${SHARE_COLUMNS} WHERE s.username = ? ORDER BY n.owner, s.node_id`);
@@ -173,6 +212,7 @@ export function createTree(db: DatabaseSync) {
   // Nodes take their shares and views with them; then nothing stays shared with those users.
   const deleteUnknown = [
     db.prepare(`DELETE FROM nodes WHERE ${UNKNOWN_OWNER}`),
+    db.prepare(`DELETE FROM files WHERE ${UNKNOWN_OWNER}`),
     ...["shares", "node_views", "resets"].map((table) => db.prepare(`DELETE FROM ${table} WHERE ${UNKNOWN_USER}`)),
   ];
   // One statement per set of changed fields, compiled the first time it is needed.
@@ -202,6 +242,27 @@ export function createTree(db: DatabaseSync) {
       updateStatements.set(key, stmt);
     }
     stmt.run(...names.map((f) => toColumnValue(fields[f]!)), rev, now, id);
+  }
+
+  /**
+   * Records which files a node's text refers to. Only files of the node's own tree count, so
+   * writing someone else's file address into a bullet shows nobody that file.
+   */
+  function syncRefs(id: string, owner: string, content: string, note: string, now: string): void {
+    const before = new Set((selectNodeRefs.all(id) as { file_id: string }[]).map((r) => r.file_id));
+    const after = new Set(
+      fileIdsIn(`${content}\n${note}`).filter((f) => (selectFile.get(f) as FileRow | undefined)?.owner === owner),
+    );
+    for (const f of before) {
+      if (after.has(f)) continue;
+      deleteRef.run(f, id);
+      setUnref.run({ $id: f, $now: now });
+    }
+    for (const f of after) {
+      if (before.has(f)) continue;
+      insertRef.run(f, id);
+      clearUnref.run(f);
+    }
   }
 
   /** Whether `ancestor` is `id` itself or one of its ancestors, walking up from `id`. */
@@ -420,6 +481,7 @@ export function createTree(db: DatabaseSync) {
           $rev: rev,
           $now: now,
         });
+        if (fields.content || fields.note) syncRefs(id, owner, fields.content ?? "", fields.note ?? "", now);
         if (!own) applyView(user, selectNode.get(id) as unknown as Row, fields, rev);
         batch.owners.add(owner);
         return true;
@@ -493,6 +555,9 @@ export function createTree(db: DatabaseSync) {
       }
     }
     if (any) updateFields(row.id, changed, rev, now);
+    if (changed.content !== undefined || changed.note !== undefined) {
+      syncRefs(row.id, row.owner, changed.content ?? row.content, changed.note ?? row.note, now);
+    }
     return any;
   }
 
@@ -708,9 +773,85 @@ export function createTree(db: DatabaseSync) {
       });
     },
 
+    // ── Files ─────────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Whose tree a file that `user` uploads into bullet `nodeId` belongs to: the bullet's owner,
+     * as bullets added there do. Refused unless `user` may change that bullet.
+     */
+    uploadOwner(user: string, nodeId: string): string {
+      const row = selectNode.get(nodeId) as Row | undefined;
+      const role = row ? roleOf(user, row, grantedTo(user)) : null;
+      if (!row || !role || !seer(new Map()).seen(nodeId).alive) throw new AccessError(404, "No such bullet");
+      if (!canWrite(role)) throw new AccessError(403, "This bullet is shared with you to read only");
+      return row.owner;
+    },
+
+    /** Records a file whose bytes are saved. */
+    addFile(file: Omit<FileRow, "has_preview">): void {
+      insertFile.run({
+        $id: file.id,
+        $owner: file.owner,
+        $uploader: file.uploader,
+        $name: file.name,
+        $type: file.type,
+        $size: file.size,
+        $now: new Date().toISOString(),
+      });
+    },
+
+    /**
+     * A file `user` may download, or null (no such file, or not theirs to see). They may if it
+     * is in their tree, if they uploaded it, or if they can see a bullet whose text refers to it.
+     */
+    fileFor(user: string, id: string): FileRow | null {
+      const file = selectFile.get(id) as FileRow | undefined;
+      if (!file) return null;
+      if (file.owner === user || file.uploader === user) return file;
+      const granted = grantedTo(user);
+      if (granted.size === 0) return null;
+      const { seen } = seer(granted);
+      for (const { node_id } of selectFileRefs.all(id) as { node_id: string }[]) {
+        const s = seen(node_id);
+        if (s.best !== null && s.alive) return file;
+      }
+      return null;
+    },
+
+    /** The file `user` may give a preview: one they uploaded (or in their tree) that has none yet. */
+    previewTarget(user: string, id: string): FileRow {
+      const file = selectFile.get(id) as FileRow | undefined;
+      if (!file || (file.uploader !== user && file.owner !== user)) throw new AccessError(404, "No such file");
+      if (file.has_preview) throw new AccessError(409, "This file has a preview already");
+      return file;
+    },
+
+    /** Records that a file's preview is saved. */
+    setPreview(id: string): void {
+      setHasPreview.run(id);
+    },
+
+    /**
+     * Deletes for good the files no bullet has referred to for PURGE_AFTER_DAYS (or ever, if they
+     * were uploaded that long ago). Returns their ids, so their bytes can be deleted too.
+     */
+    purgeFiles(now = new Date()): string[] {
+      const cutoff = new Date(now.getTime() - PURGE_AFTER_DAYS * 86_400_000).toISOString();
+      return transaction(() => {
+        const ids = (selectUnusedFiles.all(cutoff) as { id: string }[]).map((r) => r.id);
+        for (const id of ids) deleteFile.run(id);
+        return ids;
+      });
+    },
+
+    /** The id of every file there is. */
+    fileIds(): Set<string> {
+      return new Set((selectFileIds.all() as { id: string }[]).map((r) => r.id));
+    },
+
     /**
      * Deletes for good the bullets of every owner who isn't in `known` (Heimdall's usernames),
-     * i.e. of users removed from Heimdall, and stops sharing bullets with them. Returns how many
+     * i.e. of users removed from Heimdall, and their files, and stops sharing bullets with them. Returns how many
      * bullets each of them had. No revision is needed: nobody left can see those bullets, and
      * nobody left sees what was shared with them.
      */
