@@ -2,7 +2,7 @@
 // indent, and the guide lines of its ancestors are drawn per row. Memoized and subscribed to its
 // own node, so typing re-renders one row.
 import { memo, useCallback, useRef, useState, type MouseEvent } from "react";
-import { ChevronRight, Ellipsis, Star } from "lucide-react";
+import { ChevronRight, Ellipsis, Star, Users } from "lucide-react";
 import * as cmd from "../model/commands.ts";
 import type { Field } from "../model/ui.ts";
 import { Inline } from "../text/Inline.tsx";
@@ -31,6 +31,8 @@ export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: n
   const highlight = view.matches?.has(id) ? view.highlight : null;
   const expanded = hasKids && (view.filter !== null || !node.collapsed);
   const completed = node.completedAt !== null;
+  const shares = o.store.sharesOf(id);
+  const sharedWith = shares.length > 0 ? `Shared with ${shares.map((s) => s.username).join(", ")}` : "";
 
   return (
     <div data-bullet={id} className="relative" style={{ paddingLeft: depth * INDENT }}>
@@ -80,6 +82,11 @@ export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: n
             node.note && <Text id={id} text={node.note} field="note" highlight={highlight} />
           )}
         </div>
+        {sharedWith && (
+          <span title={sharedWith} className="mr-1 mt-[0.35em] shrink-0">
+            <Users aria-label={sharedWith} className="h-3.5 w-3.5 text-sky-600" />
+          </span>
+        )}
         {node.starred && (
           <Star aria-label="Starred" className="mt-[0.35em] h-3.5 w-3.5 shrink-0 fill-amber-300 text-amber-400" />
         )}

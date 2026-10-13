@@ -3,7 +3,7 @@ import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
 import { LIMITS, USER_HEADER } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { createEvents } from "./events.ts";
-import { BatchError, createTree } from "./tree.ts";
+import { AccessError, BatchError, createTree } from "./tree.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3002);
@@ -57,6 +57,12 @@ app.use("/api", auth.sameOriginWrites, auth.requireUser, (req, res, next) => {
 // The signed-in user
 app.get("/api/me", auth.me);
 
+// The users the signed-in user can share bullets with: every Heimdall user but themselves.
+app.get("/api/users", (req, res) => {
+  const { username } = auth.user(req);
+  res.json([...(known ?? [])].filter((u) => u !== username).sort());
+});
+
 // The whole tree, as the page loads it
 app.get("/api/tree", (req, res) => {
   res.json(tree.load(auth.user(req).username));
@@ -78,8 +84,10 @@ app.post("/api/ops", (req, res) => {
   }
   const { username } = auth.user(req);
   try {
-    const result = tree.applyOps(username, ops);
-    if (result.rev !== null) events.publish(username, { rev: result.rev, clientId });
+    const notify = new Set<string>();
+    const result = tree.applyOps(username, ops, notify);
+    // The user's other tabs, and whoever else sees the bullets changed.
+    if (result.rev !== null) for (const u of notify) events.publish(u, { rev: result.rev, clientId });
     res.json(result);
   } catch (err) {
     if (err instanceof BatchError) return void res.status(400).json({ error: err.message });
@@ -87,7 +95,37 @@ app.post("/api/ops", (req, res) => {
   }
 });
 
-// Live updates: a "rev" event each time the user's tree changes
+/** Answers a refused sharing request, or hands anything else on to Express. */
+function sharing(res: express.Response, fn: (notify: Set<string>) => void) {
+  const notify = new Set<string>();
+  try {
+    fn(notify);
+  } catch (err) {
+    if (err instanceof AccessError) return void res.status(err.status).json({ error: err.message });
+    throw err;
+  }
+  for (const u of notify) events.publish(u, { rev: tree.currentRev(), clientId: "" });
+}
+
+// Who a bullet of the user's own is shared with
+app.get("/api/nodes/:id/shares", (req, res) => {
+  sharing(res, () => res.json(tree.shares(auth.user(req).username, req.params.id)));
+});
+
+// Share: replace everyone the bullet (and everything under it) is shared with
+app.put("/api/nodes/:id/shares", (req, res) => {
+  sharing(res, (notify) => res.json(tree.setShares(auth.user(req).username, req.params.id, req.body, known, notify)));
+});
+
+// Stop sharing with one person. The owner can remove anyone; anyone can remove themselves.
+app.delete("/api/nodes/:id/shares/:username", (req, res) => {
+  sharing(res, (notify) => {
+    tree.removeShare(auth.user(req).username, req.params.id, req.params.username, notify);
+    res.status(204).end();
+  });
+});
+
+// Live updates: a "rev" event each time the user's tree, or a bullet shared with them, changes
 app.get("/api/events", (req, res) => {
   events.subscribe(auth.user(req).username, req, res);
 });

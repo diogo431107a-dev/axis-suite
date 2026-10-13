@@ -1,6 +1,6 @@
 // The app's model in one place: the tree, the sync queue, undo history and UI state. Every edit
 // goes through commit(), which applies it, queues it for the server and records it for undo.
-import type { Op } from "../../shared/protocol.ts";
+import type { Op, Role } from "../../shared/protocol.ts";
 import type { TextSource } from "../io/plaintext.ts";
 import { localDate } from "../text/dates.ts";
 import { parseQuery, type Term } from "../search/query.ts";
@@ -18,6 +18,46 @@ export interface CommitOptions {
   before?: Focus;
   /** The focus after the change, when the result has no caret. */
   after?: Focus;
+}
+
+export const READ_ONLY = "This bullet is shared with you to read only.";
+const OWNER_ONLY = "Only its owner can move or delete this bullet.";
+
+/** The fields a bullet shared with someone keeps for them alone; anyone may change those. */
+const OWN_VIEW = new Set(["op", "id", "collapsed", "starred"]);
+
+/**
+ * Why ops can't be made on the bullets shared with the user, or null if they can: the same rules
+ * as the server's. `roleOf` is the store's; `isSharedTop` tells the tops of shared bullets.
+ */
+export function refusal(
+  ops: readonly Op[],
+  roleOf: (id: string | null, parents: ReadonlyMap<string, string | null>) => Role,
+  isSharedTop: (id: string) => boolean,
+): string | null {
+  const parents = new Map<string, string | null>();
+  for (const op of ops) if (op.op === "create") parents.set(op.id, op.parentId);
+  const role = (id: string | null) => roleOf(id, parents);
+  for (const op of ops) {
+    switch (op.op) {
+      case "create":
+        if (role(op.parentId) === "viewer") return READ_ONLY;
+        break;
+      case "update":
+        if (role(op.id) === "viewer" && Object.keys(op).some((k) => !OWN_VIEW.has(k))) return READ_ONLY;
+        break;
+      case "move":
+        if (role(op.id) === "viewer" || role(op.parentId) === "viewer") return READ_ONLY;
+        if (isSharedTop(op.id)) return OWNER_ONLY;
+        break;
+      case "delete":
+      case "restore":
+        if (role(op.id) === "viewer") return READ_ONLY;
+        if (isSharedTop(op.id)) return OWNER_ONLY;
+        break;
+    }
+  }
+  return null;
 }
 
 export class Outliner {
@@ -132,9 +172,26 @@ export class Outliner {
     return this.commit(command(this.ctx()), options);
   }
 
-  /** Applies a command's result as one undo step. Returns false if it changed nothing. */
+  /** Whether the user may change the text of bullet id (not only if it is shared with them to read). */
+  canEdit(id: string): boolean {
+    return this.store.roleOf(id) !== "viewer";
+  }
+
+  /**
+   * Applies a command's result as one undo step. Returns false if it changed nothing, or if it
+   * would change a bullet shared with the user in a way they may not (they are told why).
+   */
   commit(result: Result | null, options: CommitOptions = {}): boolean {
     if (!result || result.ops.length === 0) return false;
+    const refused = refusal(
+      result.ops,
+      (id, parents) => this.store.roleOf(id, parents),
+      (id) => this.store.get(id)?.parentId === null && this.store.sharedWithMe(id) !== undefined,
+    );
+    if (refused) {
+      this.notice(refused);
+      return false;
+    }
     const before = options.before ?? this.focus();
     const inverse = this.store.applyAll(result.ops);
     if (inverse.length === 0) return false;

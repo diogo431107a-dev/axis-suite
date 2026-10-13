@@ -146,7 +146,7 @@ export class Sync {
   /** Loads the tree, sends what closed tabs left behind, and starts listening for changes. */
   async start(): Promise<void> {
     const tree = await this.#get<TreeResponse>("/api/tree");
-    this.#store.load(tree.nodes);
+    this.#store.load(tree.nodes, tree.shares);
     this.#rev = this.#latestRev = tree.rev;
     this.#adoptSavedQueues();
 
@@ -370,6 +370,7 @@ export class Sync {
         ]);
         this.#store.batch(() => {
           for (const node of changes.nodes) this.#store.applyRemote(node, guarded.get(node.id) ?? NOTHING_GUARDED);
+          this.#store.setShares(changes.shares);
         });
         this.#rev = Math.max(this.#rev, changes.rev);
         this.#latestRev = Math.max(this.#latestRev, changes.rev);
@@ -397,7 +398,7 @@ export class Sync {
     try {
       const tree = await this.#get<TreeResponse>("/api/tree");
       this.#store.batch(() => {
-        this.#store.load(tree.nodes);
+        this.#store.load(tree.nodes, tree.shares);
         this.#store.applyAll([...(this.#inflight ?? []), ...this.#queue]);
       });
       this.#rev = tree.rev;

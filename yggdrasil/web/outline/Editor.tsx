@@ -85,6 +85,8 @@ export function Editor({ id, field, className = "", placeholder }: Props) {
       rows={1}
       value={value}
       placeholder={placeholder}
+      // A bullet shared to read only: the caret moves and copies, but typing changes nothing.
+      readOnly={!o.canEdit(id)}
       spellCheck
       className={`ygg-text block w-full scroll-mt-16 scroll-mb-4 resize-none overflow-hidden bg-transparent outline-none ${className}`}
       onChange={(e) => save(e.currentTarget)}

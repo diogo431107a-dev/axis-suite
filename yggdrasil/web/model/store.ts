@@ -1,5 +1,6 @@
 // The tree in the browser: every node by id, the children of each node in order, and
-// subscriptions so a component re-renders only when its own node or child list changes.
+// subscriptions so a component re-renders only when its own node or child list changes. It also
+// knows the bullets shared with the user, which stay out of their own top level.
 import {
   FIELD_NAMES,
   compareSiblings,
@@ -7,6 +8,10 @@ import {
   type Node,
   type NodeFields,
   type Op,
+  type Role,
+  type Share,
+  type SharedWithMe,
+  type Shares,
 } from "../../shared/protocol.ts";
 
 type Listener = () => void;
@@ -15,8 +20,11 @@ type Listener = () => void;
 export type Guarded = FieldName | "place" | "deletedAt";
 
 const ROOT = "";
+/** Where the bullets shared with the user are listed: not a node id, so no node's children. */
+const SHARED = "(shared with me)";
 const keyOf = (parentId: string | null) => parentId ?? ROOT;
 const NO_CHILDREN: readonly string[] = Object.freeze([]);
+const NO_SHARES: readonly Share[] = Object.freeze([]);
 
 export function newNode(id: string, parentId: string | null, rank: string): Node {
   return {
@@ -47,6 +55,16 @@ export class Store {
   #changedNodes = new Set<string>();
   #changedKids = new Set<string>();
   #changedAll = false;
+  /** Who the user shares their bullets with, by bullet. */
+  #byMe = new Map<string, readonly Share[]>();
+  /** The bullets shared with the user, by id. */
+  #withMe = new Map<string, SharedWithMe>();
+  #sharesJson = "";
+
+  // A bullet shared with the user comes without its parent: it is listed apart from their own.
+  #keyOf(node: Node): string {
+    return node.parentId === null && this.#withMe.has(node.id) ? SHARED : keyOf(node.parentId);
+  }
 
   get(id: string): Node | undefined {
     return this.#nodes.get(id);
@@ -82,12 +100,67 @@ export class Store {
     return this.#nodes.values();
   }
 
-  /** Replaces the whole tree. */
-  load(nodes: Node[]): void {
+  /** The tops of the bullets shared with the user, in no particular order. */
+  sharedRoots(): readonly string[] {
+    return this.#kids.get(SHARED) ?? NO_CHILDREN;
+  }
+
+  /** Who a bullet of the user's own is shared with. */
+  sharesOf(id: string): readonly Share[] {
+    return this.#byMe.get(id) ?? NO_SHARES;
+  }
+
+  /** The bullets of the user's own that they share. */
+  sharedByMe(): string[] {
+    return [...this.#byMe.keys()];
+  }
+
+  /** A bullet someone else shares with the user, if id is one. */
+  sharedWithMe(id: string): SharedWithMe | undefined {
+    return this.#withMe.get(id);
+  }
+
+  /**
+   * The user's access to a node: theirs, or the best permission of the bullets shared with them
+   * that it is in. `parents` gives the parents of nodes not in the store yet (made by the same
+   * change).
+   */
+  roleOf(id: string | null, parents?: ReadonlyMap<string, string | null>): Role {
+    let best: SharedWithMe["permission"] | null = null;
+    for (let cur = id, steps = 0; cur !== null && steps < 100_000; steps++) {
+      const share = this.#withMe.get(cur);
+      if (share && (best === null || share.permission === "write")) best = share.permission;
+      const node = this.#nodes.get(cur);
+      cur = node ? node.parentId : (parents?.get(cur) ?? null);
+    }
+    return best === "write" ? "editor" : best === "read" ? "viewer" : "owner";
+  }
+
+  /** Takes the server's lists of shares. Returns whether they changed. */
+  setShares(shares: Shares): boolean {
+    const json = JSON.stringify(shares);
+    if (json === this.#sharesJson) return false;
+    this.#sharesJson = json;
+    const before = [...this.#withMe.keys()].sort().join();
+    this.#byMe = new Map(shares.byMe.map((s) => [s.id, s.shares]));
+    this.#withMe = new Map(shares.withMe.map((s) => [s.id, s]));
+    // Which bullets are listed apart changed: sort them out again.
+    if ([...this.#withMe.keys()].sort().join() !== before) this.load([...this.#nodes.values()]);
+    else this.batch(() => (this.#changedAll = true));
+    return true;
+  }
+
+  /** Replaces the whole tree (and with `shares`, the lists of shares). */
+  load(nodes: Node[], shares?: Shares): void {
+    if (shares) {
+      this.#sharesJson = JSON.stringify(shares);
+      this.#byMe = new Map(shares.byMe.map((s) => [s.id, s.shares]));
+      this.#withMe = new Map(shares.withMe.map((s) => [s.id, s]));
+    }
     this.#nodes = new Map(nodes.map((n) => [n.id, n]));
     const groups = new Map<string, Node[]>();
     for (const n of nodes) {
-      const key = keyOf(n.parentId);
+      const key = this.#keyOf(n);
       const group = groups.get(key);
       if (group) group.push(n);
       else groups.set(key, [n]);
@@ -217,15 +290,15 @@ export class Store {
       this.#insertChild(next);
     } else if (prev.deletedAt !== next.deletedAt || (prev.completedAt === null) !== (next.completedAt === null)) {
       // Which children are shown changed: a new array tells the parent's subscribers.
-      const key = keyOf(next.parentId);
-      this.#kids.set(key, [...this.children(next.parentId)]);
+      const key = this.#keyOf(next);
+      this.#kids.set(key, [...(this.#kids.get(key) ?? NO_CHILDREN)]);
       this.#changedKids.add(key);
     }
   }
 
   #insertChild(node: Node): void {
-    const key = keyOf(node.parentId);
-    const list = [...this.children(node.parentId)];
+    const key = this.#keyOf(node);
+    const list = [...(this.#kids.get(key) ?? NO_CHILDREN)];
     // Binary search for the first sibling that sorts after the node.
     let lo = 0;
     let hi = list.length;
@@ -240,8 +313,8 @@ export class Store {
   }
 
   #removeChild(node: Node): void {
-    const key = keyOf(node.parentId);
-    const list = this.children(node.parentId).filter((id) => id !== node.id);
+    const key = this.#keyOf(node);
+    const list = (this.#kids.get(key) ?? NO_CHILDREN).filter((id) => id !== node.id);
     if (list.length > 0) this.#kids.set(key, list);
     else this.#kids.delete(key);
     this.#changedKids.add(key);

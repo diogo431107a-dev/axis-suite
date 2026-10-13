@@ -1,6 +1,8 @@
-// The menu of a bullet's dot (right-click the dot, or the ⋯ button on the row).
+// The menu of a bullet's dot (right-click the dot, or the ⋯ button on the row). It offers only
+// what the user may do: a bullet shared with them to read can only be starred, exported or linked.
+// (The top of a bullet shared with them is never a row: it is taken off their list in the sidebar.)
 import { useEffect, useRef, type ReactNode } from "react";
-import { Check, Download, Link, Star, Trash2 } from "lucide-react";
+import { Check, Download, Link, Share2, Star, Trash2 } from "lucide-react";
 import * as cmd from "../model/commands.ts";
 import { useNode, useOutliner } from "./hooks.ts";
 import { pathOf } from "./nav.ts";
@@ -32,6 +34,7 @@ export function BulletMenu({ id, onClose }: Props) {
     fn();
     onClose();
   };
+  const role = o.store.roleOf(id);
 
   return (
     <div
@@ -42,9 +45,16 @@ export function BulletMenu({ id, onClose }: Props) {
       <Item icon={<Star className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.toggleStar(ctx, id)))}>
         {node.starred ? "Remove star" : "Star"}
       </Item>
-      <Item icon={<Check className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.toggleComplete(ctx, [id])))}>
-        {node.completedAt ? "Mark as not completed" : "Complete"}
-      </Item>
+      {role !== "viewer" && (
+        <Item icon={<Check className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.toggleComplete(ctx, [id])))}>
+          {node.completedAt ? "Mark as not completed" : "Complete"}
+        </Item>
+      )}
+      {role === "owner" && (
+        <Item icon={<Share2 className="h-4 w-4" />} onClick={act(() => o.ui.setDialog({ kind: "share", id }))}>
+          Share…
+        </Item>
+      )}
       <Item icon={<Download className="h-4 w-4" />} onClick={act(() => o.ui.setDialog({ kind: "export", root: id }))}>
         Export…
       </Item>
@@ -54,10 +64,14 @@ export function BulletMenu({ id, onClose }: Props) {
       >
         Copy link
       </Item>
-      <div className="my-1 border-t border-gray-100" />
-      <Item icon={<Trash2 className="h-4 w-4" />} danger onClick={act(() => o.run((ctx) => cmd.remove(ctx, [id])))}>
-        Delete
-      </Item>
+      {role !== "viewer" && (
+        <>
+          <div className="my-1 border-t border-gray-100" />
+          <Item icon={<Trash2 className="h-4 w-4" />} danger onClick={act(() => o.run((ctx) => cmd.remove(ctx, [id])))}>
+            Delete
+          </Item>
+        </>
+      )}
     </div>
   );
 }

@@ -34,6 +34,30 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       INSERT INTO meta (key, value) VALUES ('rev', 0), ('purged_rev', 0);
     `);
   },
+  // v2: sharing. The people a bullet is shared with (everything under it comes along); each
+  // one's own collapsed and starred for the bullets shared with them; and, per user, the latest
+  // revision after which their pages must load the whole tree again (what they may see changed).
+  (db) => {
+    db.exec(`
+      CREATE TABLE shares (
+        node_id    TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+        username   TEXT NOT NULL,                 -- Heimdall username of the person it's shared with
+        permission TEXT NOT NULL CHECK (permission IN ('read', 'write')),
+        PRIMARY KEY (node_id, username)
+      );
+      CREATE INDEX shares_username ON shares (username);
+      CREATE TABLE node_views (
+        node_id   TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+        username  TEXT NOT NULL,                  -- someone the bullet is shared with
+        collapsed INTEGER,                        -- NULL: as its owner has it
+        starred   INTEGER NOT NULL DEFAULT 0,
+        rev       INTEGER NOT NULL,
+        PRIMARY KEY (node_id, username)
+      );
+      CREATE INDEX node_views_username_rev ON node_views (username, rev);
+      CREATE TABLE resets (username TEXT PRIMARY KEY, rev INTEGER NOT NULL);
+    `);
+  },
 ];
 
 /** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */
