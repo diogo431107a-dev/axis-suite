@@ -7,6 +7,7 @@ packages:
   - janus
   - papyrus
   - vinr
+  - chronos
   - packages/*
 
 # One version of each shared tool for the whole suite. Packages ask for these with "catalog:".
