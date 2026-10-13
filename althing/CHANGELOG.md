@@ -1,0 +1,12 @@
+# Changelog
+
+What changed in Althing, newest first. Each version is tagged in git as `althing-v<version>`. How versions are numbered and released is in the [suite README](../README.md#versions-and-changelogs).
+
+## Unreleased
+
+- The suite's real-time chat: a lobby that is always open, rooms anyone can open and join (they close when everyone has left), and direct messages between two people.
+- Everyone has a profile: one of twelve fun pictures, a nickname and "About me". The profile says that personal information is forbidden.
+- "Online" means signed in to the suite, as Heimdall knows it.
+- Everything is on record: messages can't be edited or deleted, closed rooms stay in the database, and so do room visits and old nicknames. The README shows how to read the record on the server.
+- A user removed from Heimdall loses their profile, but what they said stays, as "deleted user".
+- **By hand:** install Heimdall again first (it gained `GET /online`), then Althing. With a real domain, `althing.<domain>` needs a DNS record (gansoazul.com.br already has one).

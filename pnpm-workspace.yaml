@@ -9,6 +9,7 @@ packages:
   - vinr
   - chronos
   - valkyrie
+  - althing
   - packages/*
 
 # One version of each shared tool for the whole suite. Packages ask for these with "catalog:".
