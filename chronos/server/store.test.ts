@@ -232,3 +232,125 @@ describe("removed users", () => {
     expect(store.calendars("odin")).toHaveLength(1);
   });
 });
+
+describe("sharing", () => {
+  const users = new Set(["odin", "freya", "thor", "loki"]);
+  const share = (shares: { username: string; permission: string }[], id = cal) =>
+    store.setShares("odin", id, shares, users);
+  const freyas = () => store.calendars("freya").find((c) => c.id === cal);
+  const range = { from: "2026-11-01", to: "2026-12-01" };
+
+  it("shows a calendar and its events to those it is shared with, and only to them", () => {
+    const { id } = store.createEvent("odin", timed());
+    expect(share([{ username: "freya", permission: "read" }])).toEqual([{ username: "freya", permission: "read" }]);
+    expect(freyas()).toMatchObject({ owner: "odin", role: "viewer", shared: true, name: "Personal", events: 1 });
+    expect(freyas()!.shares).toBeUndefined();
+    expect(store.calendars("odin")[0]).toMatchObject({ role: "owner", shared: true, shares: [{ username: "freya" }] });
+    expect(store.events("freya", range).map((e) => e.id)).toEqual([id]);
+    expect(store.event("freya", id).title).toBe("Lunch");
+    expect(store.calendarEvents("freya", cal)).toHaveLength(1);
+    expect(store.calendars("thor")).toEqual([]);
+    expect(store.events("thor", range)).toEqual([]);
+    expect(refusal(() => store.event("thor", id)).status).toBe(404);
+    expect(refusal(() => store.calendarEvents("thor", cal)).status).toBe(404);
+  });
+
+  it("lets a reader read, and nothing else", () => {
+    const { id, rev } = store.createEvent("odin", timed());
+    share([{ username: "freya", permission: "read" }]);
+    expect(refusal(() => store.createEvent("freya", timed())).status).toBe(403);
+    expect(refusal(() => store.putEvent("freya", id, timed({ rev, title: "Mine" }))).code).toBe("forbidden");
+    expect(refusal(() => store.deleteEvent("freya", id)).status).toBe(403);
+    expect(
+      refusal(() => store.importEvents("freya", { calendarId: cal, sourceName: "", events: [imported("x")] })).status,
+    ).toBe(403);
+    expect(refusal(() => store.putSettings("freya", { defaultCalendarId: cal })).status).toBe(403);
+    expect(store.event("odin", id).title).toBe("Lunch");
+  });
+
+  it("lets an editor change the events, which stay the owner's", () => {
+    share([{ username: "freya", permission: "write" }]);
+    expect(freyas()!.role).toBe("editor");
+    const { id, rev } = store.createEvent("freya", timed({ title: "Dinner" }));
+    const saved = store.putEvent("freya", id, timed({ rev, title: "Supper" }));
+    expect(store.event("odin", id)).toMatchObject({ title: "Supper", rev: saved.rev });
+    expect(db.prepare("SELECT owner FROM events WHERE id = ?").get(id)).toEqual({ owner: "odin" });
+    // Two people editing the same event: the later save from an old revision is refused.
+    expect(refusal(() => store.putEvent("odin", id, timed({ rev, title: "Late" }))).code).toBe("conflict");
+    expect(store.importEvents("freya", { calendarId: cal, sourceName: "", events: [imported("x")] }).added).toBe(1);
+    store.putSettings("freya", { defaultCalendarId: cal });
+    store.deleteEvent("freya", id);
+    expect(refusal(() => store.event("odin", id)).status).toBe(404);
+  });
+
+  it("leaves the calendar itself and who sees it to its owner", () => {
+    share([{ username: "freya", permission: "write" }]);
+    expect(refusal(() => store.updateCalendar("freya", cal, { name: "Ours" })).status).toBe(403);
+    expect(refusal(() => store.deleteCalendar("freya", cal)).status).toBe(403);
+    expect(refusal(() => store.setShares("freya", cal, [], users)).status).toBe(403);
+    expect(refusal(() => store.removeShare("freya", cal, "thor")).status).toBe(403);
+    expect(refusal(() => store.updateCalendar("thor", cal, { name: "Ours" })).status).toBe(404);
+    store.updateCalendar("odin", cal, { name: "Family" });
+    expect(freyas()!.name).toBe("Family");
+  });
+
+  it("checks the share list", () => {
+    expect(refusal(() => share([{ username: "odin", permission: "read" }])).code).toBe("invalid");
+    expect(refusal(() => share([{ username: "nobody", permission: "read" }])).code).toBe("invalid");
+    expect(refusal(() => share([{ username: "freya", permission: "admin" }])).code).toBe("invalid");
+    const twice = [
+      { username: "freya", permission: "read" },
+      { username: "freya", permission: "write" },
+    ];
+    expect(refusal(() => share(twice)).code).toBe("invalid");
+    expect(refusal(() => store.setShares("odin", cal, [], null)).code).toBe("invalid");
+    expect(store.calendars("odin")[0]!.shared).toBe(false);
+  });
+
+  it("gives each person their own colour and visibility, kept when the list is saved again", () => {
+    store.createCalendar("freya", { name: "Mine", color: "indigo" });
+    share([{ username: "freya", permission: "read" }]);
+    expect(freyas()).toMatchObject({ color: "sky", visible: true });
+    store.updateCalendar("freya", cal, { name: "Personal", color: "rose", visible: false });
+    expect(freyas()).toMatchObject({ color: "rose", visible: false });
+    expect(store.calendars("odin")[0]).toMatchObject({ color: "indigo", visible: true });
+    share([
+      { username: "freya", permission: "write" },
+      { username: "thor", permission: "read" },
+    ]);
+    expect(freyas()).toMatchObject({ color: "rose", visible: false, role: "editor" });
+    share([{ username: "thor", permission: "read" }]);
+    expect(freyas()).toBeUndefined();
+  });
+
+  it("lets someone take a shared calendar off their list", () => {
+    share([
+      { username: "freya", permission: "read" },
+      { username: "thor", permission: "read" },
+    ]);
+    store.removeShare("freya", cal, "freya");
+    expect(freyas()).toBeUndefined();
+    expect(refusal(() => store.removeShare("freya", cal, "freya")).status).toBe(404);
+    store.removeShare("odin", cal, "thor");
+    expect(store.calendars("odin")[0]!.shared).toBe(false);
+  });
+
+  it("moves an event only between calendars the user can change", () => {
+    const theirs = store.createCalendar("freya", { name: "Freya's" }).id;
+    store.setShares("freya", theirs, [{ username: "odin", permission: "read" }], users);
+    const { id, rev } = store.createEvent("odin", timed());
+    expect(refusal(() => store.putEvent("odin", id, timed({ rev, calendarId: theirs }))).status).toBe(403);
+    store.setShares("freya", theirs, [{ username: "odin", permission: "write" }], users);
+    store.putEvent("odin", id, timed({ rev, calendarId: theirs }));
+    expect(db.prepare("SELECT owner FROM events WHERE id = ?").get(id)).toEqual({ owner: "freya" });
+  });
+
+  it("keeps shared calendars out of the backup, and drops shares with removed users", () => {
+    share([{ username: "freya", permission: "read" }]);
+    store.createCalendar("freya", { name: "Personal" });
+    expect(store.exportAll("freya").calendars.map((c) => c.name)).toEqual(["Personal"]);
+    expect(store.calendars("freya").map((c) => c.owner)).toEqual(["freya", "odin"]);
+    store.removeUnknownOwners(new Set(["odin"]));
+    expect(store.calendars("odin")[0]!.shared).toBe(false);
+  });
+});

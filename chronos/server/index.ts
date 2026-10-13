@@ -51,6 +51,11 @@ const owner = (req: express.Request) => auth.user(req).username;
 // The signed-in user
 app.get("/api/me", auth.me);
 
+// The users the signed-in user can share calendars with: every Heimdall user but themselves.
+app.get("/api/users", (req, res) => {
+  res.json([...(known ?? [])].filter((username) => username !== owner(req)).sort());
+});
+
 app.get("/api/calendars", (req, res) => {
   res.json(store.calendars(owner(req)));
 });
@@ -66,6 +71,15 @@ app.delete("/api/calendars/:id", (req, res) => {
 });
 app.get("/api/calendars/:id/events", (req, res) => {
   res.json(store.calendarEvents(owner(req), req.params.id));
+});
+// Share: replace everyone the calendar is shared with
+app.put("/api/calendars/:id/shares", (req, res) => {
+  res.json(store.setShares(owner(req), req.params.id, req.body, known));
+});
+// Stop sharing with one person. The owner can remove anyone; anyone can remove themselves.
+app.delete("/api/calendars/:id/shares/:username", (req, res) => {
+  store.removeShare(owner(req), req.params.id, req.params.username);
+  res.status(204).end();
 });
 
 app.get("/api/events", (req, res) => {

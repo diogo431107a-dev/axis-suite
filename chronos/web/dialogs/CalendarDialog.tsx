@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Download, Trash2, Upload } from "lucide-react";
+import { Download, LogOut, Share2, Trash2, Upload } from "lucide-react";
 import { COLORS, LIMITS, type Calendar, type CalendarFields, type Color } from "../../shared/protocol.ts";
 import { CAL_COLORS } from "../colors.ts";
 import { count, stamp } from "../format.ts";
@@ -18,12 +18,21 @@ interface CalendarDialogProps {
   onDelete?: () => Promise<boolean>;
   onExport?: () => void;
   onImport?: () => void;
+  /** opens the owner's share dialog */
+  onShare?: () => void;
+  /** takes a calendar shared with the user off their list; true when it worked */
+  onLeave?: () => Promise<boolean>;
   onClose: () => void;
 }
 
-/** Makes a calendar, or renames, recolours, exports, re-imports or deletes one. */
+/**
+ * Makes a calendar, or renames, recolours, shares, exports, re-imports or deletes one. For a
+ * calendar shared with the user: their own colour for it, export, import (if they can edit), and
+ * taking it off their list.
+ */
 export function CalendarDialog(props: CalendarDialogProps) {
-  const { calendar, zone, onSave, onDelete, onExport, onImport, onClose } = props;
+  const { calendar, zone, onSave, onDelete, onExport, onImport, onShare, onLeave, onClose } = props;
+  const owned = !calendar || calendar.role === "owner";
   const [name, setName] = useState(calendar?.name ?? "");
   const [color, setColor] = useState<Color>(calendar?.color ?? props.suggestedColor ?? COLORS[0]);
   const [busy, setBusy] = useState(false);
@@ -52,10 +61,17 @@ export function CalendarDialog(props: CalendarDialogProps) {
             required
             maxLength={LIMITS.calendarNameChars}
             value={name}
+            readOnly={!owned}
             onChange={(e) => setName(e.target.value)}
             placeholder="Personal, Harvest, Formula 1…"
-            className={textInput}
+            className={`${textInput} read-only:bg-stone-50 read-only:text-stone-500`}
           />
+          {calendar && !owned && (
+            <p className="mt-1 text-xs text-stone-500">
+              Shared by {calendar.owner} · {calendar.role === "editor" ? "you can edit its events" : "read only"}. The
+              colour and whether it's shown are yours.
+            </p>
+          )}
         </div>
 
         <fieldset>
@@ -89,7 +105,22 @@ export function CalendarDialog(props: CalendarDialogProps) {
               .
             </p>
             <div className="flex flex-wrap gap-2">
-              {onImport && (
+              {owned && onShare && (
+                <button
+                  type="button"
+                  className={secondaryButton}
+                  onClick={onShare}
+                  title={
+                    calendar.shares?.length
+                      ? `Shared with ${calendar.shares.map((s) => s.username).join(", ")}`
+                      : undefined
+                  }
+                >
+                  <Share2 className="h-4 w-4" aria-hidden />
+                  {calendar.shares?.length ? `Shared (${calendar.shares.length})` : "Share"}
+                </button>
+              )}
+              {onImport && calendar.role !== "viewer" && (
                 <button type="button" className={secondaryButton} onClick={onImport}>
                   <Upload className="h-4 w-4" aria-hidden /> Import .ics into it
                 </button>
@@ -104,9 +135,26 @@ export function CalendarDialog(props: CalendarDialogProps) {
         )}
 
         <div className="flex flex-wrap items-center gap-2 pt-2">
-          {calendar && onDelete && !confirmDelete && (
+          {calendar && owned && onDelete && !confirmDelete && (
             <button type="button" className={dangerButton} onClick={() => setConfirmDelete(true)}>
               <Trash2 className="h-4 w-4" aria-hidden /> Delete…
+            </button>
+          )}
+          {calendar && !owned && onLeave && (
+            <button
+              type="button"
+              className={dangerButton}
+              disabled={busy}
+              title={`Stops sharing it with you; ${calendar.owner} can share it again`}
+              onClick={async (e) => {
+                const button = e.currentTarget;
+                setBusy(true);
+                const done = await onLeave();
+                setBusy(false);
+                if (done) closeDialog(button);
+              }}
+            >
+              <LogOut className="h-4 w-4" aria-hidden /> Remove from my list
             </button>
           )}
           <span className="flex-1" />

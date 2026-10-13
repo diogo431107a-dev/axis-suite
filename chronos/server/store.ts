@@ -14,14 +14,18 @@ import {
   type ExportFile,
   type ImportEvent,
   type ImportResult,
+  type Permission,
   type RestoreResult,
+  type Role,
   type Settings,
+  type Share,
 } from "../shared/protocol.ts";
 import { dayStart, isInstant, isZone, zoneName } from "../shared/zones.ts";
 
-// The only place calendars and events are read and written. Every query names the owner (a
-// Heimdall username), so nobody reaches another user's calendars; a row that belongs to someone
-// else answers exactly like one that doesn't exist.
+// The only place calendars and events are read and written, so this is the one place that decides
+// who may see or change a calendar: its owner (a Heimdall username), and the people it is shared
+// with. A calendar the user can't see, and its events, answer exactly like ones that don't exist;
+// one they may only read answers 403 to a change.
 
 /** A request the store refuses, with the HTTP status to answer. */
 export class StoreError extends Error {
@@ -37,6 +41,7 @@ export class StoreError extends Error {
   }
 }
 
+/** A calendar as the signed-in user sees it: colour and visibility are their own. */
 interface CalendarRow {
   id: string;
   owner: string;
@@ -47,6 +52,10 @@ interface CalendarRow {
   source_name: string | null;
   imported_at: string | null;
   events: number;
+  /** the signed-in user's permission, if the calendar is shared with them */
+  shared_as: Permission | null;
+  /** shared with anyone at all */
+  shared: number;
 }
 
 interface EventRow {
@@ -81,6 +90,16 @@ function invalid(message: string): never {
 const notFound = (what: string): never => {
   throw new StoreError(404, `No such ${what}`, "not-found");
 };
+
+function forbidden(message: string): never {
+  throw new StoreError(403, message, "forbidden");
+}
+
+/** The user's role on a calendar they can see. */
+const roleOf = (row: CalendarRow, user: string): Role =>
+  row.owner === user ? "owner" : row.shared_as === "write" ? "editor" : "viewer";
+
+export const canEdit = (role: Role) => role !== "viewer";
 
 function objectBody(input: unknown, what = "The request body"): Record<string, unknown> {
   if (typeof input !== "object" || input === null || Array.isArray(input)) invalid(`${what} must be a JSON object`);
@@ -199,33 +218,53 @@ const sameContent = (a: Content, b: Content) =>
 const eventKey = (uid: string, recurrenceId: string) => `${uid}\n${recurrenceId}`;
 
 export function createStore(db: DatabaseSync) {
+  // The user's own calendars, then those shared with them (by owner, then name). For a calendar
+  // shared with them, the colour and whether it is shown are theirs.
   const selectCalendars = db.prepare(
-    `SELECT c.*, (SELECT count(*) FROM events e WHERE e.calendar_id = c.id) AS events
-     FROM calendars c WHERE c.owner = ? ORDER BY c.position, c.created_at, c.id`,
+    `SELECT c.id, c.owner, c.name, coalesce(s.color, c.color) AS color, coalesce(s.visible, c.visible) AS visible,
+       c.position, c.source_name, c.imported_at, (SELECT count(*) FROM events e WHERE e.calendar_id = c.id) AS events,
+       s.permission AS shared_as, EXISTS (SELECT 1 FROM calendar_shares x WHERE x.calendar_id = c.id) AS shared
+     FROM calendars c LEFT JOIN calendar_shares s ON s.calendar_id = c.id AND s.username = $user
+     WHERE c.owner = $user OR s.permission IS NOT NULL
+     ORDER BY c.owner <> $user, c.owner, CASE WHEN c.owner = $user THEN c.position END, lower(c.name), c.created_at, c.id`,
   );
   const insertCalendar = db.prepare(
     `INSERT INTO calendars (id, owner, name, color, visible, position, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, (SELECT coalesce(max(position), 0) + 1 FROM calendars WHERE owner = ?), ?, ?)`,
   );
   const updateCalendarRow = db.prepare(
-    "UPDATE calendars SET name = ?, color = ?, visible = ?, updated_at = ? WHERE id = ? AND owner = ?",
+    "UPDATE calendars SET name = ?, color = ?, visible = ?, updated_at = ? WHERE id = ?",
   );
-  const markImported = db.prepare(
-    "UPDATE calendars SET source_name = ?, imported_at = ?, updated_at = ? WHERE id = ? AND owner = ?",
+  const updateShareView = db.prepare(
+    "UPDATE calendar_shares SET color = ?, visible = ? WHERE calendar_id = ? AND username = ?",
   );
-  const deleteCalendarRow = db.prepare("DELETE FROM calendars WHERE id = ? AND owner = ?");
+  const markImported = db.prepare("UPDATE calendars SET source_name = ?, imported_at = ?, updated_at = ? WHERE id = ?");
+  const deleteCalendarRow = db.prepare("DELETE FROM calendars WHERE id = ?");
 
-  const selectEvent = db.prepare("SELECT * FROM events WHERE id = ? AND owner = ?");
+  const selectShares = db.prepare(
+    "SELECT username, permission FROM calendar_shares WHERE calendar_id = ? ORDER BY username",
+  );
+  const insertShare = db.prepare(
+    "INSERT INTO calendar_shares (calendar_id, username, permission, color, visible) VALUES (?, ?, ?, ?, 1)",
+  );
+  const updateSharePermission = db.prepare(
+    "UPDATE calendar_shares SET permission = ? WHERE calendar_id = ? AND username = ?",
+  );
+  const deleteShare = db.prepare("DELETE FROM calendar_shares WHERE calendar_id = ? AND username = ?");
+
+  const selectEvent = db.prepare("SELECT * FROM events WHERE id = ?");
   // Timed events that overlap [from, to) (one with no length counts at its start), and all-day
   // events on any day from `fromDate` up to, not including, `toDate`.
   const selectRange = db.prepare(
-    `SELECT * FROM events WHERE owner = $owner AND (
+    `SELECT * FROM events WHERE calendar_id IN (
+       SELECT id FROM calendars WHERE owner = $user UNION SELECT calendar_id FROM calendar_shares WHERE username = $user
+     ) AND (
        (all_day = 0 AND start_at < $to AND (end_at > $from OR start_at >= $from))
        OR (all_day = 1 AND start_date < $toDate AND end_date > $fromDate))
      ORDER BY coalesce(start_date, start_at), id`,
   );
   const selectCalendarEvents = db.prepare(
-    "SELECT * FROM events WHERE calendar_id = ? AND owner = ? ORDER BY coalesce(start_date, start_at), id",
+    "SELECT * FROM events WHERE calendar_id = ? ORDER BY coalesce(start_date, start_at), id",
   );
   const countEvents = db.prepare("SELECT count(*) AS n FROM events WHERE owner = ?");
   const insertEvent = db.prepare(
@@ -234,13 +273,14 @@ export function createStore(db: DatabaseSync) {
      VALUES ($id, $owner, $calendar_id, $uid, $recurrence_id, $origin, $title, $all_day, $start_at, $end_at,
        $start_date, $end_date, $source_zone, $location, $description, $url, $rev, $created_at, $updated_at)`,
   );
+  // An event belongs to its calendar's owner, so moving it to someone else's calendar gives it to them.
   const updateEvent = db.prepare(
-    `UPDATE events SET calendar_id = $calendar_id, title = $title, all_day = $all_day, start_at = $start_at,
+    `UPDATE events SET owner = $owner, calendar_id = $calendar_id, title = $title, all_day = $all_day, start_at = $start_at,
        end_at = $end_at, start_date = $start_date, end_date = $end_date, source_zone = $source_zone,
        location = $location, description = $description, url = $url, rev = $rev, updated_at = $updated_at
-     WHERE id = $id AND owner = $owner`,
+     WHERE id = $id`,
   );
-  const deleteEventRow = db.prepare("DELETE FROM events WHERE id = ? AND owner = ?");
+  const deleteEventRow = db.prepare("DELETE FROM events WHERE id = ?");
   const nextRev = db.prepare("UPDATE meta SET value = value + 1 WHERE key = 'rev' RETURNING value");
 
   const selectSettings = db.prepare("SELECT data FROM settings WHERE owner = ?");
@@ -256,10 +296,11 @@ export function createStore(db: DatabaseSync) {
       UNION ALL SELECT owner, 0 FROM calendars WHERE ${UNKNOWN_OWNER}
       UNION ALL SELECT owner, 0 FROM settings WHERE ${UNKNOWN_OWNER}
     ) GROUP BY owner ORDER BY owner`);
-  // Calendars take their events with them.
-  const deleteUnknown = ["calendars", "settings"].map((table) =>
-    db.prepare(`DELETE FROM ${table} WHERE ${UNKNOWN_OWNER}`),
-  );
+  // Calendars take their events and shares with them; then nothing stays shared with those users.
+  const deleteUnknown = [
+    ...["calendars", "settings"].map((table) => db.prepare(`DELETE FROM ${table} WHERE ${UNKNOWN_OWNER}`)),
+    db.prepare("DELETE FROM calendar_shares WHERE username NOT IN (SELECT value FROM json_each($known))"),
+  ];
 
   /** Runs `fn` in one transaction. */
   function transaction<T>(fn: () => T): T {
@@ -274,8 +315,14 @@ export function createStore(db: DatabaseSync) {
     }
   }
 
-  const toCalendar = (row: CalendarRow): Calendar => ({
+  const listShares = (calendarId: string) => selectShares.all(calendarId) as unknown as Share[];
+
+  const toCalendar = (row: CalendarRow, user: string): Calendar => ({
     id: row.id,
+    owner: row.owner,
+    role: roleOf(row, user),
+    shared: Boolean(row.shared),
+    ...(row.owner === user && { shares: listShares(row.id) }),
     name: row.name,
     color: row.color,
     visible: row.visible === 1,
@@ -315,23 +362,44 @@ export function createStore(db: DatabaseSync) {
     url: e.url,
   });
 
-  const calendarRows = (owner: string) => selectCalendars.all(owner) as unknown as CalendarRow[];
+  /** Every calendar the user can see: their own, then those shared with them. */
+  const calendarRows = (user: string) => selectCalendars.all({ $user: user }) as unknown as CalendarRow[];
+  /** The user's own calendars. */
+  const ownRows = (user: string) => calendarRows(user).filter((c) => c.owner === user);
 
-  function calendarRow(owner: string, id: unknown): CalendarRow {
-    return calendarRows(owner).find((c) => c.id === id) ?? notFound("calendar");
+  /** A calendar the user can see. */
+  function calendarRow(user: string, id: unknown): CalendarRow {
+    return calendarRows(user).find((c) => c.id === id) ?? notFound("calendar");
   }
 
-  function eventRow(owner: string, id: string): EventRow {
-    return (selectEvent.get(id, owner) as EventRow | undefined) ?? notFound("event");
+  /** A calendar the user can see and change the events of. */
+  function writableRow(user: string, id: unknown): CalendarRow {
+    const row = calendarRow(user, id);
+    if (!canEdit(roleOf(row, user))) forbidden(`You can only read the calendar ${row.name}`);
+    return row;
+  }
+
+  /** A calendar of the user's own; `message` is the refusal for one shared with them. */
+  function ownedRow(user: string, id: unknown, message: string): CalendarRow {
+    const row = calendarRow(user, id);
+    if (row.owner !== user) forbidden(message);
+    return row;
+  }
+
+  /** An event of a calendar the user can see, with that calendar. */
+  function eventRow(user: string, id: string): { row: EventRow; calendar: CalendarRow } {
+    const row = (selectEvent.get(id) as EventRow | undefined) ?? notFound("event");
+    const calendar = calendarRows(user).find((c) => c.id === row.calendar_id) ?? notFound("event");
+    return { row, calendar };
   }
 
   function checkNameFree(owner: string, name: string, exceptId?: string): void {
-    const clash = calendarRows(owner).find((c) => c.id !== exceptId && nameKey(c.name) === nameKey(name));
+    const clash = ownRows(owner).find((c) => c.id !== exceptId && nameKey(c.name) === nameKey(name));
     if (clash) throw new StoreError(409, `There is already a calendar called ${clash.name}`, "exists");
   }
 
   function addCalendar(owner: string, fields: { name: string; color: Color; visible: boolean }): string {
-    if (calendarRows(owner).length >= LIMITS.calendars) {
+    if (ownRows(owner).length >= LIMITS.calendars) {
       throw new StoreError(409, `At most ${LIMITS.calendars} calendars`, "too-many");
     }
     checkNameFree(owner, fields.name);
@@ -341,15 +409,15 @@ export function createStore(db: DatabaseSync) {
     return id;
   }
 
-  /** A colour no calendar has yet, if there is one. */
-  const freeColor = (owner: string): Color => {
-    const used = new Set(calendarRows(owner).map((c) => c.color));
+  /** A colour none of the user's calendars (their own and shared ones) has yet, if there is one. */
+  const freeColor = (user: string): Color => {
+    const used = new Set(calendarRows(user).map((c) => c.color));
     return COLORS.find((c) => !used.has(c)) ?? COLORS[0];
   };
 
   /** A name like `name` that no calendar has yet: "Holidays", "Holidays (2)", … */
   function freeName(owner: string, name: string): string {
-    const taken = new Set(calendarRows(owner).map((c) => nameKey(c.name)));
+    const taken = new Set(ownRows(owner).map((c) => nameKey(c.name)));
     let candidate = name;
     for (let n = 2; taken.has(nameKey(candidate)); n++) {
       const suffix = ` (${n})`;
@@ -373,6 +441,7 @@ export function createStore(db: DatabaseSync) {
     $end_date: c.allDay ? c.end : null,
   });
 
+  /** `owner`: the owner of the calendar it goes into. */
   function insert(
     owner: string,
     calendarId: string,
@@ -402,6 +471,7 @@ export function createStore(db: DatabaseSync) {
     return { id, rev, updatedAt: now };
   }
 
+  /** `owner`: the owner of the calendar the event is (now) in. */
   function update(owner: string, id: string, calendarId: string, c: Content): EventSaved {
     const rev = newRev();
     const now = new Date().toISOString();
@@ -430,7 +500,7 @@ export function createStore(db: DatabaseSync) {
    * Puts a file's events into a calendar. An event matches one there by UID and recurrence id:
    * if anything differs it is updated, else left alone; one that matches nothing is added. With
    * `removeMissing`, the calendar's imported events that aren't in the file go (events made here
-   * stay). Runs inside the caller's transaction.
+   * stay). `owner` is the calendar's. Runs inside the caller's transaction.
    */
   function merge(
     owner: string,
@@ -440,7 +510,7 @@ export function createStore(db: DatabaseSync) {
   ) {
     const result = { added: 0, updated: 0, unchanged: 0, removed: 0 };
     const here = new Map(
-      (selectCalendarEvents.all(calendarId, owner) as unknown as EventRow[]).map((row) => [
+      (selectCalendarEvents.all(calendarId) as unknown as EventRow[]).map((row) => [
         eventKey(row.uid, row.recurrence_id),
         toEvent(row),
       ]),
@@ -466,7 +536,7 @@ export function createStore(db: DatabaseSync) {
     if (removeMissing) {
       for (const [key, e] of here) {
         if (e.origin === "import" && !inFile.has(key)) {
-          deleteEventRow.run(e.id, owner);
+          deleteEventRow.run(e.id);
           result.removed++;
         }
       }
@@ -477,57 +547,108 @@ export function createStore(db: DatabaseSync) {
   return {
     // ── Calendars ─────────────────────────────────────────────────────────────────────────────
 
-    calendars(owner: string): Calendar[] {
-      return calendarRows(owner).map(toCalendar);
+    /** The user's own calendars, then those shared with them. */
+    calendars(user: string): Calendar[] {
+      return calendarRows(user).map((row) => toCalendar(row, user));
     },
 
-    createCalendar(owner: string, input: unknown): Calendar {
+    createCalendar(user: string, input: unknown): Calendar {
       const b = objectBody(input);
       const name = calendarName(b.name);
-      const color = b.color === undefined ? freeColor(owner) : oneOf(b.color, COLORS, "The colour");
-      const id = transaction(() => addCalendar(owner, { name, color, visible: b.visible !== false }));
-      return toCalendar(calendarRow(owner, id));
+      const color = b.color === undefined ? freeColor(user) : oneOf(b.color, COLORS, "The colour");
+      const id = transaction(() => addCalendar(user, { name, color, visible: b.visible !== false }));
+      return toCalendar(calendarRow(user, id), user);
     },
 
-    updateCalendar(owner: string, id: string, input: unknown): Calendar {
+    /**
+     * The owner changes the calendar's name, colour and visibility. Someone it is shared with
+     * changes only its colour and visibility for themselves; its name is the owner's to change.
+     */
+    updateCalendar(user: string, id: string, input: unknown): Calendar {
       const b = objectBody(input);
       return transaction(() => {
-        const row = calendarRow(owner, id);
+        const row = calendarRow(user, id);
         const name = b.name === undefined ? row.name : calendarName(b.name);
         const color = b.color === undefined ? row.color : oneOf(b.color, COLORS, "The colour");
         if (b.visible !== undefined && typeof b.visible !== "boolean") invalid("visible must be true or false");
         const visible = b.visible === undefined ? row.visible === 1 : b.visible;
-        checkNameFree(owner, name, id);
-        updateCalendarRow.run(name, color, visible ? 1 : 0, new Date().toISOString(), id, owner);
-        return toCalendar(calendarRow(owner, id));
+        if (row.owner === user) {
+          checkNameFree(user, name, id);
+          updateCalendarRow.run(name, color, visible ? 1 : 0, new Date().toISOString(), id);
+        } else {
+          if (name !== row.name) forbidden("Only the owner can rename this calendar");
+          updateShareView.run(color, visible ? 1 : 0, id, user);
+        }
+        return toCalendar(calendarRow(user, id), user);
       });
     },
 
-    /** Deletes a calendar and every event in it. */
-    deleteCalendar(owner: string, id: string): void {
-      if (deleteCalendarRow.run(id, owner).changes === 0) notFound("calendar");
+    /** Deletes a calendar and every event in it. Only its owner can. */
+    deleteCalendar(user: string, id: string): void {
+      ownedRow(user, id, "Only the owner can delete this calendar");
+      deleteCalendarRow.run(id);
     },
 
     /** Every event of one calendar, for writing it as an .ics file. */
-    calendarEvents(owner: string, id: string): CalEvent[] {
-      calendarRow(owner, id);
-      return (selectCalendarEvents.all(id, owner) as unknown as EventRow[]).map(toEvent);
+    calendarEvents(user: string, id: string): CalEvent[] {
+      calendarRow(user, id);
+      return (selectCalendarEvents.all(id) as unknown as EventRow[]).map(toEvent);
+    },
+
+    // ── Sharing ───────────────────────────────────────────────────────────────────────────────
+
+    /**
+     * Replaces everyone the calendar is shared with: `[{ username, permission }]`. Only its owner
+     * can; `known` are the usernames it can be shared with (Heimdall's). People who stay keep their
+     * colour and visibility; someone new gets a colour none of their calendars has yet.
+     */
+    setShares(user: string, id: string, input: unknown, known: ReadonlySet<string> | null): Share[] {
+      if (!known) invalid("Chronos doesn't know the suite's users, so it can't share calendars");
+      if (!Array.isArray(input)) invalid("Expected a list of { username, permission }");
+      const shares = new Map<string, Permission>();
+      for (const item of input as unknown[]) {
+        const { username, permission } = (item ?? {}) as Partial<Record<keyof Share, unknown>>;
+        if (typeof username !== "string" || !known.has(username)) invalid(`Not a user: ${String(username)}`);
+        if (username === user) invalid("A calendar can't be shared with its owner");
+        if (shares.has(username)) invalid(`Listed twice: ${username}`);
+        shares.set(username, oneOf(permission, ["read", "write"] as const, "permission"));
+      }
+      return transaction(() => {
+        ownedRow(user, id, "Only the owner can share this calendar");
+        const before = new Map(listShares(id).map((s) => [s.username, s.permission]));
+        for (const username of before.keys()) if (!shares.has(username)) deleteShare.run(id, username);
+        for (const [username, permission] of shares) {
+          if (!before.has(username)) insertShare.run(id, username, permission, freeColor(username));
+          else if (before.get(username) !== permission) updateSharePermission.run(permission, id, username);
+        }
+        return listShares(id);
+      });
+    },
+
+    /** Stops sharing the calendar with one person. The owner can remove anyone; anyone can remove themselves. */
+    removeShare(user: string, id: string, username: string): void {
+      const row = calendarRow(user, id);
+      if (row.owner !== user && username !== user) forbidden("Only the owner can change who sees this calendar");
+      if (deleteShare.run(id, username).changes === 0) {
+        throw new StoreError(404, "The calendar isn't shared with them", "not-found");
+      }
     },
 
     // ── Events ────────────────────────────────────────────────────────────────────────────────
 
     /**
-     * The events on the days `from` up to, not including, `to` (YYYY-MM-DD), the days as they are
-     * in the owner's home zone. Hidden calendars' events are included: the page leaves them out.
+     * The events of every calendar the user can see on the days `from` up to, not including, `to`
+     * (YYYY-MM-DD), the days as they are in the user's home zone. Hidden calendars' events are
+     * included: the page leaves them out.
      */
-    events(owner: string, query: Record<string, unknown>): CalEvent[] {
+    events(user: string, query: Record<string, unknown>): CalEvent[] {
       const { from, to } = query;
       if (!isDate(from) || !isDate(to)) invalid("from and to must be dates, YYYY-MM-DD");
       const days = daysBetween(from, to);
       if (days < 1 || days > LIMITS.rangeDays) invalid(`from to to must be 1 to ${LIMITS.rangeDays} days`);
-      const zone = getSettings(owner).homeZone || "UTC";
+      const zone = getSettings(user).homeZone || "UTC";
       const rows = selectRange.all({
-        $owner: owner,
+        $user: user,
         $from: dayStart(from, zone),
         $to: dayStart(to, zone),
         $fromDate: from,
@@ -536,68 +657,79 @@ export function createStore(db: DatabaseSync) {
       return rows.map(toEvent);
     },
 
-    event(owner: string, id: string): CalEvent {
-      return toEvent(eventRow(owner, id));
+    event(user: string, id: string): CalEvent {
+      return toEvent(eventRow(user, id).row);
     },
 
-    createEvent(owner: string, input: unknown): EventSaved {
+    createEvent(user: string, input: unknown): EventSaved {
       const b = objectBody(input);
       const content = contentOf(b);
       return transaction(() => {
-        const calendarId = calendarRow(owner, b.calendarId).id;
+        const calendar = writableRow(user, b.calendarId);
         const saved = insert(
-          owner,
-          calendarId,
+          calendar.owner,
+          calendar.id,
           { uid: `${randomUUID()}@chronos`, recurrenceId: "", ...content, sourceZone: null },
           "user",
         );
-        checkRoom(owner);
+        checkRoom(calendar.owner);
         return saved;
       });
     },
 
-    /** Saves an event the editor changed; 409 with the event as it is now if it was saved elsewhere since. */
-    putEvent(owner: string, id: string, input: unknown): EventSaved {
+    /**
+     * Saves an event the editor changed; 409 with the event as it is now if it was saved elsewhere
+     * (by anyone) since. Moving it to another calendar needs the right to change both.
+     */
+    putEvent(user: string, id: string, input: unknown): EventSaved {
       const b = objectBody(input);
       if (!Number.isInteger(b.rev)) invalid("rev is missing: the revision the change was made from");
       const content = contentOf(b);
       return transaction(() => {
-        const current = toEvent(eventRow(owner, id));
+        const { row, calendar: from } = eventRow(user, id);
+        writableRow(user, from.id);
+        const current = toEvent(row);
         if (current.rev !== b.rev) {
           throw new StoreError(409, "This event was changed elsewhere", "conflict", current);
         }
-        const calendarId = calendarRow(owner, b.calendarId).id;
+        const to = writableRow(user, b.calendarId);
         // A file's zone means nothing once the times are changed here.
         const moved =
           content.allDay !== current.allDay || content.start !== current.start || content.end !== current.end;
-        return update(owner, id, calendarId, { ...content, sourceZone: moved ? null : current.sourceZone });
+        const saved = update(to.owner, id, to.id, { ...content, sourceZone: moved ? null : current.sourceZone });
+        if (to.owner !== from.owner) checkRoom(to.owner);
+        return saved;
       });
     },
 
-    deleteEvent(owner: string, id: string): void {
-      if (deleteEventRow.run(id, owner).changes === 0) notFound("event");
+    deleteEvent(user: string, id: string): void {
+      const { calendar } = eventRow(user, id);
+      writableRow(user, calendar.id);
+      deleteEventRow.run(id);
     },
 
     // ── Settings ──────────────────────────────────────────────────────────────────────────────
 
-    settings(owner: string): Settings {
-      return getSettings(owner);
+    settings(user: string): Settings {
+      return getSettings(user);
     },
 
-    putSettings(owner: string, input: unknown): Settings {
+    putSettings(user: string, input: unknown): Settings {
       const settings = settingsValue(input);
-      if (settings.defaultCalendarId !== null) calendarRow(owner, settings.defaultCalendarId);
-      upsertSettings.run(owner, JSON.stringify(settings));
+      // New events go into it, so it must be one the user can add events to.
+      if (settings.defaultCalendarId !== null) writableRow(user, settings.defaultCalendarId);
+      upsertSettings.run(user, JSON.stringify(settings));
       return settings;
     },
 
     // ── Import, export, users ─────────────────────────────────────────────────────────────────
 
     /**
-     * Imports a file's events (read by the page) into a calendar, existing or new (see merge).
-     * Everything is checked before anything is written: a bad file changes nothing.
+     * Imports a file's events (read by the page) into a calendar, existing (one the user can change
+     * the events of) or new (their own; see merge). Everything is checked before anything is
+     * written: a bad file changes nothing.
      */
-    importEvents(owner: string, input: unknown): ImportResult {
+    importEvents(user: string, input: unknown): ImportResult {
       const b = objectBody(input);
       if (!Array.isArray(b.events)) invalid("events must be a list");
       if (b.events.length > LIMITS.importEvents)
@@ -621,28 +753,31 @@ export function createStore(db: DatabaseSync) {
         };
       }
       return transaction(() => {
-        const calendarId = fresh
-          ? addCalendar(owner, {
-              name: freeName(owner, fresh.name),
-              color: fresh.color ?? freeColor(owner),
-              visible: true,
-            })
-          : calendarRow(owner, b.calendarId).id;
-        const result = merge(owner, calendarId, events, removeMissing);
-        checkRoom(owner);
+        const target = fresh
+          ? {
+              id: addCalendar(user, {
+                name: freeName(user, fresh.name),
+                color: fresh.color ?? freeColor(user),
+                visible: true,
+              }),
+              owner: user,
+            }
+          : writableRow(user, b.calendarId);
+        const result = merge(target.owner, target.id, events, removeMissing);
+        checkRoom(target.owner);
         const now = new Date().toISOString();
-        markImported.run(sourceName || null, now, now, calendarId, owner);
-        return { calendarId, ...result };
+        markImported.run(sourceName || null, now, now, target.id);
+        return { calendarId: target.id, ...result };
       });
     },
 
-    /** Every calendar with its events, and the settings. */
+    /** Every calendar of the user's own with its events, and their settings. */
     exportAll(owner: string): ExportFile {
-      const calendars = calendarRows(owner).map((c): ExportCalendar => ({
+      const calendars = ownRows(owner).map((c): ExportCalendar => ({
         name: c.name,
         color: c.color,
         visible: c.visible === 1,
-        events: (selectCalendarEvents.all(c.id, owner) as unknown as EventRow[]).map((row) => {
+        events: (selectCalendarEvents.all(c.id) as unknown as EventRow[]).map((row) => {
           const e = toEvent(row);
           return { uid: e.uid, recurrenceId: e.recurrenceId, origin: e.origin, ...contentFrom(e) };
         }),
@@ -693,7 +828,7 @@ export function createStore(db: DatabaseSync) {
       return transaction(() => {
         const result: RestoreResult = { calendars: 0, added: 0, updated: 0, unchanged: 0 };
         for (const c of calendars) {
-          let id = calendarRows(owner).find((row) => nameKey(row.name) === nameKey(c.name))?.id;
+          let id = ownRows(owner).find((row) => nameKey(row.name) === nameKey(c.name))?.id;
           if (!id) {
             id = addCalendar(owner, { name: c.name, color: c.color ?? freeColor(owner), visible: c.visible });
             result.calendars++;
@@ -714,7 +849,8 @@ export function createStore(db: DatabaseSync) {
 
     /**
      * Deletes for good everything (calendars, events, settings) of every owner who isn't in `known`
-     * (Heimdall's usernames), i.e. of users removed from Heimdall. Returns how many events each had.
+     * (Heimdall's usernames), i.e. of users removed from Heimdall, and stops sharing calendars with
+     * them. Returns how many events each had.
      */
     removeUnknownOwners(known: ReadonlySet<string>): { owner: string; events: number }[] {
       const $known = JSON.stringify([...known]);

@@ -32,6 +32,7 @@ export function EventDialog({ event, calendar, zone, onEdit, onDelete, onClose }
   }
 
   const source = sourceText(event, zone);
+  const readOnly = calendar?.role === "viewer";
   const maps = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(event.location)}`;
 
   return (
@@ -41,6 +42,11 @@ export function EventDialog({ event, calendar, zone, onEdit, onDelete, onClose }
           <p className="flex items-center gap-2 text-stone-500">
             <span className={`h-2.5 w-2.5 rounded-full ${CAL_COLORS[calendar.color].dot}`} aria-hidden />
             {calendar.name}
+            {calendar.role !== "owner" && (
+              <span className="text-xs text-stone-400">
+                · {readOnly ? `read only, shared by ${calendar.owner}` : `shared by ${calendar.owner}`}
+              </span>
+            )}
           </p>
         )}
         <p className="flex items-start gap-2">
@@ -93,16 +99,25 @@ export function EventDialog({ event, calendar, zone, onEdit, onDelete, onClose }
 
         {!confirmDelete ? (
           <div className="flex flex-wrap items-center gap-2 pt-2">
-            <button type="button" className={dangerButton} onClick={() => setConfirmDelete(true)}>
-              <Trash2 className="h-4 w-4" aria-hidden /> Delete…
-            </button>
+            {!readOnly && (
+              <button type="button" className={dangerButton} onClick={() => setConfirmDelete(true)}>
+                <Trash2 className="h-4 w-4" aria-hidden /> Delete…
+              </button>
+            )}
             <span className="flex-1" />
-            <button type="button" className={secondaryButton} onClick={(e) => closeDialog(e.currentTarget)}>
+            <button
+              type="button"
+              className={secondaryButton}
+              onClick={(e) => closeDialog(e.currentTarget)}
+              data-autofocus={readOnly || undefined}
+            >
               Close
             </button>
-            <button type="button" className={primaryButton} onClick={onEdit} data-autofocus>
-              <Pencil className="h-4 w-4" aria-hidden /> Edit
-            </button>
+            {!readOnly && (
+              <button type="button" className={primaryButton} onClick={onEdit} data-autofocus>
+                <Pencil className="h-4 w-4" aria-hidden /> Edit
+              </button>
+            )}
           </div>
         ) : (
           <div role="alert" className="rounded-lg border border-red-200 bg-red-50 p-3 text-red-800">

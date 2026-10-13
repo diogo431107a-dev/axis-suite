@@ -1,6 +1,6 @@
 # Chronos
 
-A calendar. Each user has any number of calendars (Personal, Harvest, Moon phases, Formula 1…), each with a colour, which can be shown or hidden; events are made here or imported from iCalendar (`.ics`) files. Chronos has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own calendars and nobody else's.
+A calendar. Each user has any number of calendars (Personal, Harvest, Moon phases, Formula 1…), each with a colour, which can be shown or hidden; events are made here or imported from iCalendar (`.ics`) files. Chronos has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own calendars and nobody else's, unless someone shares a calendar with them.
 
 | Layer    | Technology                                                                  |
 | -------- | --------------------------------------------------------------------------- |
@@ -18,13 +18,13 @@ shared/
 server/
   index.ts           routes, /healthz, removed users' calendars, graceful shutdown
   db.ts              SQLite schema and migrations (PRAGMA user_version)
-  store.ts           the only place calendars and events are read and written; import and its merging
+  store.ts           the only place calendars and events are read and written, and who may; import, sharing
 web/
   month/             the month view and how a week is laid out
   agenda/            the days from today on, with their events
   event/             an event, and the form that edits it
   inputs/            date and time fields that write YYYY-MM-DD and HH:MM, and the small month
-  dialogs/           calendars, import, settings, backup, a day's events
+  dialogs/           calendars, sharing, import, settings, backup, a day's events
   format.ts          every date and time the page shows is written here
 deploy/
   chronos.service    systemd unit (sandboxed)
@@ -74,6 +74,17 @@ The sidebar has **New event**, a small month (click a day to go to its month), *
 | Ctrl+S | Save (in the form)                        |
 | Esc    | Close a dialog (asks if the form changed) |
 
+## Sharing
+
+The owner of a calendar can share it with other Heimdall users (the pencil beside it → **Share**). For each person they choose:
+
+- **Can read**: the calendar shows up under **Shared with me** in that person's sidebar, and its events in their month and agenda, read only.
+- **Can edit**: they can also add, change and delete its events, and import an .ics file into it. Two people saving the same event are caught as any other conflict is.
+
+Only the owner can rename the calendar, delete it or change who it is shared with. Each person gives a shared calendar their own colour and shows or hides it for themselves; that changes nothing for anyone else. Someone a calendar is shared with can take it off their own list (the pencil → **Remove from my list**), which stops the sharing for them. Events added by someone else still belong to the calendar's owner and count toward their limit. A backup holds only one's own calendars.
+
+The people to choose from are Heimdall's usernames, which the installer hands to Chronos (`AXIS_USERS`). In development they come from [`dev.env`](dev.env), a copy of Heimdall's demo users.
+
 ## Local development
 
 From the suite's root, `pnpm dev` starts every module. Open **http://127.0.0.1:5178** (not `localhost`; see the [suite README](../README.md#development)).
@@ -90,27 +101,30 @@ The database is created at `data/chronos.db` on first run. If `STATE_DIRECTORY` 
 
 Every endpoint but `/healthz` requires a Heimdall session (`401 { error, loginUrl }` without one). Writes must be `application/json` and come from Chronos's own origin (`403` otherwise). Responses are never cached. Errors are `{ error, code? }`.
 
-| Method | Path                      | Description                                                                                                                      |
-| ------ | ------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| GET    | /api/me                   | The signed-in user: `{ username, name, accountUrl }`                                                                             |
-| GET    | /api/calendars            | The calendars, with how many events each has                                                                                     |
-| POST   | /api/calendars            | `{ name, color?, visible? }` → the new calendar (`409 exists` if the name is taken, ignoring case)                               |
-| PATCH  | /api/calendars/:id        | `{ name?, color?, visible? }`                                                                                                    |
-| DELETE | /api/calendars/:id        | Delete a calendar and its events                                                                                                 |
-| GET    | /api/calendars/:id/events | Every event of a calendar (for .ics export)                                                                                      |
-| GET    | /api/events?from&to       | The events on the days `from` up to, not including, `to` (`YYYY-MM-DD`, at most 800 days), the days as they are in the home zone |
-| POST   | /api/events               | An event's fields → `{ id, rev, updatedAt }`                                                                                     |
-| GET    | /api/events/:id           | One event                                                                                                                        |
-| PUT    | /api/events/:id           | Its fields and the `rev` it was edited from → `{ id, rev, updatedAt }`; `409 conflict` with the current `event` if `rev` is old  |
-| DELETE | /api/events/:id           | Delete an event                                                                                                                  |
-| GET    | /api/settings             | `{ homeZone, defaultCalendarId, defaultDuration }`                                                                               |
-| PUT    | /api/settings             | The same                                                                                                                         |
-| POST   | /api/import               | `{ calendarId \| newCalendar, sourceName, removeMissing, events }` → `{ calendarId, added, updated, unchanged, removed }`        |
-| GET    | /api/export               | Every calendar, event and setting as a backup file                                                                               |
-| POST   | /api/restore              | A backup file → `{ calendars, added, updated, unchanged }`                                                                       |
-| GET    | /healthz                  | `ok` while the service runs (not served through Caddy)                                                                           |
+| Method | Path                                | Description                                                                                                                        |
+| ------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
+| GET    | /api/me                             | The signed-in user: `{ username, name, accountUrl }`                                                                               |
+| GET    | /api/calendars                      | Your calendars, then those shared with you, with how many events each has, its owner and your `role` (`owner`, `editor`, `viewer`) |
+| POST   | /api/calendars                      | `{ name, color?, visible? }` → the new calendar (`409 exists` if the name is taken, ignoring case)                                 |
+| PATCH  | /api/calendars/:id                  | `{ name?, color?, visible? }`; for a calendar shared with you, only your own `color` and `visible`                                 |
+| DELETE | /api/calendars/:id                  | Delete a calendar and its events (owner only)                                                                                      |
+| GET    | /api/calendars/:id/events           | Every event of a calendar (for .ics export)                                                                                        |
+| PUT    | /api/calendars/:id/shares           | Share it (owner only): `[{ username, permission }]`, `permission` being `read` or `write`, replacing the list                      |
+| DELETE | /api/calendars/:id/shares/:username | Stop sharing with one person (the owner, or that person)                                                                           |
+| GET    | /api/users                          | The usernames you can share with                                                                                                   |
+| GET    | /api/events?from&to                 | The events on the days `from` up to, not including, `to` (`YYYY-MM-DD`, at most 800 days), the days as they are in the home zone   |
+| POST   | /api/events                         | An event's fields → `{ id, rev, updatedAt }`                                                                                       |
+| GET    | /api/events/:id                     | One event                                                                                                                          |
+| PUT    | /api/events/:id                     | Its fields and the `rev` it was edited from → `{ id, rev, updatedAt }`; `409 conflict` with the current `event` if `rev` is old    |
+| DELETE | /api/events/:id                     | Delete an event                                                                                                                    |
+| GET    | /api/settings                       | `{ homeZone, defaultCalendarId, defaultDuration }`                                                                                 |
+| PUT    | /api/settings                       | The same                                                                                                                           |
+| POST   | /api/import                         | `{ calendarId \| newCalendar, sourceName, removeMissing, events }` → `{ calendarId, added, updated, unchanged, removed }`          |
+| GET    | /api/export                         | Your own calendars, their events and your settings as a backup file                                                                |
+| POST   | /api/restore                        | A backup file → `{ calendars, added, updated, unchanged }`                                                                         |
+| GET    | /healthz                            | `ok` while the service runs (not served through Caddy)                                                                             |
 
-An event's `start` and `end` are instants in UTC (`2026-11-08T17:00:00Z`), or dates when `allDay` is true, the end then being the day after the last (as in iCalendar). Links must be `http://` or `https://` (an address without a scheme gets `https://`). Revisions come from one counter for the whole database. The page sends `X-Chronos-User: <username>` with every request; the API answers `409 other-user` if someone else is signed in. The types are in [`shared/protocol.ts`](shared/protocol.ts).
+An event's `start` and `end` are instants in UTC (`2026-11-08T17:00:00Z`), or dates when `allDay` is true, the end then being the day after the last (as in iCalendar). Links must be `http://` or `https://` (an address without a scheme gets `https://`). Revisions come from one counter for the whole database. A change to a calendar you may only read, or to what only its owner may change, answers `403 forbidden`; a calendar or event you can't see answers `404`. The page sends `X-Chronos-User: <username>` with every request; the API answers `409 other-user` if someone else is signed in. The types are in [`shared/protocol.ts`](shared/protocol.ts).
 
 ## Installing and data
 
@@ -126,4 +140,4 @@ sudo systemctl start chronos
 
 Each user can also save their own calendars (sidebar → Backup).
 
-Calendars belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their calendars, events and settings are deleted the next time Chronos starts (the installer restarts it when the list of users changes). Renaming a user counts as removing them: save a backup before the rename and restore it afterwards.
+Calendars belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their calendars, events and settings are deleted the next time Chronos starts (the installer restarts it when the list of users changes), and calendars shared with them stop being shared. Renaming a user counts as removing them: save a backup before the rename and restore it afterwards.

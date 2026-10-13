@@ -41,11 +41,32 @@ export const COLORS = [
 ] as const;
 export type Color = (typeof COLORS)[number];
 
+/** The signed-in user's access to a calendar: theirs, shared with them to edit, or to read. */
+export type Role = "owner" | "editor" | "viewer";
+
+/** What someone a calendar is shared with may do: read its events, or also change them. */
+export type Permission = "read" | "write";
+
+/** Someone a calendar is shared with. */
+export interface Share {
+  /** Heimdall username */
+  username: string;
+  permission: Permission;
+}
+
 export interface Calendar {
   id: string;
+  /** Heimdall username of the calendar's owner */
+  owner: string;
+  role: Role;
+  /** shared with anyone at all */
+  shared: boolean;
+  /** who it is shared with; only its owner gets this */
+  shares?: Share[];
   name: string;
+  /** for someone it is shared with, their own colour for it */
   color: Color;
-  /** hidden calendars keep their events, the page just doesn't show them */
+  /** hidden calendars keep their events, the page just doesn't show them; for someone it is shared with, their own choice */
   visible: boolean;
   position: number;
   /** the file it was last imported from, or null */
@@ -55,7 +76,7 @@ export interface Calendar {
   events: number;
 }
 
-/** POST /api/calendars; PATCH takes any of them. */
+/** POST /api/calendars; PATCH takes any of them (someone it is shared with: only color and visible). */
 export interface CalendarFields {
   name: string;
   color: Color;
@@ -175,7 +196,7 @@ export interface RestoreResult {
   unchanged: number;
 }
 
-export type ErrorCode = "invalid" | "not-found" | "conflict" | "exists" | "too-many" | "other-user";
+export type ErrorCode = "invalid" | "not-found" | "forbidden" | "conflict" | "exists" | "too-many" | "other-user";
 
 /** Every error answer: a sentence for people and, for the ones a page reacts to, a code. */
 export interface ApiError {

@@ -19,6 +19,7 @@ import {
   type EventFields,
   type EventSaved,
   type Settings,
+  type Share,
 } from "../shared/protocol.ts";
 import { isZone } from "../shared/zones.ts";
 import { Sidebar, type SidebarDialog } from "./Sidebar.tsx";
@@ -29,6 +30,7 @@ import { CalendarDialog } from "./dialogs/CalendarDialog.tsx";
 import { DayDialog } from "./dialogs/DayDialog.tsx";
 import { ImportDialog } from "./dialogs/ImportDialog.tsx";
 import { SettingsDialog } from "./dialogs/SettingsDialog.tsx";
+import { ShareDialog } from "./dialogs/ShareDialog.tsx";
 import { download, fileName } from "./download.ts";
 import { EventDialog } from "./event/EventDialog.tsx";
 import { EventEditor, type SaveOutcome } from "./event/EventEditor.tsx";
@@ -39,6 +41,7 @@ import { iconButton } from "./ui/buttons.ts";
 
 type DialogState =
   | { kind: "calendar"; calendar?: Calendar }
+  | { kind: "share"; calendar: Calendar }
   | { kind: "import"; into?: Calendar }
   | { kind: "settings" }
   | { kind: "backup" }
@@ -183,6 +186,8 @@ export default function App() {
   }, [me, openId, revision, handleError]);
 
   const calendarById = useMemo(() => new Map((calendars ?? []).map((c) => [c.id, c])), [calendars]);
+  // The calendars new events can go into: the user's own, and those shared with them to edit.
+  const writable = useMemo(() => (calendars ?? []).filter((c) => c.role !== "viewer"), [calendars]);
   // The events of shown calendars, once the ones for these days have come.
   const shown = useMemo(() => {
     if (!loaded || loaded.from !== range.from || loaded.to !== range.to) return null;
@@ -196,13 +201,13 @@ export default function App() {
   const toView = useCallback((v: View) => go({ view: v, open: null }), []);
   const newEvent = useCallback(
     (date: string | null) => {
-      if (calendars?.length === 0) {
+      if (calendars && writable.length === 0) {
         setNotice({ text: "Make a calendar first (+ beside Calendars), or import an .ics file.", tone: "info" });
         return;
       }
       go(withOpen(route, { kind: "new", date }));
     },
-    [calendars, route],
+    [calendars, writable, route],
   );
 
   // Keys, when nobody is typing: N new event, T today, ← → months, M month, A agenda.
@@ -290,6 +295,27 @@ export default function App() {
     return true;
   }
 
+  function sharesSaved(c: Calendar, shares: Share[]) {
+    setNotice({
+      text: shares.length
+        ? `${c.name} is shared with ${shares.map((s) => s.username).join(", ")}.`
+        : `Only you see ${c.name} now.`,
+      tone: "info",
+    });
+    void reloadCalendars().catch(handleError);
+  }
+
+  /** Takes a calendar shared with the user off their list. */
+  async function leaveCalendar(c: Calendar): Promise<boolean> {
+    const done = await attempt(() =>
+      api(`/api/calendars/${c.id}/shares/${encodeURIComponent(me!.username)}`, { method: "DELETE" }),
+    );
+    if (done === null) return false;
+    await reloadCalendars().catch(handleError);
+    setNotice({ text: `${c.name} is off your list.`, tone: "info" });
+    return true;
+  }
+
   async function exportCalendar(c: Calendar) {
     const events = await attempt(() => api<CalEvent[]>(`/api/calendars/${c.id}/events`));
     if (!events) return;
@@ -366,25 +392,27 @@ export default function App() {
     );
   } else if (open?.kind === "edit") {
     const event = opened?.id === open.id ? opened.event : null;
-    if (event === "missing") {
+    // An event of a calendar the user may only read opens to read.
+    const readOnly = event && event !== "missing" && calendarById.get(event.calendarId)?.role === "viewer";
+    if (event === "missing" || readOnly) {
       eventDialog = (
         <EventDialog
           key={open.id}
-          event="missing"
-          calendar={undefined}
+          event={event}
+          calendar={event === "missing" ? undefined : calendarById.get(event.calendarId)}
           zone={zone}
           onEdit={() => {}}
           onDelete={() => Promise.resolve(false)}
           onClose={() => closeOpen()}
         />
       );
-    } else if (event && calendars.length > 0) {
+    } else if (event && writable.length > 0) {
       eventDialog = (
         <EventEditor
           key={`edit-${open.id}`}
           event={event}
           date={null}
-          calendars={calendars}
+          calendars={writable}
           defaultCalendarId={settings.defaultCalendarId}
           defaultDuration={settings.defaultDuration}
           zone={zone}
@@ -394,13 +422,13 @@ export default function App() {
         />
       );
     }
-  } else if (open?.kind === "new" && calendars.length > 0) {
+  } else if (open?.kind === "new" && writable.length > 0) {
     eventDialog = (
       <EventEditor
         key={`new-${open.date}`}
         event={null}
         date={open.date}
-        calendars={calendars}
+        calendars={writable}
         defaultCalendarId={settings.defaultCalendarId}
         defaultDuration={settings.defaultDuration}
         zone={zone}
@@ -443,6 +471,7 @@ export default function App() {
             setNavOpen(false);
             newEvent(null);
           }}
+          canAdd={writable.length > 0}
           onToggle={(c) => void toggleCalendar(c)}
           onDialog={openDialog}
           onNavigate={() => setNavOpen(false)}
@@ -471,9 +500,9 @@ export default function App() {
           </div>
         )}
 
-        {calendars.length === 0 && (
+        {writable.length === 0 && (
           <div className="border-b border-indigo-100 bg-indigo-50 px-4 py-2 text-sm text-indigo-900">
-            No calendars yet.{" "}
+            {calendars.length === 0 ? "No calendars yet." : "No calendars of your own yet."}{" "}
             <button type="button" className="font-medium underline" onClick={() => openDialog("calendar")}>
               Make one
             </button>{" "}
@@ -524,13 +553,23 @@ export default function App() {
           onDelete={dialog.calendar ? () => deleteCalendar(dialog.calendar!) : undefined}
           onExport={dialog.calendar ? () => void exportCalendar(dialog.calendar!) : undefined}
           onImport={dialog.calendar ? () => setDialog({ kind: "import", into: dialog.calendar }) : undefined}
+          onShare={dialog.calendar ? () => setDialog({ kind: "share", calendar: dialog.calendar! }) : undefined}
+          onLeave={dialog.calendar ? () => leaveCalendar(dialog.calendar!) : undefined}
+          onClose={() => setDialog(null)}
+        />
+      )}
+      {dialog?.kind === "share" && (
+        <ShareDialog
+          calendar={dialog.calendar}
+          onSaved={(shares) => sharesSaved(dialog.calendar, shares)}
+          onError={handleError}
           onClose={() => setDialog(null)}
         />
       )}
       {dialog?.kind === "import" && (
         <ImportDialog
           key={dialog.into?.id ?? "any"}
-          calendars={calendars}
+          calendars={writable}
           into={dialog.into}
           zone={zone}
           today={today}
@@ -542,7 +581,7 @@ export default function App() {
       {dialog?.kind === "settings" && (
         <SettingsDialog
           settings={{ ...settings, homeZone: zone }}
-          calendars={calendars}
+          calendars={writable}
           onSave={saveSettings}
           onClose={() => setDialog(null)}
         />

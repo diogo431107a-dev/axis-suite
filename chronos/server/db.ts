@@ -60,6 +60,24 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       INSERT INTO meta (key, value) VALUES ('rev', 0);
     `);
   },
+  // v2: the people a calendar is shared with. Each has their own colour for it and shows or hides
+  // it for themselves. Deleting a calendar deletes its shares.
+  (db) => {
+    db.exec(`
+      CREATE TABLE calendar_shares (
+        calendar_id TEXT NOT NULL REFERENCES calendars(id) ON DELETE CASCADE,
+        username    TEXT NOT NULL,                    -- Heimdall username of the person it's shared with
+        permission  TEXT NOT NULL CHECK (permission IN ('read', 'write')),
+        color       TEXT NOT NULL,                    -- its colour for them
+        visible     INTEGER NOT NULL DEFAULT 1,       -- shown for them
+        PRIMARY KEY (calendar_id, username)
+      );
+      CREATE INDEX calendar_shares_username ON calendar_shares (username);
+      -- The events of a user's own and shared calendars are found by calendar, not by owner.
+      CREATE INDEX events_calendar_start_at ON events (calendar_id, start_at);
+      CREATE INDEX events_calendar_start_date ON events (calendar_id, start_date);
+    `);
+  },
 ];
 
 /** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */
