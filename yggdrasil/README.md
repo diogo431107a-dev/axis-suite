@@ -1,6 +1,6 @@
 # Yggdrasil
 
-An outliner in the style of Workflowy and Dynalist. Each signed-in user has one tree of bullets, and any bullet can be zoomed into. Yggdrasil has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own tree and nobody else's.
+An outliner in the style of Workflowy and Dynalist. Each signed-in user has one tree of bullets, and any bullet can be zoomed into. Yggdrasil has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own tree and nobody else's, unless someone shares a bullet with them.
 
 | Layer    | Technology                                                              |
 | -------- | ----------------------------------------------------------------------- |
@@ -14,11 +14,12 @@ shared/protocol.ts   nodes, ops and limits: the wire format, used by the server 
 server/
   index.ts           routes, /healthz, removed users' trees, purge timer, graceful shutdown
   db.ts              SQLite schema and migrations (PRAGMA user_version)
-  tree.ts            the only place nodes are read and written: load, changes, ops, purge, removed users
+  tree.ts            the only place nodes are read and written, so the one place that decides who may
+                     see or change them: load, changes, ops, sharing, purge, removed users
   events.ts          server-sent events, one stream per open tab
 web/
-  model/             the tree in the browser (store), editing commands, undo, sync, UI state
-  outline/           bullets, the editor, keyboard, drag and drop, sidebar, search box, export
+  model/             the tree in the browser (store), editing commands, undo, sync, sharing, UI state
+  outline/           bullets, the editor, keyboard, drag and drop, sidebar, search box, export, share
   text/              inline markup: tokenizer, renderer, dates, Ctrl+B/I/K
   search/            query language and matching
   io/                OPML, plain text and Markdown; paste and import
@@ -31,9 +32,9 @@ deploy/
 
 **Data.** Every bullet is a row in one `nodes` table: its owner (a Heimdall username), its parent, a fractional `rank` among its siblings, its text (one line of inline markdown), a note, and completed, collapsed and starred flags. Siblings are ordered by `(rank, id)`. Ids are UUIDs made by the browser, so a new bullet exists the moment it is typed.
 
-**Changes are ops.** The page never sends whole documents. Each edit becomes one or more ops (`create`, `update`, `move`, `delete`, `restore`) that are applied to the page's own copy of the tree at once, queued, and sent in batches. The server applies a batch in one transaction as one new revision and refuses ops it shouldn't apply: a node or parent of another user, a move of a bullet into itself, fields over 100,000 characters, batches over 5,000 ops. Every op can be applied twice with the same result, so a batch whose answer got lost is simply sent again.
+**Changes are ops.** The page never sends whole documents. Each edit becomes one or more ops (`create`, `update`, `move`, `delete`, `restore`) that are applied to the page's own copy of the tree at once, queued, and sent in batches. The server applies a batch in one transaction as one new revision and refuses ops it shouldn't apply: a node or parent the user can't see or may not change (see [Sharing](#sharing)), a move of a bullet into itself, fields over 100,000 characters, batches over 5,000 ops. Every op can be applied twice with the same result, so a batch whose answer got lost is simply sent again.
 
-**Sync.** The queue goes out 300 ms after typing stops (1 s at most). While the server can't be reached it is retried with back-off (1 s up to 30 s) and the status line says "Offline — N changes waiting". The queue is kept in `localStorage`, so a tab closed while offline sends it on the next load, and leaving the page with unsent changes asks first. Each tab keeps an event stream (`GET /api/events`); when another tab or device saves something, its tabs fetch what changed. A field with a local change that hasn't been saved yet keeps the local value until it has.
+**Sync.** The queue goes out 300 ms after typing stops (1 s at most). While the server can't be reached it is retried with back-off (1 s up to 30 s) and the status line says "Offline — N changes waiting". The queue is kept in `localStorage`, so a tab closed while offline sends it on the next load, and leaving the page with unsent changes asks first. Each tab keeps an event stream (`GET /api/events`); when another tab or device saves something, its tabs fetch what changed (and so do the tabs of everyone the changed tree's owner shares bullets with). A field with a local change that hasn't been saved yet keeps the local value until it has.
 
 **Drawing.** The outline is drawn as a flat list of rows (one per visible bullet), and only the rows near the window are mounted, so a tree of any size opens quickly: with 20,000 bullets all expanded, the page draws in under a second and a search answers in under 100 ms. The bullet being edited stays mounted even when scrolled away.
 
@@ -71,6 +72,19 @@ The sidebar's **Tags** list follows the same scope: it shows the tags inside the
 
 **OPML.** Import an OPML file from the sidebar, or drop it on the outline. Everything lands under a new bullet "Imported <file> <date>" in the zoomed-in bullet, as one undo step. Dynalist exports keep their markdown; Workflowy's HTML formatting becomes markdown. Export (sidebar, or a bullet's menu) writes a bullet or the whole tree as OPML 2.0, plain indented text or Markdown.
 
+## Sharing
+
+The owner of a bullet can share it, with everything under it (bullets added later included), with other Heimdall users: the bullet's menu → **Share…**. For each person they choose:
+
+- **Can read**: the bullet shows up under **Shared with me** in that person's sidebar; clicking it zooms into it, read only.
+- **Can edit**: they can also change the text, notes and completion of the bullet and everything under it, and add, move and delete bullets inside it. Two people typing in the same bullet are handled like two tabs: the last change saved wins.
+
+Only the owner can move or delete the shared bullet itself, or change who it is shared with. Someone a bullet is shared with can take it off their own list (the ✕ beside it under **Shared with me**, **Remove from my list**), which stops the sharing for them. Each person collapses, expands and stars a shared bullet for themselves; that changes nothing for anyone else. Bullets added by someone else still belong to the owner's tree, and nothing moves between two people's outlines (copy and paste still work). The owner sees a small people icon on the bullets they share, which are also listed under **Shared by me**.
+
+A shared bullet stays out of the recipient's own outline: Home, its search, its tags and the whole-outline export are theirs alone. When what they may see changes (a share is added or removed, a bullet is moved into or out of a shared one, or a shared bullet or one above it is deleted or restored), their page loads the tree again.
+
+The people to choose from are Heimdall's usernames, which the installer hands to Yggdrasil (`AXIS_USERS`). In development they come from [`dev.env`](dev.env), a copy of Heimdall's demo users.
+
 ## Local development
 
 From the suite's root, `pnpm dev` starts every module. Open **http://127.0.0.1:5174** (not `localhost`; see the [suite README](../README.md#development)).
@@ -87,16 +101,22 @@ The database is created at `data/tree.db` on first run. If `STATE_DIRECTORY` is 
 
 Every endpoint but `/healthz` requires a Heimdall session (`401 { error, loginUrl }` without one). Writes must be `application/json` and come from Yggdrasil's own origin (`403` otherwise). Responses are never cached.
 
-| Method | Path                 | Description                                                                                                                                |
-| ------ | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| GET    | /api/me              | The signed-in user: `{ username, name, accountUrl }`                                                                                       |
-| GET    | /api/tree            | `{ rev, nodes }`: every bullet the user can see                                                                                            |
-| GET    | /api/changes?since=N | `{ rev, nodes }`: bullets changed after revision N, deleted ones included; `{ reset: true }` if N is older than the last purge             |
-| POST   | /api/ops             | `{ clientId, ops }` → `{ rev, rejected: [{ index, reason }] }`: one transaction, one revision (`rev` is null if nothing changed)           |
-| GET    | /api/events          | Server-sent events: `rev` events `{ rev, clientId }`, a heartbeat every 25 s; closed after 10 minutes so the reconnect asks Heimdall again |
-| GET    | /healthz             | `ok` while the service runs (not served through Caddy)                                                                                     |
+| Method | Path                            | Description                                                                                                                                                                    |
+| ------ | ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| GET    | /api/me                         | The signed-in user: `{ username, name, accountUrl }`                                                                                                                           |
+| GET    | /api/tree                       | `{ rev, nodes, shares }`: every bullet the user can see, and the bullets they share and those shared with them                                                                 |
+| GET    | /api/changes?since=N            | `{ rev, nodes, shares }`: bullets changed after revision N, deleted ones included; `{ reset: true }` if N is older than the last purge, or what the user may see changed since |
+| POST   | /api/ops                        | `{ clientId, ops }` → `{ rev, rejected: [{ index, reason }] }`: one transaction, one revision (`rev` is null if nothing changed)                                               |
+| GET    | /api/users                      | The usernames the user can share with                                                                                                                                          |
+| GET    | /api/nodes/:id/shares           | Who a bullet of the user's own is shared with: `[{ username, permission }]`                                                                                                    |
+| PUT    | /api/nodes/:id/shares           | Share it (owner only): `[{ username, permission }]` (`read` or `write`), replacing the list                                                                                    |
+| DELETE | /api/nodes/:id/shares/:username | Stop sharing with one person (the owner, or that person)                                                                                                                       |
+| GET    | /api/events                     | Server-sent events: `rev` events `{ rev, clientId }`, a heartbeat every 25 s; closed after 10 minutes so the reconnect asks Heimdall again                                     |
+| GET    | /healthz                        | `ok` while the service runs (not served through Caddy)                                                                                                                         |
 
 The page sends `X-Yggdrasil-User: <username>` with every request (`?user=` for the event stream); the API answers `409` if someone else is signed in. The op format is in [`shared/protocol.ts`](shared/protocol.ts).
+
+In `shares`, `byMe` lists the user's bullets that are shared (`{ id, shares }`) and `withMe` the bullets shared with them (`{ id, owner, permission }`). A shared bullet comes to its recipients with `parentId: null`, and with their own `collapsed` and `starred`. A sharing request about a bullet the user can't see answers `404`, the same as one that doesn't exist; one they can see but not share answers `403`.
 
 ## Installing and data
 
@@ -110,4 +130,4 @@ sudo install -m 600 -o "$USER" /var/lib/yggdrasil/tree.db ~/tree-backup-$(date +
 sudo systemctl start yggdrasil
 ```
 
-Bullets belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their tree is deleted the next time Yggdrasil starts (the installer restarts it when the list of users changes). Renaming a user counts as removing them: the tree under the old name is deleted.
+Bullets belong to a Heimdall **username**. When a user is removed from Heimdall's `users.ts`, their tree is deleted the next time Yggdrasil starts (the installer restarts it when the list of users changes), and bullets shared with them stop being shared. Bullets they added inside someone else's shared bullet stay: they belong to that tree's owner. Renaming a user counts as removing them: the tree under the old name is deleted.

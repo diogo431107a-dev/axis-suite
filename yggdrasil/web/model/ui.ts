@@ -39,7 +39,7 @@ export interface View {
 }
 
 /** A dialog over the page. */
-export type Dialog = { kind: "export"; root: string | null };
+export type Dialog = { kind: "export"; root: string | null } | { kind: "share"; id: string };
 
 const SHOW_COMPLETED_KEY = "yggdrasil.showCompleted";
 

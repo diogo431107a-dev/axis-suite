@@ -8,6 +8,7 @@ import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./
 import { focusSearch, zoomFromLocation, zoomTo } from "./outline/nav.ts";
 import { Outline } from "./outline/Outline.tsx";
 import { SearchBox } from "./outline/SearchBox.tsx";
+import { ShareDialog } from "./outline/ShareDialog.tsx";
 import { Sidebar } from "./outline/Sidebar.tsx";
 import { plainText } from "./text/plain.ts";
 
@@ -210,6 +211,7 @@ function Page({ me, notice }: { me: Me; notice: string }) {
       </div>
       <SaveProgress />
       {dialog?.kind === "export" && <ExportDialog root={dialog.root} onClose={closeDialog} />}
+      {dialog?.kind === "share" && <ShareDialog id={dialog.id} onClose={closeDialog} />}
     </div>
   );
 }

@@ -66,19 +66,51 @@ export interface OpsResponse {
   rejected: { index: number; reason: string }[];
 }
 
+/** What someone a bullet is shared with may do: read it, or also change it. */
+export type Permission = "read" | "write";
+
+/** The signed-in user's access to a bullet: theirs, shared with them to edit, or to read. */
+export type Role = "owner" | "editor" | "viewer";
+
+/** Someone a bullet is shared with. */
+export interface Share {
+  /** Heimdall username. */
+  username: string;
+  permission: Permission;
+}
+
+/** A bullet someone else shares with the signed-in user. Everything under it comes with it. */
+export interface SharedWithMe {
+  id: string;
+  /** Heimdall username of its owner. */
+  owner: string;
+  permission: Permission;
+}
+
+/**
+ * The bullets the user shares (with whom) and those shared with them. A bullet shared with them
+ * comes with parentId null: the rest of its owner's tree isn't theirs to see.
+ */
+export interface Shares {
+  byMe: { id: string; shares: Share[] }[];
+  withMe: SharedWithMe[];
+}
+
 /** GET /api/tree: every node the user can see. */
 export interface TreeResponse {
   rev: number;
   nodes: Node[];
+  shares: Shares;
 }
 
 /**
  * GET /api/changes?since=N: every node changed after revision N, deleted ones included. reset
- * means nodes were purged since then, so the browser must load the whole tree again.
+ * means nodes were purged since then, or the bullets shared with the user changed, so the
+ * browser must load the whole tree again.
  */
-export type ChangesResponse = { rev: number; nodes: Node[]; reset?: undefined } | { reset: true };
+export type ChangesResponse = { rev: number; nodes: Node[]; shares: Shares; reset?: undefined } | { reset: true };
 
-/** The data of a "rev" event on GET /api/events: the user's tree changed. */
+/** The data of a "rev" event on GET /api/events: the user's tree, or a bullet shared with them, changed. */
 export interface RevEvent {
   rev: number;
   /** The tab that made the change. */
