@@ -1,7 +1,7 @@
 // Bullets as text, for the clipboard: "- " bullets indented by 2 spaces per level, notes as
 // lines indented under their bullet, and the same as nested <ul> HTML. Pasted text is read back
 // into a tree by its indentation.
-import type { Node } from "../../shared/protocol.ts";
+import { FILE_PATH, type Node } from "../../shared/protocol.ts";
 import type { Draft } from "../model/commands.ts";
 import { plainText } from "../text/plain.ts";
 
@@ -9,6 +9,21 @@ export interface TextSource {
   get(id: string): Node | undefined;
   /** The children to include, in order (null: the top level). */
   children(id: string | null): readonly string[];
+}
+
+/**
+ * The tree with the addresses of uploaded files made absolute (`origin` + /api/files/…), for an
+ * export: the links then lead back to Yggdrasil from wherever the file is opened.
+ */
+export function withFileOrigin(tree: TextSource, origin: string): TextSource {
+  const fix = (text: string) => text.replaceAll(`](${FILE_PATH}`, `](${origin}${FILE_PATH}`);
+  return {
+    children: (id) => tree.children(id),
+    get: (id) => {
+      const node = tree.get(id);
+      return node && { ...node, content: fix(node.content), note: fix(node.note) };
+    },
+  };
 }
 
 /** Each bullet as `line(node)`, two spaces deeper per level, its note's lines under it. */

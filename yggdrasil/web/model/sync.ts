@@ -193,6 +193,25 @@ export class Sync {
     this.#update();
   }
 
+  /**
+   * Sends what is queued now and resolves once all of it is saved: an upload needs its bullet to
+   * exist on the server. Rejects if the server can't be reached or the user is signed out.
+   */
+  whenSaved(): Promise<void> {
+    void this.#flush();
+    return new Promise((resolve, reject) => {
+      const check = () => {
+        const { kind } = this.#state;
+        if (kind === "saving") return;
+        off();
+        if (kind === "saved") resolve();
+        else reject(new Error(kind === "offline" ? "The server can't be reached" : "You are signed out"));
+      };
+      const off = this.subscribe(check);
+      check();
+    });
+  }
+
   /** After signing in again: sends what waited, and catches up. */
   resume(): void {
     this.#signedOutUrl = null;

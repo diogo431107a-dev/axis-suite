@@ -383,6 +383,17 @@ describe("other commands", () => {
     check(store, cmd.toggleComplete(ctxOf(store), ["A", "B"]), "A\nB");
   });
 
+  it("stars all, or unstars them when all are starred", () => {
+    const store = build("A\nB");
+    store.applyAll([{ op: "update", id: "A", starred: true }]);
+    expect(cmd.toggleStar(ctxOf(store), ["A", "B"]).ops).toEqual([{ op: "update", id: "B", starred: true }]);
+    store.applyAll([{ op: "update", id: "B", starred: true }]);
+    expect(cmd.toggleStar(ctxOf(store), ["A", "B"]).ops).toEqual([
+      { op: "update", id: "A", starred: false },
+      { op: "update", id: "B", starred: false },
+    ]);
+  });
+
   it("collapses only bullets with children", () => {
     const store = build(TREE);
     check(store, cmd.setCollapsed(ctxOf(store), "A", true), TREE.replace("A\n", "A [+]\n"));

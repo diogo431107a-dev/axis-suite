@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CircleCheck, PanelLeft, UserRound } from "lucide-react";
 import { SignedOutError, fetchMe, goToSignIn, watchForSignIn, type Me } from "@axis-suite/heimdall-client/browser";
+import { attachFiles, isOutlineFile } from "./files/upload.ts";
 import { importFile } from "./io/importer.ts";
+import { insertDrafts } from "./model/commands.ts";
 import { Outliner } from "./model/outliner.ts";
 import { ExportDialog } from "./outline/ExportDialog.tsx";
 import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./outline/hooks.ts";
@@ -191,7 +193,8 @@ function Page({ me, notice }: { me: Me; notice: string }) {
         </aside>
         <main
           className={`mx-auto min-w-0 max-w-3xl flex-1 px-4 pt-6 ${dropping ? "rounded-lg outline-2 outline-dashed outline-green-600" : ""}`}
-          // An OPML file dropped on the outline is imported into the zoomed-in bullet.
+          // An OPML file dropped on the outline is imported into the zoomed-in bullet; other files
+          // are attached to the bullet they are dropped on.
           onDragOver={(e) => {
             if (!e.dataTransfer.types.includes("Files")) return;
             e.preventDefault();
@@ -199,17 +202,20 @@ function Page({ me, notice }: { me: Me; notice: string }) {
           }}
           onDragLeave={() => setDropping(false)}
           onDrop={(e) => {
-            const file = e.dataTransfer.files[0];
+            const files = [...e.dataTransfer.files];
             setDropping(false);
-            if (!file) return;
+            if (files.length === 0) return;
             e.preventDefault();
-            void importFile(o, file);
+            for (const file of files.filter(isOutlineFile)) void importFile(o, file);
+            const attached = files.filter((f) => !isOutlineFile(f));
+            if (attached.length > 0) dropFiles(o, e.target as HTMLElement, attached);
           }}
         >
           <Outline />
         </main>
       </div>
       <SaveProgress />
+      <UploadProgress />
       {dialog?.kind === "export" && <ExportDialog root={dialog.root} onClose={closeDialog} />}
       {dialog?.kind === "share" && <ShareDialog id={dialog.id} onClose={closeDialog} />}
     </div>
@@ -231,6 +237,56 @@ function SyncStatus() {
     <span role="status" className={`text-xs ${color}`}>
       {text}
     </span>
+  );
+}
+
+/**
+ * Attaches dropped files to the bullet they were dropped on: in the field being edited, or at
+ * the end of its text. Dropped anywhere else, they go into a new bullet at the end.
+ */
+function dropFiles(o: Outliner, target: HTMLElement, files: File[]) {
+  const id = target.closest<HTMLElement>("[data-bullet]")?.dataset.bullet;
+  if (id && o.store.get(id)) {
+    const caret = o.ui.caret;
+    void attachFiles(o, id, caret?.id === id ? caret.field : "content", files);
+    return;
+  }
+  let created: string | null = null;
+  o.run((ctx) => {
+    const result = insertDrafts(ctx, ctx.root, ctx.shown(ctx.root).at(-1) ?? null, [{ content: "", children: [] }]);
+    created = result.ids[0] ?? null;
+    return result;
+  });
+  if (created) void attachFiles(o, created, "content", files);
+}
+
+/** A progress bar while files are uploading. */
+function UploadProgress() {
+  const o = useOutliner();
+  const list = useSyncExternalStore(
+    useCallback((cb: () => void) => o.uploads.subscribe(cb), [o]),
+    () => o.uploads.list,
+  );
+  if (list.length === 0) return null;
+  const loaded = list.reduce((n, u) => n + u.loaded, 0);
+  const total = list.reduce((n, u) => n + u.total, 0) || 1;
+  const percent = Math.min(100, Math.round((100 * loaded) / total));
+  return (
+    <div
+      role="progressbar"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+      className="fixed bottom-4 left-1/2 z-30 w-72 -translate-x-1/2 rounded-md bg-white p-3 text-xs text-gray-600 shadow-lg ring-1 ring-gray-200"
+    >
+      <div className="mb-1.5 truncate">
+        Uploading {list[0]!.name}
+        {list.length > 1 ? ` and ${list.length - 1} more` : ""} — {percent}%
+      </div>
+      <div className="h-1.5 overflow-hidden rounded bg-gray-100">
+        <div className="h-full bg-green-600 transition-all" style={{ width: `${percent}%` }} />
+      </div>
+    </div>
   );
 }
 

@@ -126,7 +126,44 @@ export const LIMITS = {
   rankChars: 1_000,
   /** Characters in a client id. */
   clientIdChars: 100,
+  /** Bytes in an uploaded file. */
+  fileBytes: 200 * 1024 * 1024,
+  /** Bytes in an image's preview, which the browser makes. */
+  previewBytes: 1024 * 1024,
+  /** Characters in an uploaded file's name. */
+  fileNameChars: 255,
 } as const;
+
+/**
+ * An uploaded file, as text refers to it: `![photo.jpg](/api/files/<id>)` shows an image,
+ * `[report.pdf](/api/files/<id>)` a file to download. Only these addresses are files.
+ */
+export const FILE_PATH = "/api/files/";
+const FILE_URLS = /\/api\/files\/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi;
+
+/** The ids of every file a text refers to, lowercased, each once. */
+export function fileIdsIn(text: string): string[] {
+  if (!text.includes(FILE_PATH)) return [];
+  return [...new Set([...text.matchAll(FILE_URLS)].map((m) => m[1]!.toLowerCase()))];
+}
+
+/** The types the page shows as images. Any other file is only ever downloaded. */
+export const IMAGE_TYPES: ReadonlySet<string> = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/gif",
+  "image/webp",
+  "image/avif",
+]);
+
+/** POST /api/files: the file just saved. */
+export interface UploadedFile {
+  id: string;
+  name: string;
+  /** Its type, as read from its first bytes. */
+  type: string;
+  size: number;
+}
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RANK = /^[0-9A-Za-z]+$/;

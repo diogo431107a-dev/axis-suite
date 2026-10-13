@@ -73,6 +73,19 @@ describe("matches", () => {
     expect(find("before:2026-10-11", node("x !(2026-10-10)"))).toBe(true);
     expect(find("after:2026-10-11", node("x !(2026-10-10)"))).toBe(false);
   });
+
+  it("finds bullets with images and files by their names, not their addresses", () => {
+    const url = "/api/files/0f8fad5b-d9cb-469f-a165-70867728950e";
+    const image = node(`look ![Cat.png](${url})`);
+    const file = node("plan", { note: `[Budget.pdf](${url})` });
+    expect(find("has:image", image)).toBe(true);
+    expect(find("has:image", file)).toBe(false);
+    expect(find("has:file", file)).toBe(true);
+    expect(find("-has:file", image)).toBe(true);
+    expect(find("cat", image)).toBe(true);
+    expect(find("budget", file)).toBe(true);
+    expect(find("api", image)).toBe(false);
+  });
 });
 
 describe("dates", () => {

@@ -58,6 +58,31 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       CREATE TABLE resets (username TEXT PRIMARY KEY, rev INTEGER NOT NULL);
     `);
   },
+  // v3: uploaded files. The bytes are in the files folder next to the database (see files.ts);
+  // here is what they are, whose tree they belong to, and which bullets' text refers to them.
+  (db) => {
+    db.exec(`
+      CREATE TABLE files (
+        id          TEXT PRIMARY KEY,             -- a UUID made by the server; the name on disk
+        owner       TEXT NOT NULL,                -- owner of the tree it was uploaded into
+        uploader    TEXT NOT NULL,                -- who uploaded it (an editor, or the owner)
+        name        TEXT NOT NULL,
+        type        TEXT NOT NULL,                -- read from its first bytes, never from the browser
+        size        INTEGER NOT NULL,
+        has_preview INTEGER NOT NULL DEFAULT 0,
+        created_at  TEXT NOT NULL,
+        unref_at    TEXT                          -- when its last reference went; NULL while referred to
+      );
+      CREATE INDEX files_owner ON files (owner);
+      -- Which bullets' text refers to which files. Only a bullet of the file's own tree counts.
+      CREATE TABLE file_refs (
+        file_id TEXT NOT NULL REFERENCES files(id) ON DELETE CASCADE,
+        node_id TEXT NOT NULL REFERENCES nodes(id) ON DELETE CASCADE,
+        PRIMARY KEY (file_id, node_id)
+      );
+      CREATE INDEX file_refs_node ON file_refs (node_id);
+    `);
+  },
 ];
 
 /** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */

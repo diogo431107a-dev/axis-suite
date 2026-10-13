@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareSiblings, parseOp } from "./protocol.ts";
+import { compareSiblings, fileIdsIn, parseOp } from "./protocol.ts";
 
 const ID = "0f8fad5b-d9cb-469f-a165-70867728950e";
 const PARENT = "7c9e6679-7425-40de-944b-e07fc1f90ae7";
@@ -51,5 +51,13 @@ describe("compareSiblings", () => {
       { rank: "a0V", id: "c" },
     ];
     expect(list.sort(compareSiblings).map((n) => n.id)).toEqual(["z", "c", "a", "b"]);
+  });
+});
+
+describe("fileIdsIn", () => {
+  it("finds every file a text refers to, once each", () => {
+    const text = `![a](/api/files/${ID}) [b](/API/FILES/${ID.toUpperCase()}) [c](/api/files/${PARENT})`;
+    expect(fileIdsIn(text)).toEqual([ID, PARENT]);
+    expect(fileIdsIn(`/api/files/not-an-id ${ID}`)).toEqual([]);
   });
 });

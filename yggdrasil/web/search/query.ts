@@ -3,14 +3,14 @@
 //   words             in the text or note, ignoring case and accents
 //   "exact phrase"
 //   #tag  @who
-//   is:completed      has:note  has:date
+//   is:completed      has:note  has:date  has:image  has:file
 //   date:today  date:tomorrow  date:overdue  before:YYYY-MM-DD  after:YYYY-MM-DD
 
 export type Term = { negate: boolean } & (
   | { kind: "word" | "phrase"; value: string }
   | { kind: "tag" | "mention"; value: string }
   | { kind: "is"; value: "completed" }
-  | { kind: "has"; value: "note" | "date" }
+  | { kind: "has"; value: "note" | "date" | "image" | "file" }
   | { kind: "date"; value: "today" | "tomorrow" | "overdue" }
   | { kind: "before" | "after"; value: string }
 );
@@ -33,7 +33,9 @@ function term(raw: string, negate: boolean, quoted: boolean): Term | null {
     const key = raw.slice(0, colon).toLowerCase();
     const value = raw.slice(colon + 1).toLowerCase();
     if (key === "is" && value === "completed") return { kind: "is", value, negate };
-    if (key === "has" && (value === "note" || value === "date")) return { kind: "has", value, negate };
+    if (key === "has" && (value === "note" || value === "date" || value === "image" || value === "file")) {
+      return { kind: "has", value, negate };
+    }
     if (key === "date" && (value === "today" || value === "tomorrow" || value === "overdue")) {
       return { kind: "date", value, negate };
     }

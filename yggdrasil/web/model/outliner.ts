@@ -1,6 +1,7 @@
 // The app's model in one place: the tree, the sync queue, undo history and UI state. Every edit
 // goes through commit(), which applies it, queues it for the server and records it for undo.
 import type { Op, Role } from "../../shared/protocol.ts";
+import { Uploads } from "../files/uploads.ts";
 import type { TextSource } from "../io/plaintext.ts";
 import { localDate } from "../text/dates.ts";
 import { parseQuery, type Term } from "../search/query.ts";
@@ -64,6 +65,7 @@ export class Outliner {
   readonly store = new Store();
   readonly history = new History();
   readonly ui = new Ui();
+  readonly uploads = new Uploads();
   readonly sync: Sync;
   readonly username: string;
   /** Tells the user something went wrong (a toast). */
