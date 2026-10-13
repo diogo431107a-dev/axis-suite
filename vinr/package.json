@@ -1,6 +1,6 @@
 {
   "name": "vinr",
-  "version": "1.0.0",
+  "version": "0.0.4",
   "private": true,
   "description": "Vinr — a contacts manager for every signed-in user",
   "type": "module",

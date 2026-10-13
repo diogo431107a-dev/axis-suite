@@ -26,6 +26,20 @@ The editor of choice is `vim`. When a step means editing a file by hand (e.g. `s
 
 The owner is new to Git, so Claude runs it: branches, commits, merges, and cleaning up merged branches. Explain the result in plain words. The repository is public: confirm before every push.
 
+## Versions and changelogs
+
+Each module, and the suite as a whole, has its own version and `CHANGELOG.md` (see "Versions and changelogs" in the README).
+
+- Every change adds a line to its module's changelog under **Unreleased** before it is merged into `main`. Write it for the owner, not for a programmer: what they will notice, and **By hand:** before any step they must take besides the installer.
+- **Remind the owner to classify.** For a module at 1.0.0 or later (Yggdrasil), ask the owner before merging whether the change is **Major**, **Minor** or a **Fix**, with a suggestion and why, and start its changelog line with that word. A module still at 0.0.N needs no classification.
+- A version is made only when the owner deploys, in one release commit:
+  - A module at 0.0.N: N = `git rev-list --count --no-merges main -- <module>` plus one (the release commit), counted just before it.
+  - A module at 1.0.0 or later: the largest kind in **Unreleased** decides (Major → x+1.0.0, Minor → x.y+1.0, Fix → x.y.z+1). Say which version it will be, and why, before tagging.
+  - The suite: 0.0.N, N = `git rev-list --count --no-merges main` plus one. Add its entry to the root `CHANGELOG.md` with every module's version.
+  - **Unreleased** becomes `## <version> — <date>`, both `package.json` files match, and the commit is tagged `<module>-v<version>` and `axis-suite-v<version>`, then pushed with `git push origin main --follow-tags`. Name the versions in the VPS steps.
+- Only the owner moves a module to 1.0.0 (when its development map is complete) or the suite past 0.0. Never invent a number.
+- Never move or delete a tag that has been pushed. A mistake gets a new version.
+
 ## Before committing
 
 `pnpm check` and `pnpm build` from the root. On Windows, Prettier reports every file because the checkout has CRLF line endings (CI on Linux does not); check changed files with `npx prettier --check --end-of-line auto <files>` instead.

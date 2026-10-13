@@ -1,6 +1,6 @@
 {
   "name": "papyrus",
-  "version": "1.0.0",
+  "version": "0.0.5",
   "private": true,
   "description": "Papyrus — a journal, one page per day, for every signed-in user",
   "type": "module",
