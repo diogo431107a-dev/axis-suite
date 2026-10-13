@@ -1,0 +1,42 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- A desert lizard waving hello. Drawn for Althing. -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#e0f2fe"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#sky)"/>
+  <circle cx="214" cy="40" r="18" fill="#fde68a"/>
+  <!-- dunes and a cactus -->
+  <path d="M0 196 C60 170 110 176 160 194 C200 208 230 196 256 186 V256 H0 Z" fill="#fbbf24"/>
+  <path d="M0 226 C70 206 150 212 256 232 V256 H0 Z" fill="#f59e0b"/>
+  <path d="M30 196 v-34 m0 14 h-10 v-12 m10 6 h10 v-14" stroke="#15803d" stroke-width="7" fill="none" stroke-linecap="round" stroke-linejoin="round"/>
+  <!-- neck and body -->
+  <path d="M104 256 C100 214 112 180 136 170 C160 180 172 214 168 256 Z" fill="#d6b48a"/>
+  <path d="M124 256 C122 220 128 196 136 190 C144 196 150 220 148 256 Z" fill="#f1e2c6"/>
+  <!-- waving arm, long fingers -->
+  <path d="M164 206 C184 196 196 176 200 150" stroke="#c49a6c" stroke-width="12" fill="none" stroke-linecap="round"/>
+  <path d="M200 150 l-12 -30 M200 150 l0 -34 M200 150 l12 -30 M200 150 l20 -20" stroke="#c49a6c" stroke-width="7" stroke-linecap="round"/>
+  <circle cx="188" cy="120" r="5" fill="#c49a6c"/>
+  <circle cx="200" cy="116" r="5" fill="#c49a6c"/>
+  <circle cx="212" cy="120" r="5" fill="#c49a6c"/>
+  <circle cx="220" cy="130" r="5" fill="#c49a6c"/>
+  <path d="M176 116 a28 28 0 0 1 -6 -14 M226 112 a28 28 0 0 0 6 -14" stroke="#64748b" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- head -->
+  <path d="M60 128 C60 96 96 82 136 86 C168 90 176 112 170 134 C164 160 126 176 92 168 C70 162 60 148 60 128 Z" fill="#d6b48a" stroke="#a07850" stroke-width="3"/>
+  <circle cx="76" cy="122" r="3" fill="#7c5a36"/>
+  <circle cx="84" cy="122" r="3" fill="#7c5a36"/>
+  <!-- bulging eyes with heavy lids -->
+  <circle cx="108" cy="90" r="24" fill="#fff" stroke="#a07850" stroke-width="3"/>
+  <circle cx="148" cy="92" r="22" fill="#fff" stroke="#a07850" stroke-width="3"/>
+  <circle cx="112" cy="96" r="9" fill="#65a30d"/>
+  <circle cx="150" cy="98" r="8" fill="#65a30d"/>
+  <circle cx="113" cy="97" r="4" fill="#1c1917"/>
+  <circle cx="151" cy="99" r="4" fill="#1c1917"/>
+  <path d="M84 88 C86 62 132 62 132 88 Z" fill="#e8956b" stroke="#a07850" stroke-width="3"/>
+  <path d="M126 90 C128 66 170 66 170 92 Z" fill="#e8956b" stroke="#a07850" stroke-width="3"/>
+  <!-- wide grin -->
+  <path d="M74 140 C96 160 138 158 158 136" stroke="#5b3a1e" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M152 134 l10 -4" stroke="#5b3a1e" stroke-width="5" stroke-linecap="round"/>
+</svg>

@@ -7,7 +7,7 @@ The suite's sign-in service. Users sign in with hardcoded credentials. After sig
 
 ```
 server/
-  index.ts          HTTP routes: GET /, POST /login, POST /logout, GET /whoami, GET /healthz
+  index.ts          HTTP routes: GET /, POST /login, POST /logout, GET /whoami, GET /online, GET /healthz
   users.ts          ← the hardcoded accounts live here
   state.ts          sessions (48 h idle / 14 days, saved to disk) + 3-strikes / 5-minute lockout
   views.ts          HTML pages (login, dashboard)
@@ -90,5 +90,6 @@ Environment variables. On a server, `deploy/install.sh` writes them to `/etc/axi
 Modules use [`@axis-suite/heimdall-client`](../packages/heimdall-client/README.md) rather than talking to these endpoints themselves. Change the two together.
 
 - **`GET /whoami`** returns `200 {"username","name","expiresAt"}` for the session in the request's `heimdall_sid` cookie, or `401`. A module's server forwards the browser's `Cookie` header here on every request, so closing a session in Heimdall signs the user out of every module immediately. Each call counts as use and restarts the session's 48-hour idle clock. `expiresAt` is when the session ends unless it is used again.
+- **`GET /online`** returns `200 {"usernames":[…]}`, every user with at least one session that hasn't ended, or `401` if the request's own cookie has no live session. Only Althing uses it, for its "online" list, asking every 15 seconds with the cookie of someone who has Althing open. It does not count as use, so it never keeps a session open.
 - **`COOKIE_DOMAIN`** makes `loggbok.example.com` receive the cookie as well as `heimdall.example.com`. Trade-off: the browser now sends it to _every_ subdomain (mail included). It stays HttpOnly, Secure and SameSite=Lax, so page scripts on those sites can't read it, but any server on a subdomain could.
 - **`/?next=<url>`**: after signing in, or right away if they already are, the user goes back to that URL if its origin is registered. A `next` from any other origin is ignored, so this can't be used as an open redirect.

@@ -135,6 +135,15 @@ export function touchSession(token: string | undefined): void {
   saveSessions();
 }
 
+/** Every user with at least one session that hasn't ended, sorted. */
+export function onlineUsernames(now = Date.now()): string[] {
+  const online = new Set<string>();
+  for (const s of sessions.values()) {
+    if (!endReason(s, now)) online.add(s.username);
+  }
+  return [...online].sort();
+}
+
 export function destroySession(token: string | undefined): void {
   if (token && sessions.delete(tokenKey(token))) saveSessions();
 }

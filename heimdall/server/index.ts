@@ -9,6 +9,7 @@ import {
   getSession,
   idleEndsAt,
   lockedFor,
+  onlineUsernames,
   recordFailure,
   touchSession,
 } from "./state.ts";
@@ -186,6 +187,19 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
           : { error: "Not signed in" },
       ),
     );
+    return;
+  }
+
+  // For Althing's "online" list: every user with a session that hasn't ended. Only a signed-in
+  // caller may ask. Unlike /whoami this doesn't count as use, since Althing asks every few seconds.
+  if (pathname === "/online" && req.method === "GET") {
+    const session = getSession(sid);
+    res.writeHead(session ? 200 : 401, {
+      "Content-Type": "application/json; charset=utf-8",
+      "Cache-Control": "no-store",
+      "X-Content-Type-Options": "nosniff",
+    });
+    res.end(JSON.stringify(session ? { usernames: onlineUsernames() } : { error: "Not signed in" }));
     return;
   }
 

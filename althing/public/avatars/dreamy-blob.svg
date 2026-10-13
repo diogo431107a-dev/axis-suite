@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <!-- A dreamy green blob, chin on its hand. Drawn for Althing. -->
+  <defs>
+    <radialGradient id="bg" cx="0.3" cy="0.25" r="0.9">
+      <stop offset="0" stop-color="#fdba74"/>
+      <stop offset="1" stop-color="#ea580c"/>
+    </radialGradient>
+    <radialGradient id="skin" cx="0.38" cy="0.3" r="0.75">
+      <stop offset="0" stop-color="#a3e635"/>
+      <stop offset="1" stop-color="#4d7c0f"/>
+    </radialGradient>
+  </defs>
+  <rect width="256" height="256" fill="url(#bg)"/>
+  <!-- body -->
+  <path d="M40 256 C40 200 70 178 128 178 C186 178 216 200 216 256 Z" fill="#65a30d"/>
+  <!-- a sprout on top -->
+  <path d="M124 50 C122 36 126 26 132 20" stroke="#3f6212" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <path d="M131 22 C140 8 160 10 164 18 C154 28 140 28 131 22 Z" fill="#a3e635" stroke="#3f6212" stroke-width="3"/>
+  <path d="M129 26 C120 14 104 16 102 24 C110 32 122 32 129 26 Z" fill="#bef264" stroke="#3f6212" stroke-width="3"/>
+  <!-- head -->
+  <ellipse cx="124" cy="120" rx="86" ry="74" fill="url(#skin)"/>
+  <!-- eyes, half closed -->
+  <ellipse cx="94" cy="92" rx="26" ry="22" fill="#fff"/>
+  <ellipse cx="150" cy="90" rx="26" ry="22" fill="#fff"/>
+  <circle cx="100" cy="98" r="8" fill="#1c1917"/>
+  <circle cx="156" cy="96" r="8" fill="#1c1917"/>
+  <path d="M68 92 C70 68 118 66 120 90 Z" fill="#65a30d"/>
+  <path d="M124 90 C126 64 174 64 176 88 Z" fill="#65a30d"/>
+  <path d="M68 92 C80 88 108 87 120 90" stroke="#3f6212" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M124 90 C136 86 164 85 176 88" stroke="#3f6212" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- blush and smile -->
+  <ellipse cx="78" cy="132" rx="12" ry="7" fill="#f472b6" opacity="0.45"/>
+  <ellipse cx="174" cy="128" rx="12" ry="7" fill="#f472b6" opacity="0.45"/>
+  <path d="M92 140 C108 160 146 160 160 136" stroke="#1a2e05" stroke-width="5" fill="none" stroke-linecap="round"/>
+  <!-- hand under the chin -->
+  <path d="M150 176 C150 150 176 140 196 150 C214 160 210 186 190 192 C172 198 150 192 150 176 Z" fill="#84cc16" stroke="#3f6212" stroke-width="3"/>
+  <path d="M170 150 C168 160 170 170 176 176 M186 150 C184 160 186 170 192 176" stroke="#3f6212" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <!-- a little thought bubble -->
+  <circle cx="214" cy="56" r="7" fill="#fff" opacity="0.85"/>
+  <circle cx="230" cy="36" r="11" fill="#fff" opacity="0.85"/>
+</svg>
