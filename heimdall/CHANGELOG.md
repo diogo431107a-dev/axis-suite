@@ -4,6 +4,8 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+- Development only: signing in on the development server (`pnpm dev`) can send you back to Mimir's, at 127.0.0.1:5181. Nothing changes on a server, so this alone needs no new install.
+
 ## 0.0.17 — 2026-10-13
 
 - Althing can ask Heimdall who is signed in anywhere in the suite, for its "online" list. Asking doesn't keep anyone's session open.

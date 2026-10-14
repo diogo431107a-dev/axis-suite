@@ -1,0 +1,20 @@
+# Mimir's Caddy site. axis-suite/deploy/install.sh fills in the @PLACEHOLDERS@ and writes it
+# to /etc/caddy/sites.d/mimir.caddy.
+@SITE@ {
+	import axis_site
+
+	# The API checks every request with Heimdall itself, so Caddy only forwards it.
+	handle /api/* {
+		reverse_proxy 127.0.0.1:@PORT@
+	}
+
+	# The built React app. Unknown paths fall back to index.html.
+	handle {
+		root * @APP_DIR@/dist/web
+		header Content-Security-Policy "default-src 'self'; img-src 'self' data:; object-src 'none'; base-uri 'none'; form-action 'self'; frame-ancestors 'none'"
+		# Vite puts a content hash in every file name under /assets, so they never change.
+		header /assets/* Cache-Control "public, max-age=31536000, immutable"
+		try_files {path} /index.html
+		file_server
+	}
+}

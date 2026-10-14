@@ -1,0 +1,14 @@
+@import "tailwindcss";
+/* No classes are used there. */
+@source not "../server";
+@source not "../shared";
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
