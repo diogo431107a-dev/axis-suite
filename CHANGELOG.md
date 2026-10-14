@@ -4,6 +4,23 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.74 — 2026-10-13
+
+Mimir joins the suite: mind maps that lay themselves out from the centre to both sides, with relationship arrows, OPML in and out, and PNG pictures.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.17  |
+| Loggbok   | 0.0.12  |
+| Yggdrasil | 1.0.0   |
+| Janus     | 0.0.5   |
+| Papyrus   | 0.0.5   |
+| Vinr      | 0.0.4   |
+| Chronos   | 0.0.5   |
+| Valkyrie  | 0.0.4   |
+| Althing   | 0.0.2   |
+| Mimir     | 0.0.4   |
+
 ## 0.0.68 — 2026-10-13
 
 Althing joins the suite: a real-time chat with a lobby, rooms and direct messages, all kept on record. Heimdall can now tell Althing who is signed in.
