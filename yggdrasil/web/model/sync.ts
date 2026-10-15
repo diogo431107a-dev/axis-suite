@@ -118,8 +118,14 @@ export class Sync {
   #latestRev = 0;
   /** Revisions saved by this tab, not yet passed by #rev. */
   #ownRevs = new Set<number>();
-  /** Ops saved as revisions newer than #rev: a server row older than them must not undo them. */
+  /**
+   * Ops this tab saved, with their revisions: a server row older than them must not undo them.
+   * Kept until #rev has passed them and no read of the tree is on its way, since a read asked for
+   * before a save was confirmed may answer after it, as the tree was before it.
+   */
   #acked: { rev: number; ops: Op[] }[] = [];
+  /** Reads of the tree (GET /api/changes, GET /api/tree) on their way. */
+  #reads = 0;
 
   #flushTimer: ReturnType<typeof setTimeout> | undefined;
   #firstQueuedAt = 0;
@@ -366,7 +372,7 @@ export class Sync {
       this.#ownRevs.delete(this.#rev + 1);
       this.#rev++;
     }
-    this.#acked = this.#acked.filter((a) => a.rev > this.#rev);
+    if (this.#reads === 0) this.#acked = this.#acked.filter((a) => a.rev > this.#rev);
     if (this.#latestRev > this.#rev) void this.#fetchChanges();
   }
 
@@ -376,6 +382,7 @@ export class Sync {
       return;
     }
     this.#fetching = true;
+    this.#reads++;
     let failed = false;
     try {
       const changes = await this.#get<ChangesResponse>(`/api/changes?since=${this.#rev}`);
@@ -401,6 +408,7 @@ export class Sync {
       else setTimeout(() => this.#advance(), RETRY_MIN_MS * 2);
     } finally {
       this.#fetching = false;
+      this.#reads--;
     }
     if (failed) {
       this.#fetchAgain = false;
@@ -412,22 +420,29 @@ export class Sync {
     }
   }
 
-  /** Loads the whole tree again, then reapplies the changes not saved yet. */
+  /**
+   * Loads the whole tree again, then reapplies what it doesn't have: saves confirmed after the
+   * server answered, and the changes not saved yet.
+   */
   async #reload(): Promise<void> {
+    this.#reads++;
     try {
       const tree = await this.#get<TreeResponse>("/api/tree");
+      const newer = this.#acked.filter((a) => a.rev > tree.rev);
       this.#store.batch(() => {
         this.#store.load(tree.nodes, tree.shares);
-        this.#store.applyAll([...(this.#inflight ?? []), ...this.#queue]);
+        this.#store.applyAll([...newer.flatMap((a) => a.ops), ...(this.#inflight ?? []), ...this.#queue]);
       });
       this.#rev = tree.rev;
       this.#latestRev = Math.max(this.#latestRev, tree.rev);
       this.#ownRevs.clear();
-      this.#acked = [];
+      this.#acked = newer;
       this.#events.reloaded();
     } catch (err) {
       if (err instanceof SignedOutError) this.#signedOut(err.loginUrl);
       else console.error("Reloading the tree failed:", err);
+    } finally {
+      this.#reads--;
     }
   }
 
