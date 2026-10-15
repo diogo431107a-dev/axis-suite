@@ -99,7 +99,9 @@ class FakeEventSource {
     this.#listeners.set(type, [...(this.#listeners.get(type) ?? []), listener]);
   }
 
-  close(): void {}
+  close(): void {
+    this.readyState = FakeEventSource.CLOSED;
+  }
 
   emit(type: string): void {
     for (const listener of this.#listeners.get(type) ?? []) listener({ data: "null" });
@@ -138,7 +140,7 @@ describe("Sync", () => {
       sync.push([op]);
       vi.advanceTimersByTime(300);
     };
-    return { store, type, events: FakeEventSource.latest! };
+    return { store, sync, type, events: FakeEventSource.latest! };
   }
 
   it("keeps saved text that an answer asked for earlier doesn't have yet", async () => {
@@ -174,5 +176,24 @@ describe("Sync", () => {
     tree.answer({ rev: 2, nodes: [row("hello ")], shares: NO_SHARES });
     await settle();
     expect(store.get(X)!.content).toBe("hello world");
+  });
+
+  it("closes its event stream and heartbeat when stopped", async () => {
+    const { sync, events } = await open();
+    expect(vi.getTimerCount()).toBe(1);
+    sync.stop();
+    expect(events.readyState).toBe(FakeEventSource.CLOSED);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it("starts nothing when stopped while still loading", async () => {
+    FakeEventSource.latest = null;
+    const sync = new Sync(new Store(), "odin", { notice: () => {}, reloaded: () => {} });
+    const started = sync.start();
+    sync.stop();
+    request("/api/tree").answer({ rev: 1, nodes: [row("")], shares: NO_SHARES });
+    await started;
+    expect(FakeEventSource.latest).toBeNull();
+    expect(vi.getTimerCount()).toBe(0);
   });
 });

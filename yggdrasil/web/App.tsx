@@ -23,10 +23,12 @@ export default function App() {
   useEffect(() => {
     let cancelled = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
+    let created: Outliner | undefined;
     const load = async (attempt: number) => {
       try {
         const user = await fetchMe();
-        const o = new Outliner(user.username, { notice: setNotice });
+        if (cancelled) return;
+        const o = (created = new Outliner(user.username, { notice: setNotice }));
         o.ui.setView({ zoom: zoomFromLocation() });
         await o.sync.start();
         if (cancelled) return;
@@ -40,9 +42,12 @@ export default function App() {
       }
     };
     void load(0);
+    // In development React runs this twice, cleaning up the first run: its Outliner, maybe still
+    // loading, would otherwise keep a second event stream and heartbeat going.
     return () => {
       cancelled = true;
       clearTimeout(retry);
+      created?.sync.stop();
     };
   }, []);
 

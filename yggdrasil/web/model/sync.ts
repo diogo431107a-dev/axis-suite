@@ -137,6 +137,10 @@ export class Sync {
   #source: EventSource | null = null;
   #sourceRetry = RETRY_MIN_MS;
   #sourceTimer: ReturnType<typeof setTimeout> | undefined;
+  #heartbeat: ReturnType<typeof setInterval> | undefined;
+  /** Removes the page listeners added by start(). */
+  readonly #unlisten = new AbortController();
+  #stopped = false;
 
   #state: SyncState = { kind: "saved" };
   #listeners = new Set<() => void>();
@@ -152,28 +156,58 @@ export class Sync {
   /** Loads the tree, sends what closed tabs left behind, and starts listening for changes. */
   async start(): Promise<void> {
     const tree = await this.#get<TreeResponse>("/api/tree");
+    if (this.#stopped) return;
     this.#store.load(tree.nodes, tree.shares);
     this.#rev = this.#latestRev = tree.rev;
     this.#adoptSavedQueues();
 
-    window.addEventListener("online", () => this.#retryNow());
-    window.addEventListener("beforeunload", (e) => {
-      if (this.pending > 0) e.preventDefault();
-    });
+    const { signal } = this.#unlisten;
+    window.addEventListener("online", () => this.#retryNow(), { signal });
+    window.addEventListener(
+      "beforeunload",
+      (e) => {
+        if (this.pending > 0) e.preventDefault();
+      },
+      { signal },
+    );
     // A tab being hidden may be closed next: send now rather than after the pause.
-    document.addEventListener("visibilitychange", () => {
-      if (document.visibilityState === "hidden") void this.#flush();
-    });
+    document.addEventListener(
+      "visibilitychange",
+      () => {
+        if (document.visibilityState === "hidden") void this.#flush();
+      },
+      { signal },
+    );
     // Leaving the page: whatever is still unsaved is for the next tab to send, straight away.
-    window.addEventListener("pagehide", () => {
-      if (this.pending > 0) this.#save(0);
-    });
-    setInterval(() => {
+    window.addEventListener(
+      "pagehide",
+      () => {
+        if (this.pending > 0) this.#save(0);
+      },
+      { signal },
+    );
+    this.#heartbeat = setInterval(() => {
       if (this.pending > 0) this.#save();
       // A tab closed (or reloaded) with unsent changes: they go out from here.
       this.#adoptSavedQueues();
     }, HEARTBEAT_MS);
     this.#listen();
+  }
+
+  /**
+   * Stops for good, even while start() is still loading: no more listening, sending or fetching.
+   * For a Sync the page won't use (in development, React runs the app's start-up twice). What it
+   * still had unsent stays in localStorage, for an open tab to adopt.
+   */
+  stop(): void {
+    this.#stopped = true;
+    this.#unlisten.abort();
+    clearInterval(this.#heartbeat);
+    clearTimeout(this.#flushTimer);
+    clearTimeout(this.#retryTimer);
+    clearTimeout(this.#sourceTimer);
+    this.#source?.close();
+    this.#source = null;
   }
 
   /** Ops waiting to be saved, sent or not. */
@@ -244,7 +278,7 @@ export class Sync {
   async #flush(): Promise<void> {
     clearTimeout(this.#flushTimer);
     this.#flushTimer = undefined;
-    if (this.#inflight || this.#signedOutUrl || this.#queue.length === 0) return;
+    if (this.#stopped || this.#inflight || this.#signedOutUrl || this.#queue.length === 0) return;
     const batch = takeBatch(this.#queue);
     this.#inflight = batch;
     this.#update();
@@ -337,6 +371,7 @@ export class Sync {
 
   #listen(): void {
     clearTimeout(this.#sourceTimer);
+    if (this.#stopped) return;
     const source = new EventSource(`/api/events?user=${encodeURIComponent(this.#username)}`);
     this.#source = source;
     source.addEventListener("open", () => {
@@ -377,6 +412,7 @@ export class Sync {
   }
 
   async #fetchChanges(): Promise<void> {
+    if (this.#stopped) return;
     if (this.#fetching) {
       this.#fetchAgain = true;
       return;
@@ -425,6 +461,7 @@ export class Sync {
    * server answered, and the changes not saved yet.
    */
   async #reload(): Promise<void> {
+    if (this.#stopped) return;
     this.#reads++;
     try {
       const tree = await this.#get<TreeResponse>("/api/tree");
