@@ -4,6 +4,23 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.82 — 2026-10-15
+
+Yggdrasil 1.0.1: letters typed just before a short pause no longer disappear.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.17  |
+| Loggbok   | 0.0.12  |
+| Yggdrasil | 1.0.1   |
+| Janus     | 0.0.5   |
+| Papyrus   | 0.0.5   |
+| Vinr      | 0.0.4   |
+| Chronos   | 0.0.5   |
+| Valkyrie  | 0.0.4   |
+| Althing   | 0.0.2   |
+| Mimir     | 0.0.4   |
+
 ## 0.0.74 — 2026-10-13
 
 Mimir joins the suite: mind maps that lay themselves out from the centre to both sides, with relationship arrows, OPML in and out, and PNG pictures.

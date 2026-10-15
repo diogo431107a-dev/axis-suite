@@ -4,6 +4,8 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 
 ## Unreleased
 
+## 1.0.1 — 2026-10-15
+
 - **Fix:** Letters typed just before a short pause could disappear a moment later, and the next key you pressed saved the bullet without them. It happened when an older copy of the bullet came back from the server after the newer text was already saved. The older copy no longer replaces it.
 - **Fix:** In development (`pnpm dev`), the page no longer runs a second, hidden copy of its saving and syncing next to the real one, so the server's log shows only the requests the page really makes. Nothing changes in production, which never ran the second copy.
 
