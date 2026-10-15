@@ -304,16 +304,18 @@ export class Sync {
     }
     if (res.status >= 500 || res.status === 408 || res.status === 429) return this.#sendFailed(batch);
 
-    this.#inflight = null;
     this.#retryDelay = 0;
     if (!res.ok) {
       // Refused as a whole, so sending it again won't help.
       console.error("POST /api/ops:", res.status, await res.text().catch(() => ""));
+      this.#inflight = null;
       this.#save();
       this.#events.notice("Some changes could not be saved. The outline was reloaded.");
       await this.#reload();
     } else {
-      const result = (await res.json()) as OpsResponse;
+      // In flight until the answer is read, so that this tab's own "rev" event, arriving meanwhile,
+      // is skipped rather than fetching back what was just saved. Cleared even if reading fails.
+      const result = (await res.json().finally(() => (this.#inflight = null))) as OpsResponse;
       this.#save();
       if (result.rev !== null) {
         this.#ownRevs.add(result.rev);
