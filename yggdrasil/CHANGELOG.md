@@ -4,6 +4,8 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 
 ## Unreleased
 
+- **Fix:** Letters typed just before a short pause could disappear a moment later, and the next key you pressed saved the bullet without them. It happened when an older copy of the bullet came back from the server after the newer text was already saved. The older copy no longer replaces it.
+
 ## 1.0.0 — 2026-10-13
 
 The first numbered version: Yggdrasil as it runs in production on this date. Its development map is complete, so it starts at 1.0.0 rather than at its commit count, which would have made it 0.0.16. From here, every change is classified as major, minor or a fix.
