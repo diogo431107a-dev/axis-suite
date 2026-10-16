@@ -29,15 +29,6 @@ const events = createEvents();
 /** Tells every open tab of `owners` to ask again. */
 const changed = (...owners: string[]) => events.send(owners, "changed", {});
 
-// Sessions that reach midnight (or 05:00) stop by themselves. Their numbers are right without this;
-// it writes the stop down and tells the open tabs. Checked now and every 15 seconds.
-function sweep() {
-  const owners = store.closeExpired();
-  if (owners.length > 0) changed(...owners);
-}
-sweep();
-setInterval(sweep, 15_000).unref();
-
 const app = express();
 app.disable("x-powered-by");
 
@@ -65,7 +56,7 @@ const owner = (req: Request) => auth.user(req).username;
 // The signed-in user
 app.get("/api/me", auth.me);
 
-// Everything the timer shows: ?today= is the page's date, ?project= the project it shows too.
+// Everything the timer shows: ?today= is the page's date, ?project= and ?task= the ones it shows too.
 app.get("/api/state", (req, res) => {
   res.json(store.state(owner(req), req.query));
 });
@@ -108,6 +99,15 @@ app.delete("/api/projects/:id", (req, res) => {
   const user = owner(req);
   store.deleteProject(user, req.params.id);
   res.status(204).end();
+  changed(user);
+});
+
+app.get("/api/tasks", (req, res) => {
+  res.json(store.tasks(owner(req), req.query));
+});
+app.patch("/api/tasks", (req, res) => {
+  const user = owner(req);
+  res.json(store.updateTask(user, req.body));
   changed(user);
 });
 

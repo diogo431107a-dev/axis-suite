@@ -1,48 +1,55 @@
 import { describe, expect, it } from "vitest";
-import { sessionBounds } from "./cutoff.ts";
 import { addDays, isDate, monthOf, weekStart } from "./dates.ts";
-import { instantOf, isInstant, toInstantMs, zoneName } from "./zones.ts";
+import { daySpans, lastDayOf } from "./days.ts";
+import { isInstant, toInstantMs, zoneName } from "./zones.ts";
 
-/** sessionBounds for a start on the wall clock of `zone`, with the stop as an instant. */
-function bounds(wall: string, zone: string) {
-  const { day, cutoffMs } = sessionBounds(toInstantMs(wall, zone), zone);
-  return { day, cutoff: instantOf(cutoffMs) };
-}
+/** daySpans for a session between two times on the wall clock of `zone`. */
+const spans = (from: string, to: string, zone: string) =>
+  daySpans(toInstantMs(from, zone), toInstantMs(to, zone), zone);
 
-describe("automatic stops", () => {
+const H = 3600;
+
+describe("days a session has time in", () => {
   // London is on summer time (UTC+1) until 25 October 2026.
   const london = "Europe/London";
 
-  it("stops a daytime session at the next midnight", () => {
-    expect(bounds("2026-10-15T09:00", london)).toEqual({ day: "2026-10-15", cutoff: "2026-10-15T23:00:00Z" });
-    expect(bounds("2026-10-15T00:00:00", london)).toEqual({ day: "2026-10-15", cutoff: "2026-10-15T23:00:00Z" });
-    expect(bounds("2026-10-15T21:59:59", london)).toEqual({ day: "2026-10-15", cutoff: "2026-10-15T23:00:00Z" });
+  it("gives a session within a day all to that day", () => {
+    expect(spans("2026-10-15T09:00", "2026-10-15T17:30", london)).toEqual([{ day: "2026-10-15", seconds: 8.5 * H }]);
+    expect(spans("2026-10-15T00:00", "2026-10-16T00:00", london)).toEqual([{ day: "2026-10-15", seconds: 24 * H }]);
   });
 
-  it("lets a session started at 22:00 or later run until 05:00, counting for the day it started", () => {
-    expect(bounds("2026-10-15T22:00:00", london)).toEqual({ day: "2026-10-15", cutoff: "2026-10-16T04:00:00Z" });
-    expect(bounds("2026-10-15T23:59:59", london)).toEqual({ day: "2026-10-15", cutoff: "2026-10-16T04:00:00Z" });
+  it("splits a session at each midnight, however long it runs", () => {
+    expect(spans("2026-10-15T22:30", "2026-10-16T01:15", london)).toEqual([
+      { day: "2026-10-15", seconds: 1.5 * H },
+      { day: "2026-10-16", seconds: 1.25 * H },
+    ]);
+    expect(spans("2026-10-15T18:00", "2026-10-18T06:00", london).map((s) => s.seconds / H)).toEqual([6, 24, 24, 6]);
   });
 
-  it("gives a session started after midnight the whole day", () => {
-    expect(bounds("2026-10-16T00:30", london)).toEqual({ day: "2026-10-16", cutoff: "2026-10-16T23:00:00Z" });
-    expect(bounds("2026-10-16T04:59", london)).toEqual({ day: "2026-10-16", cutoff: "2026-10-16T23:00:00Z" });
+  it("counts a session of no length on its day", () => {
+    expect(spans("2026-10-15T09:00", "2026-10-15T09:00", london)).toEqual([{ day: "2026-10-15", seconds: 0 }]);
+  });
+
+  it("ends a session's days with its last second", () => {
+    const start = toInstantMs("2026-10-15T22:00", london);
+    expect(lastDayOf(start, toInstantMs("2026-10-16T00:00", london), london)).toBe("2026-10-15");
+    expect(lastDayOf(start, toInstantMs("2026-10-16T00:00:01", london), london)).toBe("2026-10-16");
+    expect(lastDayOf(start, start, london)).toBe("2026-10-15");
   });
 
   it("follows the clocks when they change in the night", () => {
-    // London goes back from 02:00 summer time to 01:00 winter time on 25 October 2026.
-    expect(bounds("2026-10-24T09:00", london)).toEqual({ day: "2026-10-24", cutoff: "2026-10-24T23:00:00Z" });
-    expect(bounds("2026-10-24T22:30", london)).toEqual({ day: "2026-10-24", cutoff: "2026-10-25T05:00:00Z" });
-    // New York jumps from 02:00 to 03:00 on 8 March 2026.
+    // London goes back from 02:00 summer time to 01:00 winter time on 25 October 2026: a day of 25 hours.
+    expect(spans("2026-10-24T23:00", "2026-10-26T01:00", london).map((s) => s.seconds / H)).toEqual([1, 25, 1]);
+    // New York jumps from 02:00 to 03:00 on 8 March 2026: a day of 23 hours.
     const newYork = "America/New_York";
-    expect(bounds("2026-03-07T23:00", newYork)).toEqual({ day: "2026-03-07", cutoff: "2026-03-08T09:00:00Z" });
-    expect(bounds("2026-03-08T01:30", newYork)).toEqual({ day: "2026-03-08", cutoff: "2026-03-09T04:00:00Z" });
+    expect(spans("2026-03-07T23:00", "2026-03-09T01:00", newYork).map((s) => s.seconds / H)).toEqual([1, 23, 1]);
   });
 
   it("works in São Paulo, which has no summer time", () => {
-    const saoPaulo = "America/Sao_Paulo";
-    expect(bounds("2026-10-15T08:00", saoPaulo)).toEqual({ day: "2026-10-15", cutoff: "2026-10-16T03:00:00Z" });
-    expect(bounds("2026-10-15T22:15", saoPaulo)).toEqual({ day: "2026-10-15", cutoff: "2026-10-16T08:00:00Z" });
+    expect(spans("2026-10-15T23:00", "2026-10-16T02:00", "America/Sao_Paulo")).toEqual([
+      { day: "2026-10-15", seconds: H },
+      { day: "2026-10-16", seconds: 2 * H },
+    ]);
   });
 });
 

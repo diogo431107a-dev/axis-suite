@@ -2,6 +2,8 @@
 // started and the time now, so a laptop that slept or a tab the browser slowed down is right again
 // on its next tick. One timer serves every part of the page that shows a live number.
 import { useSyncExternalStore } from "react";
+import { addDays, monthOf, weekStart } from "../shared/dates.ts";
+import { daySpans } from "../shared/days.ts";
 import type { Periods, Session, Tally } from "../shared/protocol.ts";
 
 /**
@@ -13,25 +15,49 @@ export function clockSkew(serverNow: string, localNow = Date.now()): number {
   return Math.abs(gap) > 2000 ? gap : 0;
 }
 
-/** A session's whole seconds at `nowMs`: up to its end, or to its automatic stop while it runs. */
+/** A session's whole seconds at `nowMs`: up to its end, or to now while it runs. */
 export function elapsed(session: Session, nowMs: number): number {
-  const end = session.endedAt ? Date.parse(session.endedAt) : Math.min(nowMs, Date.parse(session.cutoffAt));
+  const end = session.endedAt ? Date.parse(session.endedAt) : nowMs;
   return Math.max(0, Math.floor((end - Date.parse(session.startedAt)) / 1000));
 }
 
+/** Where a session ends at `nowMs` (ms): its end, or now, in whole seconds, while it runs. */
+export const endOf = (session: Session, nowMs: number) =>
+  session.endedAt ? Date.parse(session.endedAt) : Date.parse(session.startedAt) + elapsed(session, nowMs) * 1000;
+
 /**
- * Periods as they are at `nowMs`: as the server counted them, plus what the running session has
- * run since. `running` is null when it doesn't count in these periods (another project's).
+ * Periods around `day` as they are at `nowMs`: as the server counted them, plus what the running
+ * session has run since, which may make it the longest. `running` is null when it doesn't count in
+ * these periods (another project's).
  */
-export function livePeriods(periods: Periods, running: Session | null, nowMs: number): Periods {
+export function livePeriods(periods: Periods, running: Session | null, nowMs: number, day: string): Periods {
   const extra = running ? elapsed(running, nowMs) - running.seconds : 0;
-  if (extra <= 0) return periods;
-  const add = (t: Tally): Tally => ({ ...t, seconds: t.seconds + extra });
+  if (!running || extra <= 0) return periods;
+  const spans = daySpans(Date.parse(running.startedAt), endOf(running, nowMs), running.zone);
+  const monday = weekStart(day);
+  const sunday = addDays(monday, 6);
+  // The running session's part in a period.
+  const partIn = (inside: (d: string) => boolean) =>
+    spans.filter((s) => inside(s.day)).reduce((sum, s) => sum + s.seconds, 0);
+  const add = (t: Tally, part: number): Tally => ({
+    ...t,
+    seconds: t.seconds + extra,
+    longest: Math.max(t.longest, part),
+  });
   return {
-    today: add(periods.today),
-    week: add(periods.week),
-    month: add(periods.month),
-    overall: add(periods.overall),
+    today: add(
+      periods.today,
+      partIn((d) => d === day),
+    ),
+    week: add(
+      periods.week,
+      partIn((d) => d >= monday && d <= sunday),
+    ),
+    month: add(
+      periods.month,
+      partIn((d) => monthOf(d) === monthOf(day)),
+    ),
+    overall: add(periods.overall, elapsed(running, nowMs)),
   };
 }
 

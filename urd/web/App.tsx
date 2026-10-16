@@ -8,16 +8,17 @@ import {
   watchForSignIn,
   type Me,
 } from "@axis-suite/heimdall-client/browser";
-import type { Project, TagCount } from "../shared/protocol.ts";
+import type { Project, TagCount, Task } from "../shared/protocol.ts";
 import { api, describeError, query, setPageUser } from "./api.ts";
 import { elapsed, useSecond } from "./clock.ts";
-import { clock } from "./format.ts";
+import { clock, sessionName } from "./format.ts";
 import { HistoryView } from "./history/HistoryView.tsx";
 import { useToday } from "./hooks.ts";
 import { listen } from "./live.ts";
 import { useRoute, type Route } from "./nav.ts";
 import { ProjectDialog } from "./projects/ProjectDialog.tsx";
 import { ProjectsView } from "./projects/ProjectsView.tsx";
+import { TaskDialog } from "./projects/TaskDialog.tsx";
 import { TimerView } from "./timer/TimerView.tsx";
 import { useTimer, type Timer } from "./timer/useTimer.ts";
 import { Link } from "./ui/Link.tsx";
@@ -45,6 +46,7 @@ export default function App() {
 
 function SignedIn({ me }: { me: Me }) {
   const [projects, setProjects] = useState<Project[] | null>(null);
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [tags, setTags] = useState<TagCount[]>([]);
   // Goes up when something changed, here or on another device: everything shown is asked for again.
   const [revision, setRevision] = useState(0);
@@ -52,6 +54,7 @@ function SignedIn({ me }: { me: Me }) {
   // Set when the session ends mid-use. Holds the sign-in URL.
   const [signedOut, setSignedOut] = useState<string | null>(null);
   const [dialog, setDialog] = useState<Project | null>(null);
+  const [taskDialog, setTaskDialog] = useState<Task | null>(null);
   const route = useRoute();
   const today = useToday();
 
@@ -73,6 +76,7 @@ function SignedIn({ me }: { me: Me }) {
     user: me.username,
     today,
     projects: projects ?? [],
+    tasks,
     revision,
     onChanged: changed,
     onError: handleError,
@@ -80,10 +84,15 @@ function SignedIn({ me }: { me: Me }) {
 
   useEffect(() => {
     let stale = false;
-    Promise.all([api<Project[]>(`/api/projects${query({ day: today })}`), api<TagCount[]>("/api/tags")]).then(
-      ([p, t]) => {
+    Promise.all([
+      api<Project[]>(`/api/projects${query({ day: today })}`),
+      api<Task[]>(`/api/tasks${query({ day: today })}`),
+      api<TagCount[]>("/api/tags"),
+    ]).then(
+      ([p, k, t]) => {
         if (stale) return;
         setProjects(p);
+        setTasks(k);
         setTags(t);
       },
       (err: unknown) => !stale && handleError(err),
@@ -139,6 +148,7 @@ function SignedIn({ me }: { me: Me }) {
         unnamed={route.unnamed}
         unnamedCount={timer.state?.unnamed ?? 0}
         projects={projects ?? []}
+        tasks={tasks}
         tags={tags}
         skew={timer.skew}
         revision={revision}
@@ -147,13 +157,14 @@ function SignedIn({ me }: { me: Me }) {
       />
     );
   } else if (route.kind === "projects") {
-    view = <ProjectsView projects={projects} onOpen={setDialog} />;
+    view = <ProjectsView projects={projects} tasks={tasks} onOpen={setDialog} onOpenTask={setTaskDialog} />;
   } else {
     view = (
       <TimerView
         timer={timer}
         today={today}
         projects={projects ?? []}
+        tasks={tasks}
         tags={tags}
         onOpenProject={setDialog}
         onEstimate={setEstimate}
@@ -222,6 +233,15 @@ function SignedIn({ me }: { me: Me }) {
           onClose={() => setDialog(null)}
         />
       )}
+
+      {taskDialog && (
+        <TaskDialog
+          task={taskDialog}
+          projects={projects ?? []}
+          onChanged={changed}
+          onClose={() => setTaskDialog(null)}
+        />
+      )}
     </div>
   );
 }
@@ -242,7 +262,7 @@ function NavLink({ route, to, children }: { route: Route; to: Route; children: s
 function TitleAndIcon({ timer }: { timer: Timer }) {
   const running = timer.state?.running ?? null;
   const now = useSecond(!!running) + timer.skew;
-  const title = running ? `${clock(elapsed(running, now))} · ${running.project ?? "No project"} — Urd` : "Urd";
+  const title = running ? `${clock(elapsed(running, now))} · ${sessionName(running)} — Urd` : "Urd";
   useEffect(() => {
     document.title = title;
   }, [title]);
