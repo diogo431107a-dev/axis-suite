@@ -4,6 +4,8 @@ What changed in Loggbok, newest first. Each version is tagged in git as `loggbok
 
 ## Unreleased
 
+## 0.0.14 — 2026-10-15
+
 - A small download arrow in the bottom bar, next to Share, saves the open note as a text file named after its title (e.g. `Groceries.txt`). It saves what is on screen, unsaved changes included.
 
 ## 0.0.12 — 2026-10-13

@@ -4,6 +4,24 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.84 — 2026-10-15
+
+Loggbok 0.0.14: a download arrow saves the open note as a text file. Urd, the suite's time tracker, gets its first version, 1.0.0.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.17  |
+| Loggbok   | 0.0.14  |
+| Yggdrasil | 1.0.1   |
+| Janus     | 0.0.5   |
+| Papyrus   | 0.0.5   |
+| Vinr      | 0.0.4   |
+| Chronos   | 0.0.5   |
+| Valkyrie  | 0.0.4   |
+| Althing   | 0.0.2   |
+| Mimir     | 0.0.4   |
+| Urd       | 1.0.0   |
+
 ## 0.0.82 — 2026-10-15
 
 Yggdrasil 1.0.1: letters typed just before a short pause no longer disappear.
