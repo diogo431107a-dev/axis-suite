@@ -4,6 +4,9 @@ What changed in Urd, newest first. Each version is tagged in git as `urd-v<versi
 
 ## Unreleased
 
+- **Minor:** Dark mode. Urd follows the computer's or phone's light or dark setting, and a switch in the header (System, Light, Dark) overrides it, remembered on each computer. Urd is the first app in the suite to have one.
+- **Minor:** New task, above Resume: it empties the project, task and tags, for a task that isn't in the list. A running session stops for it; the new one starts on Play.
+
 ## 2.0.0 — 2026-10-16
 
 - **Major:** Urd never stops a session by itself any more: a session runs until you press Stop, however long that is. Sessions that stopped by themselves before keep that stop.
