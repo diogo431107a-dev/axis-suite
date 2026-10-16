@@ -4,6 +4,8 @@ What changed in Urd, newest first. Each version is tagged in git as `urd-v<versi
 
 ## Unreleased
 
+## 2.0.0 — 2026-10-16
+
 - **Major:** Urd never stops a session by itself any more: a session runs until you press Stop, however long that is. Sessions that stopped by themselves before keep that stop.
 - **Major:** Time that runs past midnight is split between the two days (and their weeks and months), instead of all counting for the day it started. "Today" is always today, and a session past midnight shows on both days in History.
 - **Minor:** Tasks. A session can have a task, inside a project or on its own. Projects lists each project's tasks with their time and interruptions (its time without a task first, then the tasks in the order they were started), and the tasks without a project; a click renames a task or moves it to another project. "Without a project" in History is now "Unnamed": sessions with neither a project nor a task.
