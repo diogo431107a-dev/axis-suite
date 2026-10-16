@@ -30,6 +30,7 @@ web/
   clock.ts           the one-second tick, and live numbers between two answers from the server
   tasks.ts           finding a task by name, and the tags it resumes with
   live.ts            the live connection
+  theme.ts           light or dark: the computer's setting, or the header's switch
 deploy/
   urd.service        systemd unit (sandboxed)
   urd.caddy          Caddy site: /api to the service (events unbuffered), everything else from dist/web
@@ -41,7 +42,7 @@ deploy/
 
 **Projects and tasks.** A session has an optional project, an optional task and tags, which can be set before, during or after it. A task is a name, inside a project or on its own: the sessions with the same project and task name (ignoring case) are that task, spelled as it was first. Tasks have no estimate, only their time and interruptions. A session with neither project nor task is _unnamed_, and can be named later from History. A project is made when a session is first given its name, and goes by itself once nothing is left in it, neither a session nor an estimate (a typo, corrected).
 
-**Resuming.** Resume lists the latest tasks (and projects used without a task); ▶ starts one again with the tags its latest session had. Choosing a project or a task in the timer's fields also brings its last tags: the task's, else the project's latest; a name never used keeps the tags shown. On a running session without tags, naming it brings them too.
+**Resuming.** Resume lists the latest tasks (and projects used without a task); ▶ starts one again with the tags its latest session had. Choosing a project or a task in the timer's fields also brings its last tags: the task's, else the project's latest; a name never used keeps the tags shown. On a running session without tags, naming it brings them too. New task empties the fields for a task not in the list, stopping a running session first.
 
 **Days, weeks, months.** A session's time counts for the days it covers, split at each midnight on the clock of the browser that pressed Play (its time zone is kept with the session, so changes of summer time are followed): 22:30 to 01:15 is 1h 30m for one day and 1h 15m for the next, and so for their weeks (Monday to Sunday) and months. "Today" is always today: after midnight, a running session's numbers move on to the new day.
 

@@ -97,7 +97,10 @@ export function ProjectDialog({ project, onChanged, onClose }: ProjectDialogProp
         </div>
 
         {mergeInto && (
-          <div role="alert" className="rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-900">
+          <div
+            role="alert"
+            className="rounded-lg border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950 p-3 text-sm text-amber-900 dark:text-amber-200"
+          >
             <p className="mb-2">
               There is already a project called “{mergeInto}”. Merge this one into it? Its{" "}
               {sessionsText(total.sessions)} move there, and “{project.name}” goes away.
@@ -126,7 +129,7 @@ export function ProjectDialog({ project, onChanged, onClose }: ProjectDialogProp
               className={`${numberInput} w-20`}
               placeholder="0"
             />
-            <span className="text-sm text-zinc-500">h</span>
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">h</span>
             <input
               aria-label="Minutes"
               inputMode="numeric"
@@ -136,11 +139,11 @@ export function ProjectDialog({ project, onChanged, onClose }: ProjectDialogProp
               className={`${numberInput} w-16`}
               placeholder="0"
             />
-            <span className="text-sm text-zinc-500">m</span>
+            <span className="text-sm text-zinc-500 dark:text-zinc-400">m</span>
             {hoursValue !== null && (
               <button
                 type="button"
-                className="ml-auto whitespace-nowrap text-sm text-zinc-500 underline"
+                className="ml-auto whitespace-nowrap text-sm text-zinc-500 dark:text-zinc-400 underline"
                 onClick={() => setHm(["", ""])}
               >
                 No estimate
@@ -148,10 +151,12 @@ export function ProjectDialog({ project, onChanged, onClose }: ProjectDialogProp
             )}
           </div>
           {!estimateValid && (
-            <p className="mt-1 text-xs text-rose-700">An estimate is from 1 minute to 100,000 hours.</p>
+            <p className="mt-1 text-xs text-rose-700 dark:text-rose-400">
+              An estimate is from 1 minute to 100,000 hours.
+            </p>
           )}
           {project.estimateLog.length > 0 && (
-            <ol className="mt-2 space-y-0.5 text-xs text-zinc-500">
+            <ol className="mt-2 space-y-0.5 text-xs text-zinc-500 dark:text-zinc-400">
               {project.estimateLog.map((c) => (
                 <li key={c.at + String(c.to)}>
                   {dateOf(c.at)}:{" "}
@@ -166,12 +171,12 @@ export function ProjectDialog({ project, onChanged, onClose }: ProjectDialogProp
           )}
         </fieldset>
 
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {hours(total.seconds)} in {sessionsText(total.sessions)}, {hours(project.periods.month.seconds)} this month.
         </p>
 
         {error && (
-          <p role="alert" className="text-sm text-rose-700">
+          <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
             {error}
           </p>
         )}

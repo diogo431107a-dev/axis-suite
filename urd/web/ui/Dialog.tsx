@@ -31,16 +31,16 @@ export function Dialog({ title, onClose, children, wide }: DialogProps) {
       onClose={onClose}
       // A click on the backdrop lands on the <dialog> itself, outside its content.
       onClick={(e) => e.target === ref.current && ref.current.close()}
-      className={`m-auto p-0 rounded-xl shadow-xl border border-zinc-200 backdrop:bg-zinc-900/40
+      className={`m-auto p-0 rounded-xl shadow-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 text-zinc-800 dark:text-zinc-100 backdrop:bg-zinc-900/40 dark:backdrop:bg-black/60
                   w-[calc(100vw-2rem)] ${wide ? "max-w-2xl" : "max-w-md"}`}
     >
-      <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-zinc-200">
-        <h2 className="font-semibold text-zinc-800">{title}</h2>
+      <div className="flex items-center justify-between gap-4 px-5 py-3 border-b border-zinc-200 dark:border-zinc-800">
+        <h2 className="font-semibold text-zinc-800 dark:text-zinc-100">{title}</h2>
         <button
           type="button"
           onClick={() => ref.current?.close()}
           aria-label="Close"
-          className="p-1 -mr-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100"
+          className="p-1 -mr-1 rounded text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800"
         >
           <X className="w-4 h-4" />
         </button>

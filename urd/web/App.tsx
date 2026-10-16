@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { AlertTriangle } from "lucide-react";
+import { AlertTriangle, Monitor, Moon, Sun } from "lucide-react";
 import {
   SignedOutError,
   fetchMe,
@@ -21,7 +21,9 @@ import { ProjectsView } from "./projects/ProjectsView.tsx";
 import { TaskDialog } from "./projects/TaskDialog.tsx";
 import { TimerView } from "./timer/TimerView.tsx";
 import { useTimer, type Timer } from "./timer/useTimer.ts";
+import { NEXT_THEME, useTheme, type Theme } from "./theme.ts";
 import { Link } from "./ui/Link.tsx";
+import { iconButton } from "./ui/buttons.ts";
 
 export default function App() {
   const [me, setMe] = useState<Me | null>(null);
@@ -39,7 +41,7 @@ export default function App() {
       });
   }, []);
 
-  if (loadError) return <p className="p-8 text-center text-sm text-zinc-500">{loadError}</p>;
+  if (loadError) return <p className="p-8 text-center text-sm text-zinc-500 dark:text-zinc-400">{loadError}</p>;
   if (!me) return null;
   return <SignedIn me={me} />;
 }
@@ -173,11 +175,14 @@ function SignedIn({ me }: { me: Me }) {
   }
 
   return (
-    <div className="flex min-h-full flex-col bg-zinc-50 text-zinc-800">
+    <div className="flex min-h-full flex-col bg-zinc-50 text-zinc-800 dark:bg-zinc-950 dark:text-zinc-100">
       <TitleAndIcon timer={timer} />
-      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-50/95 backdrop-blur">
+      <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-50/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
         <div className="mx-auto flex max-w-2xl items-center gap-1 px-3 py-2 sm:gap-2">
-          <Link to={{ kind: "timer" }} className="mr-2 flex items-center gap-2 font-semibold text-zinc-800">
+          <Link
+            to={{ kind: "timer" }}
+            className="mr-2 flex items-center gap-2 font-semibold text-zinc-800 dark:text-zinc-100"
+          >
             <img src="/favicon.svg" alt="" className="h-6 w-6" />
             <span className="hidden min-[400px]:inline">Urd</span>
           </Link>
@@ -190,9 +195,10 @@ function SignedIn({ me }: { me: Me }) {
           <NavLink route={route} to={{ kind: "projects" }}>
             Projects
           </NavLink>
+          <ThemeSwitch />
           <a
             href={me.accountUrl}
-            className="ml-auto truncate text-sm text-zinc-500 hover:text-zinc-800"
+            className="truncate text-sm text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"
             title="Your account and sign-in, in Heimdall"
           >
             {me.name}
@@ -203,7 +209,7 @@ function SignedIn({ me }: { me: Me }) {
       {signedOut && (
         <div
           role="alert"
-          className="flex flex-wrap items-center justify-center gap-x-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900"
+          className="flex flex-wrap items-center justify-center gap-x-2 border-b border-amber-200 bg-amber-50 px-4 py-2 text-sm text-amber-900 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-200"
         >
           <AlertTriangle className="h-4 w-4 shrink-0" aria-hidden />
           Your session has ended. A running timer keeps running;
@@ -251,10 +257,28 @@ function NavLink({ route, to, children }: { route: Route; to: Route; children: s
   return (
     <Link
       to={to}
-      className={`rounded-md px-2.5 py-1 text-sm ${here ? "bg-zinc-200/70 font-medium text-zinc-900" : "text-zinc-500 hover:text-zinc-800"}`}
+      className={`rounded-md px-2.5 py-1 text-sm ${here ? "bg-zinc-200/70 font-medium text-zinc-900 dark:bg-zinc-800 dark:text-zinc-100" : "text-zinc-500 hover:text-zinc-800 dark:text-zinc-400 dark:hover:text-zinc-100"}`}
     >
       {children}
     </Link>
+  );
+}
+
+const THEMES: Record<Theme, { name: string; Icon: typeof Sun }> = {
+  system: { name: "System", Icon: Monitor },
+  light: { name: "Light", Icon: Sun },
+  dark: { name: "Dark", Icon: Moon },
+};
+
+/** Light, dark, or as the computer is: each click moves to the next. */
+function ThemeSwitch() {
+  const [theme, next] = useTheme();
+  const { name, Icon } = THEMES[theme];
+  const text = `Theme: ${name} (click for ${THEMES[NEXT_THEME[theme]].name})`;
+  return (
+    <button type="button" onClick={next} aria-label={text} title={text} className={`${iconButton} ml-auto`}>
+      <Icon className="h-4 w-4" />
+    </button>
   );
 }
 

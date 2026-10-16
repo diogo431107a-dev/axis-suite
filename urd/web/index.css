@@ -3,6 +3,9 @@
 @source not "../server";
 @source not "../shared";
 
+/* Dark when theme.ts marks the page so: the computer's setting, or the switch in the header. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 html,
 body,
 #root {
@@ -11,4 +14,22 @@ body,
   padding: 0;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+html {
+  color-scheme: light;
+  background-color: var(--color-zinc-50);
+}
+
+/* Before the script runs, a dark computer gets a dark page rather than a white flash. */
+@media (prefers-color-scheme: dark) {
+  html:not(.light) {
+    color-scheme: dark;
+    background-color: var(--color-zinc-950);
+  }
+}
+
+html.dark {
+  color-scheme: dark;
+  background-color: var(--color-zinc-950);
 }

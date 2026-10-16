@@ -82,17 +82,20 @@ export function HistoryView({
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h1 className="mr-auto text-lg font-semibold text-zinc-800">History</h1>
-        <nav className="flex rounded-lg border border-zinc-200 bg-white p-0.5 text-sm" aria-label="Filter">
+        <h1 className="mr-auto text-lg font-semibold text-zinc-800 dark:text-zinc-100">History</h1>
+        <nav
+          className="flex rounded-lg border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-0.5 text-sm"
+          aria-label="Filter"
+        >
           <Link
             to={{ kind: "history", unnamed: false }}
-            className={`rounded-md px-3 py-1 ${unnamed ? "text-zinc-500 hover:text-zinc-800" : "bg-zinc-100 text-zinc-800"}`}
+            className={`rounded-md px-3 py-1 ${unnamed ? "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100" : "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100"}`}
           >
             All
           </Link>
           <Link
             to={{ kind: "history", unnamed: true }}
-            className={`rounded-md px-3 py-1 ${unnamed ? "bg-zinc-100 text-zinc-800" : "text-zinc-500 hover:text-zinc-800"}`}
+            className={`rounded-md px-3 py-1 ${unnamed ? "bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-100" : "text-zinc-500 dark:text-zinc-400 hover:text-zinc-800 dark:hover:text-zinc-100"}`}
           >
             Unnamed{unnamedCount > 0 ? ` (${unnamedCount})` : ""}
           </Link>
@@ -109,7 +112,7 @@ export function HistoryView({
       </div>
 
       {sessions && sessions.length === 0 && (
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {unnamed ? "Every session has a project or a task." : "No sessions yet."}
         </p>
       )}
@@ -118,10 +121,10 @@ export function HistoryView({
         {days.map(({ day, sessions: list }) => (
           <section key={day}>
             <h2 className="mb-1 flex items-baseline justify-between gap-3 px-1 text-sm">
-              <span className="font-medium text-zinc-700">{dayTitle(day)}</span>
+              <span className="font-medium text-zinc-700 dark:text-zinc-300">{dayTitle(day)}</span>
               <DayTotal day={day} sessions={list} skew={skew} />
             </h2>
-            <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
+            <ul className="divide-y divide-zinc-100 dark:divide-zinc-800 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900">
               {list.map((s) => (
                 <li key={s.id}>
                   <SessionRow session={s} day={day} skew={skew} onOpen={() => setOpen(s)} />
@@ -167,7 +170,7 @@ function DayTotal({ day, sessions, skew }: { day: string; sessions: Session[]; s
   const now = useSecond(running) + skew;
   const total = sessions.reduce((sum, s) => sum + partIn(s, day, now), 0);
   return (
-    <span className="tabular-nums text-zinc-500">
+    <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
       {clock(total)} · {sessionsText(sessions.length)}
     </span>
   );
@@ -192,36 +195,44 @@ function SessionRow({ session: s, day, skew, onOpen }: SessionRowProps) {
       type="button"
       onClick={onOpen}
       className="grid w-full grid-cols-[auto_1fr_auto] items-baseline gap-x-3 gap-y-0.5 px-4 py-2.5 text-left text-sm
-                 hover:bg-zinc-50 focus:outline-none focus-visible:bg-zinc-50"
+                 hover:bg-zinc-50 dark:hover:bg-zinc-800/60 focus:outline-none focus-visible:bg-zinc-50 dark:focus-visible:bg-zinc-800/60"
     >
-      <span className="tabular-nums text-zinc-500">
+      <span className="tabular-nums text-zinc-500 dark:text-zinc-400">
         {timeOfDay(s.startedAt)}–{running ? "now" : timeOfDay(s.endedAt!)}
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        {s.task && <span className="min-w-0 break-words text-zinc-800">{s.task}</span>}
+        {s.task && <span className="min-w-0 break-words text-zinc-800 dark:text-zinc-100">{s.task}</span>}
         {s.project && (
-          <span className={`min-w-0 break-words ${s.task ? "text-zinc-500" : "text-zinc-800"}`}>{s.project}</span>
+          <span
+            className={`min-w-0 break-words ${s.task ? "text-zinc-500 dark:text-zinc-400" : "text-zinc-800 dark:text-zinc-100"}`}
+          >
+            {s.project}
+          </span>
         )}
-        {!s.task && !s.project && <span className="italic text-zinc-400">Unnamed</span>}
+        {!s.task && !s.project && <span className="italic text-zinc-400 dark:text-zinc-500">Unnamed</span>}
         {s.tags.map((t) => (
-          <span key={t} className="text-zinc-500">
+          <span key={t} className="text-zinc-500 dark:text-zinc-400">
             #{t}
           </span>
         ))}
         {s.day < day && (
-          <span className="whitespace-nowrap rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
+          <span className="whitespace-nowrap rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">
             from {dayShort(s.day)}
           </span>
         )}
         {continues && (
-          <span className="whitespace-nowrap rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
+          <span className="whitespace-nowrap rounded bg-zinc-100 dark:bg-zinc-800 px-1.5 py-0.5 text-xs text-zinc-600 dark:text-zinc-300">
             continues past midnight
           </span>
         )}
-        {running && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700">running</span>}
+        {running && (
+          <span className="rounded bg-rose-50 dark:bg-rose-950 px-1.5 py-0.5 text-xs text-rose-700 dark:text-rose-400">
+            running
+          </span>
+        )}
         {s.stop === "auto" && (
           <span
-            className="whitespace-nowrap rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800"
+            className="whitespace-nowrap rounded bg-amber-50 dark:bg-amber-950 px-1.5 py-0.5 text-xs text-amber-800 dark:text-amber-200"
             title="Before Urd 2.0.0, a session nobody stopped stopped by itself"
           >
             stopped by itself
@@ -229,7 +240,7 @@ function SessionRow({ session: s, day, skew, onOpen }: SessionRowProps) {
         )}
       </span>
       <span
-        className="tabular-nums text-zinc-800"
+        className="tabular-nums text-zinc-800 dark:text-zinc-100"
         title={spans.length > 1 ? `${clock(elapsed(s, now))} in all, ${clock(part)} on this day` : undefined}
       >
         {clock(part)}

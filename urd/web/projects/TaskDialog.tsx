@@ -79,12 +79,12 @@ export function TaskDialog({ task, projects, onChanged, onClose }: TaskDialogPro
             placeholder="No project"
           />
         </div>
-        <p className="text-sm text-zinc-500">
+        <p className="text-sm text-zinc-500 dark:text-zinc-400">
           {hours(overall.seconds)} in {interruptionsText(overall.sessions)}, {hours(month.seconds)} this month. A change
           applies to every one of its sessions; a name the project already has puts the two tasks together.
         </p>
         {error && (
-          <p role="alert" className="text-sm text-rose-700">
+          <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
             {error}
           </p>
         )}
