@@ -51,6 +51,8 @@ export interface Timer {
   toggle: () => Promise<void>;
   /** starts a task again with its last tags; a running session stops for it */
   resume: (task: Task) => Promise<void>;
+  /** empties the project, task and tags for the next session; a running session stops for it */
+  newTask: () => Promise<void>;
   setProject: (name: string) => Promise<void>;
   setTask: (name: string) => Promise<void>;
   setTags: (tags: string[]) => Promise<void>;
@@ -129,11 +131,9 @@ export function useTimer({ user, today, projects, tasks, revision, onChanged, on
     [busy, setDraft, onChanged, onError],
   );
 
-  const toggle = useCallback(async () => {
-    if (!running) {
-      return start({ project: shown.project.trim() || null, task: shown.task.trim() || null, tags: shown.tags });
-    }
-    if (busy) return;
+  /** Whether the running session stopped (or had already, on another device). */
+  const stop = useCallback(async (): Promise<boolean> => {
+    if (busy) return false;
     setBusy(true);
     try {
       await api<Session>("/api/sessions/stop", { method: "POST" }).catch((err: unknown) => {
@@ -141,17 +141,32 @@ export function useTimer({ user, today, projects, tasks, revision, onChanged, on
         if (!(err instanceof ApiFailure && err.code === "not-running")) throw err;
       });
       onChanged();
+      return true;
     } catch (err) {
       onError(err);
+      return false;
     } finally {
       setBusy(false);
     }
-  }, [busy, running, shown, start, onChanged, onError]);
+  }, [busy, onChanged, onError]);
+
+  const toggle = useCallback(async () => {
+    if (!running) {
+      return start({ project: shown.project.trim() || null, task: shown.task.trim() || null, tags: shown.tags });
+    }
+    await stop();
+  }, [running, shown, start, stop]);
 
   const resume = useCallback(
     (task: Task) => start({ project: task.project, task: task.name, tags: task.lastTags, switch: !!running }),
     [running, start],
   );
+
+  // An empty draft stays empty: only none at all takes the last session's names.
+  const newTask = useCallback(async () => {
+    if (running && !(await stop())) return;
+    setDraft({ project: "", task: "", tags: [] });
+  }, [running, stop, setDraft]);
 
   const patchRunning = useCallback(
     async (patch: SessionPatch) => {
@@ -192,5 +207,5 @@ export function useTimer({ user, today, projects, tasks, revision, onChanged, on
     [running, shown, patchRunning, setDraft],
   );
 
-  return { state, skew, shown, busy, toggle, resume, setProject, setTask, setTags };
+  return { state, skew, shown, busy, toggle, resume, newTask, setProject, setTask, setTags };
 }

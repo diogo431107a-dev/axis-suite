@@ -161,12 +161,15 @@ export function SessionDialog({ session, projects, tasks, tags, onChanged, onErr
             />
           </div>
         </div>
-        <p className={`text-sm ${problem ? "text-rose-700" : "text-zinc-500"}`} role={problem ? "alert" : undefined}>
+        <p
+          className={`text-sm ${problem ? "text-rose-700 dark:text-rose-400" : "text-zinc-500 dark:text-zinc-400"}`}
+          role={problem ? "alert" : undefined}
+        >
           {problem ||
             `${running && endMs === null ? "Running for" : "Length:"} ${clock(length ?? 0)}. Times can only shorten a session.`}
         </p>
         {error && (
-          <p role="alert" className="text-sm text-rose-700">
+          <p role="alert" className="text-sm text-rose-700 dark:text-rose-400">
             {error}
           </p>
         )}

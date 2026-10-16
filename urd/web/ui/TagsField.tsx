@@ -27,18 +27,18 @@ export function TagsField({ tags, suggestions, onChange, id }: TagsFieldProps) {
 
   return (
     <div
-      className="flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border border-zinc-200 bg-white px-2 py-1.5
+      className="flex min-h-10 w-full flex-wrap items-center gap-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5
                  focus-within:border-transparent focus-within:ring-2 focus-within:ring-sky-400"
     >
       {tags.map((tag) => (
         <span
           key={tag}
-          className="inline-flex items-center gap-1 rounded-md bg-zinc-100 py-0.5 pr-1 pl-2 text-sm text-zinc-700"
+          className="inline-flex items-center gap-1 rounded-md bg-zinc-100 dark:bg-zinc-800 py-0.5 pr-1 pl-2 text-sm text-zinc-700 dark:text-zinc-300"
         >
           #{tag}
           <button
             type="button"
-            className="rounded text-zinc-400 hover:text-zinc-700"
+            className="rounded text-zinc-400 dark:text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-100"
             aria-label={`Remove the tag ${tag}`}
             onClick={() => onChange(tags.filter((t) => t !== tag))}
           >
@@ -54,7 +54,7 @@ export function TagsField({ tags, suggestions, onChange, id }: TagsFieldProps) {
         maxLength={LIMITS.tagChars + 1}
         autoComplete="off"
         placeholder={tags.length ? "" : "Tags (optional)"}
-        className="min-w-24 flex-1 bg-transparent px-1 py-0.5 text-sm text-zinc-800 placeholder-zinc-400 outline-none"
+        className="min-w-24 flex-1 bg-transparent px-1 py-0.5 text-sm text-zinc-800 dark:text-zinc-100 placeholder-zinc-400 dark:placeholder-zinc-500 outline-none"
         onChange={(e) => {
           const value = e.target.value;
           if (value.endsWith(",") || (e.nativeEvent as InputEvent).inputType === "insertReplacementText")
