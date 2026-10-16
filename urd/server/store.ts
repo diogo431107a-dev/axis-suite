@@ -13,6 +13,7 @@ import {
   type StopKind,
   type TagCount,
   type Tally,
+  type Task,
   type TimerState,
 } from "../shared/protocol.ts";
 import { instantOf, isInstant, msOf, toWall, zoneName } from "../shared/zones.ts";
@@ -41,6 +42,7 @@ interface SessionRow {
   owner: string;
   project_id: string | null;
   project_name: string | null;
+  task: string | null;
   started_at: number;
   ended_at: number | null;
   zone: string;
@@ -65,6 +67,7 @@ interface ProjectRow {
 /** A session as the periods need it. */
 interface SpanRow {
   project_id: string | null;
+  task: string | null;
   started_at: number;
   ended_at: number | null;
   zone: string;
@@ -75,6 +78,17 @@ interface OverallRow {
   project_id?: string | null;
   seconds: number;
   sessions: number;
+}
+
+/** A task's sessions together, from SQL. */
+interface TaskRow extends OverallRow {
+  project_id: string | null;
+  project_name: string | null;
+  task: string | null;
+  first: number;
+  last: number;
+  /** JSON array: the tags of its latest session */
+  tags: string;
 }
 
 /** The periods but `overall`, which comes from SQL. */
@@ -111,6 +125,19 @@ function projectName(value: unknown): string | null {
     invalid(`A project's name has at most ${LIMITS.projectNameChars} characters`);
   return name || null;
 }
+
+/** A task's name as given, trimmed; null for none ("" or null). */
+function taskName(value: unknown): string | null {
+  if (value === null) return null;
+  if (typeof value !== "string") invalid("The task must be a name");
+  const name = value.trim().replace(/\s+/g, " ");
+  if (name.length > LIMITS.taskNameChars) invalid(`A task's name has at most ${LIMITS.taskNameChars} characters`);
+  return name || null;
+}
+
+/** The key of a task: its project and its name, ignoring case. */
+const taskKey = (projectId: string | null, task: string | null) =>
+  JSON.stringify([projectId, task?.toLowerCase() ?? null]);
 
 /** Tags in lower case, without # or repeats, in the order given. */
 function tagList(value: unknown): string[] {
@@ -170,8 +197,9 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
   const selectLast = db.prepare(
     `${SESSION_SELECT} WHERE s.owner = ? AND s.ended_at IS NOT NULL ORDER BY s.started_at DESC LIMIT 1`,
   );
-  // History's filters, on the sessions table as `s`.
-  const HISTORY_FILTERS = "($unnamed = 0 OR s.project_id IS NULL) AND ($project IS NULL OR s.project_id = $project)";
+  // History's filters, on the sessions table as `s`. Unnamed: neither a project nor a task.
+  const HISTORY_FILTERS = `($unnamed = 0 OR (s.project_id IS NULL AND s.task IS NULL))
+    AND ($project IS NULL OR s.project_id = $project)`;
   // Every day up to $last that a session has time in: from its start day to its end day (the
   // running one's: $open_end, today where it was started).
   const selectHistoryDays = db.prepare(`
@@ -187,15 +215,42 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     WHERE s.owner = $owner AND s.day <= $to AND coalesce(s.end_day, $open_end) >= $from AND ${HISTORY_FILTERS}
     ORDER BY s.started_at DESC`);
   const selectAllSessions = db.prepare(`${SESSION_SELECT} WHERE s.owner = ? ORDER BY s.started_at`);
-  const countUnnamed = db.prepare("SELECT count(*) AS n FROM sessions WHERE owner = ? AND project_id IS NULL");
+  const countUnnamed = db.prepare(
+    "SELECT count(*) AS n FROM sessions WHERE owner = ? AND project_id IS NULL AND task IS NULL",
+  );
   const insertSession = db.prepare(
-    `INSERT INTO sessions (id, owner, project_id, started_at, zone, day, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    `INSERT INTO sessions (id, owner, project_id, task, started_at, zone, day, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   );
   const updateSessionRow = db.prepare(
-    `UPDATE sessions SET project_id = ?, started_at = ?, ended_at = ?, day = ?, end_day = ?, stop = ?, updated_at = ?
+    `UPDATE sessions SET project_id = ?, task = ?, started_at = ?, ended_at = ?, day = ?, end_day = ?, stop = ?,
+       updated_at = ?
      WHERE id = ? AND owner = ?`,
   );
+  // A task's name as its first session spelled it.
+  const selectTaskSpelling = db.prepare(`
+    SELECT task FROM sessions WHERE owner = ? AND project_id IS ? AND task = ? COLLATE NOCASE
+    ORDER BY started_at LIMIT 1`);
+  // The sessions of a task ($task NULL: of its project's sessions without one).
+  const TASK_SESSIONS = `owner = $owner AND project_id IS $project
+    AND (($task IS NULL AND task IS NULL) OR task = $task COLLATE NOCASE)`;
+  const moveTask = db.prepare(
+    `UPDATE sessions SET project_id = $to_project, task = $to_task, updated_at = $at WHERE ${TASK_SESSIONS}`,
+  );
+  // Every task with all its time, and the tags of its latest session.
+  const selectTasks = db.prepare(`
+    SELECT g.*, p.name AS project_name,
+      (SELECT json_group_array(tag) FROM
+        (SELECT tag FROM session_tags t WHERE t.session_id = (
+          SELECT id FROM sessions s WHERE s.owner = $owner AND s.project_id IS g.project_id
+            AND ((g.task IS NULL AND s.task IS NULL) OR s.task = g.task COLLATE NOCASE)
+          ORDER BY s.started_at DESC LIMIT 1
+        ) ORDER BY position)) AS tags
+    FROM (
+      SELECT project_id, min(task) AS task, min(started_at) AS first, max(started_at) AS last, ${OVERALL_COLUMNS}
+      FROM sessions WHERE owner = $owner GROUP BY project_id, task COLLATE NOCASE
+    ) g LEFT JOIN projects p ON p.id = g.project_id
+    ORDER BY g.last DESC`);
   const deleteSessionRow = db.prepare("DELETE FROM sessions WHERE id = ? AND owner = ? RETURNING project_id");
   const deleteTags = db.prepare("DELETE FROM session_tags WHERE session_id = ?");
   const insertTag = db.prepare("INSERT INTO session_tags (session_id, position, tag) VALUES (?, ?, ?)");
@@ -204,11 +259,13 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     WHERE s.owner = ? GROUP BY t.tag ORDER BY count DESC, t.tag LIMIT 500`);
 
   const selectReaching = db.prepare(
-    `SELECT project_id, started_at, ended_at, zone FROM sessions WHERE owner = $owner AND ${REACHES}`,
+    `SELECT project_id, task, started_at, ended_at, zone FROM sessions WHERE owner = $owner AND ${REACHES}`,
   );
+  // Everything ($scoped 0), a project's sessions ($scoped 1, $task NULL) or a task's.
   const selectOverall = db.prepare(`
     SELECT ${OVERALL_COLUMNS} FROM sessions
-    WHERE owner = $owner AND ($project IS NULL OR project_id = $project)`);
+    WHERE owner = $owner AND ($scoped = 0 OR project_id IS $project)
+      AND ($task IS NULL OR task = $task COLLATE NOCASE)`);
   const selectProjectOverall = db.prepare(`
     SELECT project_id, ${OVERALL_COLUMNS} FROM sessions
     WHERE owner = $owner AND project_id IS NOT NULL GROUP BY project_id`);
@@ -269,6 +326,7 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
       id: row.id,
       projectId: row.project_id,
       project: row.project_name,
+      task: row.task,
       tags: JSON.parse(row.tags) as string[],
       startedAt: iso(row.started_at),
       endedAt: row.ended_at === null ? null : iso(row.ended_at),
@@ -332,11 +390,31 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     sessions: row?.sessions ?? 0,
   });
 
-  /** A project's periods around `day`; every project's together for null. */
-  function periods(owner: string, projectId: string | null, day: string): Periods {
-    const near = around(owner, day, (r) => (projectId === null || r.project_id === projectId ? "" : null)).get("");
-    const overall = selectOverall.get({ $owner: owner, $project: projectId, $now: nowS() }) as OverallRow | undefined;
+  /**
+   * The periods around `day` of every session (no `scope`), of a project's (`project`, which is
+   * never null here) or of a task's (`task`, in `project` or in none).
+   */
+  function periods(owner: string, day: string, scope?: { project: string | null; task?: string }): Periods {
+    const task = scope?.task?.toLowerCase();
+    const inScope = (r: SpanRow) =>
+      !scope || (r.project_id === scope.project && (task === undefined || r.task?.toLowerCase() === task));
+    const near = around(owner, day, (r) => (inScope(r) ? "" : null)).get("");
+    const overall = selectOverall.get({
+      $owner: owner,
+      $scoped: scope ? 1 : 0,
+      $project: scope?.project ?? null,
+      $task: scope?.task ?? null,
+      $now: nowS(),
+    }) as OverallRow | undefined;
     return { ...(near ?? emptyAround()), overall: toTally(overall) };
+  }
+
+  /** A task's name from the page, spelled as its first session in `projectId` spelled it. */
+  function taskFor(owner: string, projectId: string | null, value: unknown): string | null {
+    const name = taskName(value);
+    if (name === null) return null;
+    const found = selectTaskSpelling.get(owner, projectId, name) as { task: string } | undefined;
+    return found?.task ?? name;
   }
 
   function projectRow(owner: string, id: string): ProjectRow {
@@ -367,43 +445,47 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     return name === null ? null : projectNamed(owner, name).id;
   }
 
-  /** Writes a session's project, times and stop, with the days they settle. */
+  /** Writes a session's project, task, times and stop, with the days they settle. */
   function writeSession(
     owner: string,
     row: SessionRow,
-    projectId: string | null,
+    names: { projectId: string | null; task: string | null },
     start: number,
     end: number | null,
     stop: StopKind | null,
   ): void {
     const day = dayOf(start * 1000, row.zone);
     const endDay = end === null ? null : lastDayOf(start * 1000, end * 1000, row.zone);
-    updateSessionRow.run(projectId, start, end, day, endDay, stop, nowIso(), row.id, owner);
+    updateSessionRow.run(names.projectId, names.task, start, end, day, endDay, stop, nowIso(), row.id, owner);
   }
 
   /** Stops the running session now. */
   function stopRunning(owner: string, running: SessionRow): void {
-    writeSession(owner, running, running.project_id, running.started_at, nowS(), "manual");
+    const names = { projectId: running.project_id, task: running.task };
+    writeSession(owner, running, names, running.started_at, nowS(), "manual");
   }
 
   return {
     /**
      * Play. Starts a session in the browser's time zone, unless one is running already: then it
-     * answers that one, so two tabs or devices pressing Play don't start two.
+     * answers that one, so two tabs or devices pressing Play don't start two. With `switch`, it
+     * stops the running one instead, and starts this one in the same moment.
      */
     start(owner: string, input: unknown): Session {
       return transaction(() => {
-        const running = selectRunning.get(owner) as SessionRow | undefined;
-        if (running) return toSession(running);
         const b = objectBody(input);
+        const running = selectRunning.get(owner) as SessionRow | undefined;
+        if (running && b.switch !== true) return toSession(running);
         const zone = zoneName(b.zone);
         if (!zone) invalid("The time zone must be a named one, such as America/Sao_Paulo");
         const tags = b.tags === undefined ? [] : tagList(b.tags);
         const projectId = b.project === undefined ? null : projectIdFor(owner, b.project);
+        const task = b.task === undefined ? null : taskFor(owner, projectId, b.task);
+        if (running) stopRunning(owner, running);
         const start = nowS();
         const id = randomUUID();
         const at = nowIso();
-        insertSession.run(id, owner, projectId, start, zone, dayOf(start * 1000, zone), at, at);
+        insertSession.run(id, owner, projectId, task, start, zone, dayOf(start * 1000, zone), at, at);
         setTags(id, tags);
         return toSession(sessionRow(owner, id));
       });
@@ -420,8 +502,9 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     },
 
     /**
-     * Names a session (its project and tags, at any time), or shortens it: its start may only move
-     * later and its end earlier, so no time is ever added. Ending a running session earlier stops it.
+     * Names a session (its project, task and tags, at any time), or shortens it: its start may only
+     * move later and its end earlier, so no time is ever added. Ending a running session earlier
+     * stops it. A session moved to another project takes its task's name there.
      */
     updateSession(owner: string, id: string, input: unknown): Session {
       return transaction(() => {
@@ -446,7 +529,13 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
           invalid("A session must end after it starts");
         }
         const projectId = b.project === undefined ? row.project_id : projectIdFor(owner, b.project);
-        writeSession(owner, row, projectId, start, end, stop);
+        const task =
+          b.task !== undefined
+            ? taskFor(owner, projectId, b.task)
+            : projectId === row.project_id
+              ? row.task
+              : taskFor(owner, projectId, row.task);
+        writeSession(owner, row, { projectId, task }, start, end, stop);
         if (tags) setTags(id, tags);
         if (row.project_id && row.project_id !== projectId) deleteIfEmpty.run(row.project_id);
         return toSession(sessionRow(owner, id));
@@ -466,8 +555,8 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     },
 
     /**
-     * The timer's numbers, around `today` (the page's date). Also for one project: ?project=, else
-     * the running session's.
+     * The timer's numbers, around `today` (the page's date). Also for one project and one task:
+     * ?project= and ?task= (in that project, or in none), else the running session's.
      */
     state(owner: string, query: Record<string, unknown>): TimerState {
       if (!isDate(query.today)) invalid("today must be a date written YYYY-MM-DD");
@@ -475,16 +564,37 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
       const runningRow = selectRunning.get(owner) as SessionRow | undefined;
       const lastRow = selectLast.get(owner) as SessionRow | undefined;
       const day = query.today;
-      const projectId =
-        typeof query.project === "string" && query.project ? query.project : (runningRow?.project_id ?? null);
+      const asked = (value: unknown) => (typeof value === "string" && value ? value : null);
+      const askedProject = asked(query.project);
+      const askedTask = asked(query.task);
+      const projectId = askedProject ?? (askedTask ? null : (runningRow?.project_id ?? null));
       const project = projectId === null ? undefined : (selectProject.get(projectId, owner) as ProjectRow | undefined);
+      let task: TimerState["task"] = null;
+      const taskScope = askedTask
+        ? { project: askedProject, task: askedTask }
+        : !askedProject && runningRow?.task
+          ? { project: runningRow.project_id, task: runningRow.task }
+          : null;
+      if (taskScope) {
+        const spelled = selectTaskSpelling.get(owner, taskScope.project, taskScope.task) as
+          { task: string } | undefined;
+        const name = spelled?.task ?? taskScope.task;
+        task = {
+          projectId: taskScope.project,
+          name,
+          periods: periods(owner, day, { project: taskScope.project, task: name }),
+        };
+      }
       return {
         now: iso(now),
         day,
         running: runningRow ? toSession(runningRow, now) : null,
         last: lastRow ? toSession(lastRow, now) : null,
-        all: periods(owner, null, day),
-        project: project ? { id: project.id, name: project.name, periods: periods(owner, project.id, day) } : null,
+        all: periods(owner, day),
+        project: project
+          ? { id: project.id, name: project.name, periods: periods(owner, day, { project: project.id }) }
+          : null,
+        task,
         unnamed: (countUnnamed.get(owner) as { n: number }).n,
       };
     },
@@ -603,6 +713,47 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
       });
     },
 
+    /**
+     * Every task, the latest used first, with its time around `?day=` and the tags of its latest
+     * session. Each project's sessions without a task are one more, without a name.
+     */
+    tasks(owner: string, query: Record<string, unknown>): Task[] {
+      if (!isDate(query.day)) invalid("day must be a date written YYYY-MM-DD");
+      const near = around(owner, query.day, (r) => taskKey(r.project_id, r.task));
+      return (selectTasks.all({ $owner: owner, $now: nowS() }) as unknown as TaskRow[]).map((t) => ({
+        projectId: t.project_id,
+        project: t.project_name,
+        name: t.task,
+        firstStartedAt: iso(t.first),
+        lastStartedAt: iso(t.last),
+        lastTags: JSON.parse(t.tags) as string[],
+        periods: { ...(near.get(taskKey(t.project_id, t.task)) ?? emptyAround()), overall: toTally(t) },
+      }));
+    },
+
+    /**
+     * Renames a task, or moves it to another project: all its sessions change. A name the target
+     * already has puts the two tasks together. Answers where the task is now.
+     */
+    updateTask(owner: string, input: unknown): { projectId: string | null; name: string | null } {
+      return transaction(() => {
+        const b = objectBody(input);
+        if (b.projectId !== null && typeof b.projectId !== "string")
+          invalid("projectId must be a project's id or null");
+        const from = b.projectId as string | null;
+        if (from !== null) projectRow(owner, from);
+        const name = taskName(b.name ?? null);
+        const to = b.project === undefined ? from : projectIdFor(owner, b.project);
+        let rename = b.rename === undefined ? name : taskName(b.rename);
+        // A new spelling of its own name is kept; another task's name takes that task's spelling.
+        const sameTask = to === from && rename?.toLowerCase() === name?.toLowerCase();
+        if (!sameTask) rename = taskFor(owner, to, rename);
+        moveTask.run({ $owner: owner, $project: from, $task: name, $to_project: to, $to_task: rename, $at: nowIso() });
+        if (from !== null && from !== to) deleteIfEmpty.run(from);
+        return { projectId: to, name: rename };
+      });
+    },
+
     /** The tags a user has used, the most used first. */
     tags(owner: string): TagCount[] {
       return selectTags.all(owner) as unknown as TagCount[];
@@ -611,7 +762,7 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
     /** Every session as CSV, oldest first, times on the wall clock where each was started. */
     exportCsv(owner: string): string {
       const now = nowS();
-      const lines = ["day,start,end,zone,seconds,hours,project,tags,stop"];
+      const lines = ["day,start,end,zone,seconds,hours,project,task,tags,stop"];
       for (const row of selectAllSessions.all(owner) as unknown as SessionRow[]) {
         const s = toSession(row, now);
         lines.push(
@@ -623,6 +774,7 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
             String(s.seconds),
             (s.seconds / 3600).toFixed(2),
             s.project ?? "",
+            s.task ?? "",
             s.tags.join(" "),
             s.stop ?? "running",
           ]

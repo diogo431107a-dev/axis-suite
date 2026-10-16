@@ -1,13 +1,15 @@
 // The timer's state and its actions, shared by the whole page (the tab title shows the clock on
 // every view). The numbers come from the server; the page only adds the seconds that pass.
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { Project, Session, SessionPatch, StartBody, TimerState } from "../../shared/protocol.ts";
+import type { Project, Session, SessionPatch, StartBody, Task, TimerState } from "../../shared/protocol.ts";
 import { ApiFailure, api, query } from "../api.ts";
 import { clockSkew } from "../clock.ts";
+import { tagsFor } from "../tasks.ts";
 
 /** What the next session will be named, set while nothing runs. */
 export interface Draft {
   project: string;
+  task: string;
   tags: string[];
 }
 
@@ -17,7 +19,12 @@ function loadDraft(user: string): Draft | null {
   try {
     const value = JSON.parse(localStorage.getItem(draftKey(user)) ?? "null") as Partial<Draft> | null;
     if (typeof value?.project !== "string" || !Array.isArray(value.tags)) return null;
-    return { project: value.project, tags: value.tags.filter((t): t is string => typeof t === "string") };
+    return {
+      project: value.project,
+      // A draft kept before tasks had none.
+      task: typeof value.task === "string" ? value.task : "",
+      tags: value.tags.filter((t): t is string => typeof t === "string"),
+    };
   } catch {
     return null;
   }
@@ -38,11 +45,14 @@ export interface Timer {
   state: TimerState | null;
   /** how far the server's clock is ahead of this computer's (ms) */
   skew: number;
-  /** the project and tags shown: the running session's, or the next one's */
+  /** the project, task and tags shown: the running session's, or the next one's */
   shown: Draft;
   busy: boolean;
   toggle: () => Promise<void>;
+  /** starts a task again with its last tags; a running session stops for it */
+  resume: (task: Task) => Promise<void>;
   setProject: (name: string) => Promise<void>;
+  setTask: (name: string) => Promise<void>;
   setTags: (tags: string[]) => Promise<void>;
 }
 
@@ -50,6 +60,8 @@ interface Options {
   user: string;
   today: string;
   projects: Project[];
+  /** the latest used first */
+  tasks: Task[];
   /** goes up when the server says something changed */
   revision: number;
   /** after a change made here */
@@ -57,7 +69,7 @@ interface Options {
   onError: (err: unknown) => void;
 }
 
-export function useTimer({ user, today, projects, revision, onChanged, onError }: Options): Timer {
+export function useTimer({ user, today, projects, tasks, revision, onChanged, onError }: Options): Timer {
   const [state, setState] = useState<TimerState | null>(null);
   const [skew, setSkew] = useState(0);
   const [draft, setDraftState] = useState(() => loadDraft(user));
@@ -72,20 +84,22 @@ export function useTimer({ user, today, projects, revision, onChanged, onError }
     [user],
   );
 
-  // While nothing runs, the next session takes the last one's project and tags unless told otherwise.
+  // While nothing runs, the next session takes the last one's names and tags unless told otherwise.
   const shown: Draft = useMemo(() => {
-    if (running) return { project: running.project ?? "", tags: running.tags };
-    return draft ?? { project: state?.last?.project ?? "", tags: state?.last?.tags ?? [] };
+    if (running) return { project: running.project ?? "", task: running.task ?? "", tags: running.tags };
+    const last = state?.last;
+    return draft ?? { project: last?.project ?? "", task: last?.task ?? "", tags: last?.tags ?? [] };
   }, [running, draft, state?.last]);
 
-  // The project the numbers are about: the running session's (the server knows it), or the next one's.
-  const nextProjectId = running
-    ? ""
-    : (projects.find((p) => p.name.toLowerCase() === shown.project.trim().toLowerCase())?.id ?? "");
+  // What the numbers are about: the running session's project and task (the server knows them), or
+  // the next one's. A project not made yet has no numbers, nor has a task in it.
+  const nextProject = running ? null : shown.project.trim().toLowerCase();
+  const nextProjectId = nextProject ? (projects.find((p) => p.name.toLowerCase() === nextProject)?.id ?? null) : null;
+  const nextTask = running || (nextProject && !nextProjectId) ? null : shown.task.trim() || null;
 
   useEffect(() => {
     let stale = false;
-    api<TimerState>(`/api/state${query({ today, project: nextProjectId })}`).then(
+    api<TimerState>(`/api/state${query({ today, project: nextProjectId, task: nextTask })}`).then(
       (s) => {
         if (stale) return;
         setSkew(clockSkew(s.now));
@@ -96,29 +110,48 @@ export function useTimer({ user, today, projects, revision, onChanged, onError }
     return () => {
       stale = true;
     };
-  }, [today, nextProjectId, revision, onError]);
+  }, [today, nextProjectId, nextTask, revision, onError]);
+
+  const start = useCallback(
+    async (body: Omit<StartBody, "zone">) => {
+      if (busy) return;
+      setBusy(true);
+      try {
+        await api<Session>("/api/sessions/start", { method: "POST", body: { zone: browserZone(), ...body } });
+        setDraft(null);
+        onChanged();
+      } catch (err) {
+        onError(err);
+      } finally {
+        setBusy(false);
+      }
+    },
+    [busy, setDraft, onChanged, onError],
+  );
 
   const toggle = useCallback(async () => {
+    if (!running) {
+      return start({ project: shown.project.trim() || null, task: shown.task.trim() || null, tags: shown.tags });
+    }
     if (busy) return;
     setBusy(true);
     try {
-      if (running) {
-        await api<Session>("/api/sessions/stop", { method: "POST" }).catch((err: unknown) => {
-          // Already stopped, on another device or by itself.
-          if (!(err instanceof ApiFailure && err.code === "not-running")) throw err;
-        });
-      } else {
-        const body: StartBody = { zone: browserZone(), project: shown.project.trim() || null, tags: shown.tags };
-        await api<Session>("/api/sessions/start", { method: "POST", body });
-        setDraft(null);
-      }
+      await api<Session>("/api/sessions/stop", { method: "POST" }).catch((err: unknown) => {
+        // Already stopped, on another device.
+        if (!(err instanceof ApiFailure && err.code === "not-running")) throw err;
+      });
       onChanged();
     } catch (err) {
       onError(err);
     } finally {
       setBusy(false);
     }
-  }, [busy, running, shown, setDraft, onChanged, onError]);
+  }, [busy, running, shown, start, onChanged, onError]);
+
+  const resume = useCallback(
+    (task: Task) => start({ project: task.project, task: task.name, tags: task.lastTags, switch: !!running }),
+    [running, start],
+  );
 
   const patchRunning = useCallback(
     async (patch: SessionPatch) => {
@@ -133,13 +166,23 @@ export function useTimer({ user, today, projects, revision, onChanged, onError }
     [running, onChanged, onError],
   );
 
-  const setProject = useCallback(
-    async (name: string) => {
-      if (running) return patchRunning({ project: name.trim() || null });
-      setDraft({ ...shown, project: name.trim() });
+  // A new project or task brings the tags it had last time: on the next session, or on the running
+  // one if it has none yet.
+  const rename = useCallback(
+    async (project: string, task: string) => {
+      const known = tagsFor(tasks, project, task);
+      if (running) {
+        const patch: SessionPatch = { project: project || null, task: task || null };
+        if (known && running.tags.length === 0) patch.tags = known;
+        return patchRunning(patch);
+      }
+      setDraft({ project, task, tags: known ?? shown.tags });
     },
-    [running, shown, patchRunning, setDraft],
+    [tasks, running, shown, patchRunning, setDraft],
   );
+
+  const setProject = useCallback((name: string) => rename(name.trim(), shown.task), [rename, shown.task]);
+  const setTask = useCallback((name: string) => rename(shown.project, name.trim()), [rename, shown.project]);
 
   const setTags = useCallback(
     async (tags: string[]) => {
@@ -149,5 +192,5 @@ export function useTimer({ user, today, projects, revision, onChanged, onError }
     [running, shown, patchRunning, setDraft],
   );
 
-  return { state, skew, shown, busy, toggle, setProject, setTags };
+  return { state, skew, shown, busy, toggle, resume, setProject, setTask, setTags };
 }

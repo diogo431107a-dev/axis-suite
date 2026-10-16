@@ -1,12 +1,14 @@
 import { describe, expect, it } from "vitest";
-import type { Periods, Session } from "../shared/protocol.ts";
+import type { Periods, Session, Task } from "../shared/protocol.ts";
 import { clockSkew, elapsed, livePeriods } from "./clock.ts";
-import { clock, fromLocalInput, hours, localInput } from "./format.ts";
+import { clock, fromLocalInput, hours, localInput, sessionName } from "./format.ts";
+import { tagsFor } from "./tasks.ts";
 
 const running: Session = {
   id: "s",
   projectId: null,
   project: null,
+  task: null,
   tags: [],
   startedAt: "2026-10-15T09:00:00Z",
   endedAt: null,
@@ -15,6 +17,42 @@ const running: Session = {
   stop: null,
   seconds: 60,
 };
+
+describe("resuming", () => {
+  const tally = { seconds: 0, sessions: 0 };
+  const periods: Periods = { today: tally, week: tally, month: tally, overall: tally };
+  const task = (project: string | null, name: string | null, lastTags: string[]): Task => ({
+    projectId: project && `id-${project}`,
+    project,
+    name,
+    firstStartedAt: "2026-10-15T09:00:00Z",
+    lastStartedAt: "2026-10-15T09:00:00Z",
+    lastTags,
+    periods,
+  });
+  // The latest used first.
+  const tasks = [
+    task("Printer", "Pull strings", ["hw"]),
+    task("Admin", null, ["admin"]),
+    task("Printer", "Mount chassis", ["hw", "chassis"]),
+    task(null, "Tax return", ["money"]),
+  ];
+
+  it("takes the tags a task had last time, else its project's latest", () => {
+    expect(tagsFor(tasks, "printer", " MOUNT chassis")).toEqual(["hw", "chassis"]);
+    expect(tagsFor(tasks, "Printer", "Something new")).toEqual(["hw"]);
+    expect(tagsFor(tasks, "Admin", "")).toEqual(["admin"]);
+    expect(tagsFor(tasks, "", "tax return")).toEqual(["money"]);
+    expect(tagsFor(tasks, "", "Something new")).toBeUndefined();
+    expect(tagsFor(tasks, "New project", "")).toBeUndefined();
+  });
+
+  it("names a session by its task and project", () => {
+    expect(sessionName({ project: "Printer", task: "Pull strings" })).toBe("Pull strings · Printer");
+    expect(sessionName({ project: "Printer", task: null })).toBe("Printer");
+    expect(sessionName({ project: null, task: null })).toBe("Unnamed");
+  });
+});
 
 describe("formats", () => {
   it("shows clocks and totals in whole seconds and minutes", () => {

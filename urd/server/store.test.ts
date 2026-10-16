@@ -28,15 +28,15 @@ const at = (wall: string) => {
   now = Date.parse(`${wall.length === 16 ? `${wall}:00` : wall}Z`);
 };
 
-/** A session from `from` to `to` (UTC wall clock), in a project or none. */
-function session(from: string, to: string, project: string | null = null, tags: string[] = []) {
+/** A session from `from` to `to` (UTC wall clock), in a project and a task, or none. */
+function session(from: string, to: string, project: string | null = null, tags: string[] = [], task?: string) {
   at(from);
-  store.start("alice", { zone: UTC, project, tags });
+  store.start("alice", { zone: UTC, project, tags, task });
   at(to);
   return store.stop("alice");
 }
 
-const state = (today: string, project?: string) => store.state("alice", { today, project });
+const state = (today: string, project?: string, task?: string) => store.state("alice", { today, project, task });
 
 beforeEach(() => {
   db = openDatabase(":memory:");
@@ -150,16 +150,100 @@ describe("stats", () => {
     expect(s.running?.seconds).toBe(9000);
   });
 
-  it("knows which sessions still need a project", () => {
+  it("knows which sessions still need a name: a project or a task", () => {
     const s1 = session("2026-10-15T09:00", "2026-10-15T10:00");
     session("2026-10-15T10:00", "2026-10-15T11:00", "Axis");
+    session("2026-10-15T11:00", "2026-10-15T11:30", null, [], "Tax return");
     expect(state("2026-10-15").unnamed).toBe(1);
+    expect(store.sessions("alice", { unnamed: "1" }).sessions.map((s) => s.id)).toEqual([s1.id]);
     expect(store.updateSession("alice", s1.id, { project: "axis", tags: ["review"] })).toMatchObject({
       project: "Axis",
       tags: ["review"],
     });
     expect(state("2026-10-15").unnamed).toBe(0);
     expect(store.tags("alice")).toEqual([{ tag: "review", count: 1 }]);
+  });
+});
+
+describe("tasks", () => {
+  const tasks = () => store.tasks("alice", { day: "2026-10-15" });
+
+  it("tracks tasks in a project or on their own, spelled as they were first", () => {
+    session("2026-10-15T09:00", "2026-10-15T09:14", "Printer");
+    session("2026-10-15T10:00", "2026-10-15T10:30", "Printer", ["hw"], "Mount printhead");
+    const again = session("2026-10-15T11:00", "2026-10-15T11:10", "printer", ["hw", "fix"], "mount  PRINTHEAD ");
+    expect(again).toMatchObject({ project: "Printer", task: "Mount printhead" });
+    session("2026-10-15T12:00", "2026-10-15T12:40", null, ["admin"], "Tax return");
+    session("2026-10-15T13:00", "2026-10-15T13:05");
+    expect(tasks()).toMatchObject([
+      { project: null, name: null, periods: { overall: { seconds: 300, sessions: 1 } } },
+      { project: null, name: "Tax return", lastTags: ["admin"] },
+      {
+        project: "Printer",
+        name: "Mount printhead",
+        firstStartedAt: "2026-10-15T10:00:00Z",
+        lastStartedAt: "2026-10-15T11:00:00Z",
+        lastTags: ["hw", "fix"],
+        periods: { today: { seconds: 2400, sessions: 2 }, overall: { seconds: 2400, sessions: 2 } },
+      },
+      { project: "Printer", name: null, periods: { today: { seconds: 840, sessions: 1 } } },
+    ]);
+    const printer = again.projectId!;
+    const s = state("2026-10-15", printer, "MOUNT printhead");
+    expect(s.task).toMatchObject({
+      projectId: printer,
+      name: "Mount printhead",
+      periods: { today: { seconds: 2400 } },
+    });
+    expect(s.project?.periods.today).toEqual({ seconds: 840 + 2400, sessions: 3 });
+    // A task on its own: no project.
+    expect(state("2026-10-15", undefined, "tax return")).toMatchObject({
+      project: null,
+      task: { projectId: null, name: "Tax return", periods: { today: { seconds: 2400, sessions: 1 } } },
+    });
+  });
+
+  it("shows the running session's task", () => {
+    at("2026-10-15T09:00");
+    store.start("alice", { zone: UTC, project: "Printer", task: "Pull strings" });
+    at("2026-10-15T09:40");
+    expect(state("2026-10-15").task).toMatchObject({ name: "Pull strings", periods: { today: { seconds: 2400 } } });
+  });
+
+  it("renames a task, names the sessions without one, and moves tasks between projects", () => {
+    session("2026-10-15T09:00", "2026-10-15T09:14", "Printer");
+    const mount = session("2026-10-15T10:00", "2026-10-15T10:30", "Printer", [], "Mount printhead");
+    session("2026-10-15T12:00", "2026-10-15T12:40", null, [], "Tax return");
+    const printer = mount.projectId!;
+    expect(
+      store.updateTask("alice", { projectId: printer, name: "mount printhead", rename: "Mount the printhead" }),
+    ).toEqual({ projectId: printer, name: "Mount the printhead" });
+    // Only a new spelling of its own name.
+    store.updateTask("alice", { projectId: printer, name: "Mount the printhead", rename: "mount the printhead" });
+    store.updateTask("alice", { projectId: printer, name: null, rename: "Unbox" });
+    const admin = store.updateTask("alice", { projectId: null, name: "Tax return", project: "Admin" }).projectId;
+    // Into a task the project has already: the two are one.
+    store.updateTask("alice", { projectId: printer, name: "Unbox", project: "admin", rename: "TAX RETURN" });
+    expect(tasks().map((t) => [t.project, t.name, t.periods.overall])).toEqual([
+      ["Admin", "Tax return", { seconds: 2400 + 840, sessions: 2 }],
+      ["Printer", "mount the printhead", { seconds: 1800, sessions: 1 }],
+    ]);
+    expect(admin).not.toBe(printer);
+    expect(refusal(() => store.updateTask("alice", { projectId: "nope", name: null })).status).toBe(404);
+    expect(refusal(() => store.updateTask("bob", { projectId: printer, name: null })).status).toBe(404);
+  });
+
+  it("switches from the running session to another in one step", () => {
+    at("2026-10-15T09:00");
+    const first = store.start("alice", { zone: UTC, project: "Printer", task: "Mount chassis" });
+    at("2026-10-15T09:30");
+    // Without switch, Play answers the running session.
+    expect(store.start("alice", { zone: UTC, task: "Phone call" }).id).toBe(first.id);
+    const second = store.start("alice", { zone: UTC, task: "Phone call", tags: ["call"], switch: true });
+    expect(second).toMatchObject({ project: null, task: "Phone call", tags: ["call"], endedAt: null });
+    const s = state("2026-10-15");
+    expect(s.running?.id).toBe(second.id);
+    expect(s.last).toMatchObject({ id: first.id, endedAt: "2026-10-15T09:30:00Z", stop: "manual" });
   });
 });
 
@@ -256,8 +340,8 @@ describe("history", () => {
   it("exports every session as CSV", () => {
     session("2026-10-15T09:00", "2026-10-15T10:30", '=Sum, "quoted"', ["code"]);
     expect(store.exportCsv("alice").split("\r\n")).toEqual([
-      "day,start,end,zone,seconds,hours,project,tags,stop",
-      `2026-10-15,2026-10-15 09:00:00,2026-10-15 10:30:00,UTC,5400,1.50,"'=Sum, ""quoted""",code,manual`,
+      "day,start,end,zone,seconds,hours,project,task,tags,stop",
+      `2026-10-15,2026-10-15 09:00:00,2026-10-15 10:30:00,UTC,5400,1.50,"'=Sum, ""quoted""",,code,manual`,
       "",
     ]);
   });

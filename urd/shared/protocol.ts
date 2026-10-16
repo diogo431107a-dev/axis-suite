@@ -6,6 +6,7 @@ export const USER_HEADER = "X-Urd-User";
 
 export const LIMITS = {
   projectNameChars: 100,
+  taskNameChars: 200,
   /** projects per user, archived ones included */
   projects: 1000,
   tagChars: 50,
@@ -26,8 +27,10 @@ export type StopKind = "manual" | "auto";
 export interface Session {
   id: string;
   projectId: string | null;
-  /** the project's name, or null for a session not named yet */
+  /** the project's name, or null for none */
   project: string | null;
+  /** the task's name, or null for none; a session with neither project nor task is "unnamed" */
+  task: string | null;
   /** lower case, without #, in the order given */
   tags: string[];
   startedAt: string;
@@ -73,8 +76,42 @@ export interface TimerState {
   all: Periods;
   /** the project asked for (?project=), else the running session's; null if neither */
   project: { id: string; name: string; periods: Periods } | null;
-  /** sessions without a project */
+  /** the task asked for (?task=, in ?project= or in none), else the running session's; null if neither */
+  task: { projectId: string | null; name: string; periods: Periods } | null;
+  /** sessions with neither a project nor a task */
   unnamed: number;
+}
+
+/**
+ * GET /api/tasks: a task, the sessions of a project (or of none) with the same task name. Each
+ * project also has a "task" without a name: its sessions without a task.
+ */
+export interface Task {
+  projectId: string | null;
+  /** the project's name, null for none */
+  project: string | null;
+  /** null: the sessions without a task */
+  name: string | null;
+  firstStartedAt: string;
+  lastStartedAt: string;
+  /** the tags of its latest session, for resuming it */
+  lastTags: string[];
+  /** around the day asked for (?day=) */
+  periods: Periods;
+}
+
+/**
+ * PATCH /api/tasks: renames a task (or names a project's sessions without one), or moves it to
+ * another project. A name the target has already puts the two together.
+ */
+export interface TaskPatch {
+  /** the task: its project's id (null: none) and its name (null: the sessions without a task) */
+  projectId: string | null;
+  name: string | null;
+  /** the new name; null or "" for none */
+  rename?: string | null;
+  /** the project's name to move it to; null or "" for none */
+  project?: string | null;
 }
 
 /** A change to a project's estimate. */
@@ -106,7 +143,11 @@ export interface StartBody {
   zone: string;
   /** a project's name (found ignoring case, or made); null or "" = none yet */
   project?: string | null;
+  /** a task's name, in that project (found ignoring case); null or "" = none */
+  task?: string | null;
   tags?: string[];
+  /** while a session runs: stop it and start this one, rather than answering the running one */
+  switch?: boolean;
 }
 
 /**
@@ -115,6 +156,7 @@ export interface StartBody {
  */
 export interface SessionPatch {
   project?: string | null;
+  task?: string | null;
   tags?: string[];
   startedAt?: string;
   endedAt?: string;

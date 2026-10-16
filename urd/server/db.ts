@@ -78,6 +78,14 @@ const migrations: ((db: DatabaseSync) => void)[] = [
     const setEndDay = db.prepare("UPDATE sessions SET end_day = ? WHERE id = ?");
     for (const s of ended) setEndDay.run(lastDayOf(s.started_at * 1000, s.ended_at * 1000, s.zone), s.id);
   },
+  // v3: tasks. A session's task is a name, in its project or without one; the sessions with the same
+  // project and task (ignoring case) are that task.
+  (db) => {
+    db.exec(`
+      ALTER TABLE sessions ADD COLUMN task TEXT;        -- NULL = no task
+      CREATE INDEX sessions_task ON sessions (owner, project_id, task COLLATE NOCASE);
+    `);
+  },
 ];
 
 /**

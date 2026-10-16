@@ -65,3 +65,12 @@ export function fromLocalInput(value: string): number | null {
 
 /** "1 session", "3 sessions". */
 export const sessionsText = (n: number) => `${n.toLocaleString()} session${n === 1 ? "" : "s"}`;
+
+/** "1 interruption", "3 interruptions": every play/stop. */
+export const interruptionsText = (n: number) => `${n.toLocaleString()} interruption${n === 1 ? "" : "s"}`;
+
+/** What a session is about, from its task and project: "Mount printhead · Assemble printer", "Unnamed". */
+export function sessionName({ project, task }: { project: string | null; task: string | null }): string {
+  if (task && project) return `${task} · ${project}`;
+  return task ?? project ?? "Unnamed";
+}

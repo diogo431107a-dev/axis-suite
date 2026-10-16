@@ -1,17 +1,19 @@
 import { useState } from "react";
-import type { Project, Session, SessionPatch, TagCount } from "../../shared/protocol.ts";
+import type { Project, Session, SessionPatch, TagCount, Task } from "../../shared/protocol.ts";
 import { instantOf } from "../../shared/zones.ts";
 import { api, describeError } from "../api.ts";
 import { clock, dayTitle, fromLocalInput, localInput } from "../format.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { ProjectField } from "../ui/ProjectField.tsx";
 import { TagsField } from "../ui/TagsField.tsx";
+import { TaskField } from "../ui/TaskField.tsx";
 import { closeDialog } from "../ui/closeDialog.ts";
 import { dangerButton, label, primaryButton, textInput } from "../ui/buttons.ts";
 
 interface SessionDialogProps {
   session: Session;
   projects: Project[];
+  tasks: Task[];
   tags: TagCount[];
   onChanged: () => void;
   onError: (err: unknown) => void;
@@ -19,12 +21,13 @@ interface SessionDialogProps {
 }
 
 /**
- * A session's project and tags, and its times, which can only shorten it: the start can move
+ * A session's project, task and tags, and its times, which can only shorten it: the start can move
  * later, the end earlier. Ending a running session stops it then.
  */
-export function SessionDialog({ session, projects, tags, onChanged, onError, onClose }: SessionDialogProps) {
+export function SessionDialog({ session, projects, tasks, tags, onChanged, onError, onClose }: SessionDialogProps) {
   const running = session.endedAt === null;
   const [project, setProject] = useState(session.project ?? "");
+  const [task, setTask] = useState(session.task ?? "");
   const [tagList, setTagList] = useState(session.tags);
   const [start, setStart] = useState(localInput(session.startedAt));
   const [end, setEnd] = useState(running ? "" : localInput(session.endedAt!));
@@ -52,6 +55,7 @@ export function SessionDialog({ session, projects, tags, onChanged, onError, onC
   async function save(form: Element) {
     const patch: SessionPatch = {};
     if (project.trim() !== (session.project ?? "")) patch.project = project.trim() || null;
+    if (task.trim() !== (session.task ?? "")) patch.task = task.trim() || null;
     if (tagList.join("\n") !== session.tags.join("\n")) patch.tags = tagList;
     const startedAt = instantOf(Math.floor(startMs! / 1000) * 1000);
     if (startedAt !== session.startedAt) patch.startedAt = startedAt;
@@ -104,6 +108,19 @@ export function SessionDialog({ session, projects, tags, onChanged, onError, onC
             projects={projects}
             onCommit={setProject}
             onText={setProject}
+          />
+        </div>
+        <div>
+          <label htmlFor="session-task" className={label}>
+            Task
+          </label>
+          <TaskField
+            id="session-task"
+            value={task}
+            tasks={tasks}
+            project={project}
+            onCommit={setTask}
+            onText={setTask}
           />
         </div>
         <div>

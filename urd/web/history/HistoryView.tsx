@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
-import type { HistoryPage, Project, Session, TagCount } from "../../shared/protocol.ts";
+import type { HistoryPage, Project, Session, TagCount, Task } from "../../shared/protocol.ts";
 import { daySpans } from "../../shared/days.ts";
 import { api, query } from "../api.ts";
 import { elapsed, endOf, useSecond } from "../clock.ts";
@@ -11,9 +11,10 @@ import { SessionDialog } from "./SessionDialog.tsx";
 
 interface HistoryViewProps {
   unnamed: boolean;
-  /** sessions without a project, for the filter's label */
+  /** sessions with neither a project nor a task, for the filter's label */
   unnamedCount: number;
   projects: Project[];
+  tasks: Task[];
   tags: TagCount[];
   skew: number;
   /** goes up when the server says something changed */
@@ -27,6 +28,7 @@ export function HistoryView({
   unnamed,
   unnamedCount,
   projects,
+  tasks,
   tags,
   skew,
   revision,
@@ -92,7 +94,7 @@ export function HistoryView({
             to={{ kind: "history", unnamed: true }}
             className={`rounded-md px-3 py-1 ${unnamed ? "bg-zinc-100 text-zinc-800" : "text-zinc-500 hover:text-zinc-800"}`}
           >
-            Without a project{unnamedCount > 0 ? ` (${unnamedCount})` : ""}
+            Unnamed{unnamedCount > 0 ? ` (${unnamedCount})` : ""}
           </Link>
         </nav>
         <a
@@ -107,7 +109,9 @@ export function HistoryView({
       </div>
 
       {sessions && sessions.length === 0 && (
-        <p className="text-sm text-zinc-500">{unnamed ? "Every session has a project." : "No sessions yet."}</p>
+        <p className="text-sm text-zinc-500">
+          {unnamed ? "Every session has a project or a task." : "No sessions yet."}
+        </p>
       )}
 
       <div className="flex flex-col gap-5">
@@ -140,6 +144,7 @@ export function HistoryView({
         <SessionDialog
           session={open}
           projects={projects}
+          tasks={tasks}
           tags={tags}
           onChanged={onChanged}
           onError={onError}
@@ -193,11 +198,11 @@ function SessionRow({ session: s, day, skew, onOpen }: SessionRowProps) {
         {timeOfDay(s.startedAt)}–{running ? "now" : timeOfDay(s.endedAt!)}
       </span>
       <span className="flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5">
-        {s.project ? (
-          <span className="min-w-0 break-words text-zinc-800">{s.project}</span>
-        ) : (
-          <span className="italic text-zinc-400">No project</span>
+        {s.task && <span className="min-w-0 break-words text-zinc-800">{s.task}</span>}
+        {s.project && (
+          <span className={`min-w-0 break-words ${s.task ? "text-zinc-500" : "text-zinc-800"}`}>{s.project}</span>
         )}
+        {!s.task && !s.project && <span className="italic text-zinc-400">Unnamed</span>}
         {s.tags.map((t) => (
           <span key={t} className="text-zinc-500">
             #{t}
