@@ -19,7 +19,7 @@ const running: Session = {
 };
 
 describe("resuming", () => {
-  const tally = { seconds: 0, sessions: 0 };
+  const tally = { seconds: 0, sessions: 0, longest: 0 };
   const periods: Periods = { today: tally, week: tally, month: tally, overall: tally };
   const task = (project: string | null, name: string | null, lastTags: string[]): Task => ({
     projectId: project && `id-${project}`,
@@ -75,13 +75,22 @@ describe("the running clock", () => {
     expect(elapsed({ ...running, endedAt: "2026-10-15T09:00:10Z" }, Date.parse("2026-10-16T03:00:00Z"))).toBe(10);
   });
 
-  it("adds what the running session ran since the server counted", () => {
-    const tally = { seconds: 100, sessions: 2 };
+  it("adds what the running session ran since the server counted, which may make it the longest", () => {
+    const tally = { seconds: 100, sessions: 2, longest: 90 };
     const periods: Periods = { today: tally, week: tally, month: tally, overall: tally };
-    const later = livePeriods(periods, running, Date.parse("2026-10-15T09:02:00Z"));
-    expect(later.today).toEqual({ seconds: 160, sessions: 2 });
-    expect(later.overall).toEqual({ seconds: 160, sessions: 2 });
-    expect(livePeriods(periods, null, Date.parse("2026-10-15T09:02:00Z"))).toBe(periods);
+    const later = livePeriods(periods, running, Date.parse("2026-10-15T09:02:00Z"), "2026-10-15");
+    expect(later.today).toEqual({ seconds: 160, sessions: 2, longest: 120 });
+    expect(later.overall).toEqual({ seconds: 160, sessions: 2, longest: 120 });
+    expect(livePeriods(periods, null, Date.parse("2026-10-15T09:02:00Z"), "2026-10-15")).toBe(periods);
+  });
+
+  it("counts only today's part of a session that ran past midnight as today's longest", () => {
+    const night = { ...running, startedAt: "2026-10-15T23:00:00Z", day: "2026-10-15", seconds: 3600 };
+    const tally = { seconds: 0, sessions: 1, longest: 1500 };
+    const periods: Periods = { today: tally, week: tally, month: tally, overall: tally };
+    const later = livePeriods(periods, night, Date.parse("2026-10-16T00:30:00Z"), "2026-10-16");
+    expect(later.today.longest).toBe(1800);
+    expect(later.overall.longest).toBe(5400);
   });
 
   it("ignores the small gaps a request makes between clocks", () => {

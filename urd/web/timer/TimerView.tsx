@@ -1,4 +1,4 @@
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { Play, Square } from "lucide-react";
 import { addDays } from "../../shared/dates.ts";
 import type { Periods, Project, Session, TagCount, Tally, Task, TimerState } from "../../shared/protocol.ts";
@@ -119,6 +119,7 @@ export function TimerView({ timer, today, projects, tasks, tags, onOpenProject, 
         <EstimateBar
           project={project}
           periods={state.project!.periods}
+          day={state.day}
           running={running?.projectId === project.id ? running : null}
           skew={timer.skew}
           onOpen={() => onOpenProject(project)}
@@ -230,23 +231,63 @@ function Resume({ tasks, running, busy, onResume }: ResumeProps) {
   );
 }
 
-/** Time and interruptions: for the session, the day, its week and month, and ever. */
+/** What the numbers are about: the task, its project, or everything. */
+type Scope = "task" | "project" | "all";
+const SCOPES: { scope: Scope; name: string }[] = [
+  { scope: "task", name: "Task" },
+  { scope: "project", name: "Project" },
+  { scope: "all", name: "All" },
+];
+const SCOPE_KEY = "urd.scope";
+
+function loadScope(): Scope {
+  try {
+    const value = localStorage.getItem(SCOPE_KEY);
+    return value === "project" || value === "all" ? value : "task";
+  } catch {
+    return "task";
+  }
+}
+
+function saveScope(scope: Scope): void {
+  try {
+    localStorage.setItem(SCOPE_KEY, scope);
+  } catch {
+    // not kept: the next visit starts with the task
+  }
+}
+
+/**
+ * Time, interruptions and the longest uninterrupted work: for the session, the day, its week and
+ * month, and ever; of the task, the project or everything (the choice is kept on this computer).
+ */
 function Stats({ state, today, skew }: { state: TimerState; today: string; skew: number }) {
+  const [chosen, setChosen] = useState(loadScope);
   const running = state.running;
   const now = useSecond(!!running) + skew;
-  const all = livePeriods(state.all, running, now);
-  const project = state.project;
-  const mine = (s: Session | null) => !!s && !!project && s.projectId === project.id;
-  const own = project ? livePeriods(project.periods, mine(running) ? running : null, now) : null;
+  const { task, project } = state;
+
+  // A scope the shown session hasn't (no task, no project) gives way to the next wider one.
+  const available: Record<Scope, boolean> = { task: !!task, project: !!project, all: true };
+  const order: Scope[] = ["task", "project", "all"];
+  const scope = order.slice(order.indexOf(chosen)).find((s) => available[s])!;
+  const inScope = (s: Session | null): boolean =>
+    !!s &&
+    (scope === "all" ||
+      (scope === "project" && s.projectId === project!.id) ||
+      (scope === "task" && s.projectId === task!.projectId && s.task?.toLowerCase() === task!.name.toLowerCase()));
+  const base = scope === "task" ? task!.periods : scope === "project" ? project!.periods : state.all;
+  const periods = livePeriods(base, inScope(running) ? running : null, now, state.day);
   const session = running ?? state.last;
   const sessionSeconds = running ? elapsed(running, now) : (state.last?.seconds ?? 0);
+  const label = scope === "task" ? task!.name : scope === "project" ? project!.name : "All projects";
 
-  const rows: { name: string; all: Tally | null; own: Tally | null; long: boolean }[] = [
+  const rows: { name: string; tally: Tally | null; long: boolean; first?: boolean }[] = [
     {
       name: running ? "This session" : "Last session",
-      all: session ? { seconds: sessionSeconds, sessions: 1 } : null,
-      own: mine(session) ? { seconds: sessionSeconds, sessions: 1 } : null,
+      tally: inScope(session) ? { seconds: sessionSeconds, sessions: 1, longest: sessionSeconds } : null,
       long: false,
+      first: true,
     },
     ...(
       [
@@ -255,63 +296,68 @@ function Stats({ state, today, skew }: { state: TimerState; today: string; skew:
         ["This month", "month", true],
         ["Overall", "overall", true],
       ] as const
-    ).map(([name, key, long]) => ({ name, all: all[key], own: own?.[key] ?? null, long })),
+    ).map(([name, key, long]) => ({ name, tally: periods[key], long })),
   ];
 
   const time = (t: Tally | null, long: boolean) => (t ? (long ? hours(t.seconds) : clock(t.seconds)) : "—");
-  const count = (t: Tally | null, first: boolean) => (t && !first ? t.sessions.toLocaleString() : "—");
 
   return (
-    <table className="w-full table-fixed text-sm">
-      <thead>
-        <tr className="text-left text-xs font-medium text-zinc-500">
-          <th className="w-[28%] pb-1 font-medium" />
-          {project && (
-            <th colSpan={2} className="truncate pb-1 font-medium text-zinc-700" title={project.name}>
-              {project.name}
+    <section aria-label="Numbers" className="flex flex-col gap-2">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex rounded-lg border border-zinc-200 bg-white p-0.5 text-sm" role="group" aria-label="Of">
+          {SCOPES.map(({ scope: s, name }) => (
+            <button
+              key={s}
+              type="button"
+              disabled={!available[s]}
+              aria-pressed={scope === s}
+              onClick={() => {
+                setChosen(s);
+                saveScope(s);
+              }}
+              className={`rounded-md px-3 py-1 disabled:text-zinc-300 ${
+                scope === s ? "bg-zinc-100 text-zinc-800" : "text-zinc-500 hover:text-zinc-800"
+              }`}
+            >
+              {name}
+            </button>
+          ))}
+        </div>
+        <span className="min-w-0 truncate text-sm font-medium text-zinc-700" title={label}>
+          {label}
+        </span>
+      </div>
+      <table className="w-full table-fixed text-sm">
+        <thead>
+          <tr className="border-b border-zinc-200 text-left text-xs text-zinc-400">
+            <th className="w-[31%] pb-1" />
+            <th className="pb-1 font-normal">Time</th>
+            <th className="pb-1 font-normal">
+              <abbr title="Interruptions: every play/stop" className="no-underline">
+                Interr.
+              </abbr>
             </th>
-          )}
-          <th colSpan={2} className="pb-1 font-medium text-zinc-700">
-            All projects
-          </th>
-        </tr>
-        <tr className="border-b border-zinc-200 text-left text-xs text-zinc-400">
-          <th />
-          {project && <Heads />}
-          <Heads />
-        </tr>
-      </thead>
-      <tbody>
-        {rows.map((row, i) => (
-          <tr key={row.name} className="border-b border-zinc-100 last:border-0">
-            <th scope="row" className="py-1.5 pr-2 text-left font-normal text-zinc-500">
-              {row.name}
+            <th className="pb-1 font-normal">
+              <abbr title="The longest uninterrupted work: one session, from Play to Stop" className="no-underline">
+                Longest
+              </abbr>
             </th>
-            {project && (
-              <>
-                <Cell>{time(row.own, row.long)}</Cell>
-                <Cell muted>{count(row.own, i === 0)}</Cell>
-              </>
-            )}
-            <Cell>{time(row.all, row.long)}</Cell>
-            <Cell muted>{count(row.all, i === 0)}</Cell>
           </tr>
-        ))}
-      </tbody>
-    </table>
-  );
-}
-
-function Heads() {
-  return (
-    <>
-      <th className="pb-1 font-normal">Time</th>
-      <th className="pb-1 font-normal">
-        <abbr title="Interruptions: every play/stop" className="no-underline">
-          Interr.
-        </abbr>
-      </th>
-    </>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.name} className="border-b border-zinc-100 last:border-0">
+              <th scope="row" className="py-1.5 pr-2 text-left font-normal text-zinc-500">
+                {row.name}
+              </th>
+              <Cell>{time(row.tally, row.long)}</Cell>
+              <Cell muted>{row.tally && !row.first ? row.tally.sessions.toLocaleString() : "—"}</Cell>
+              <Cell muted>{row.tally && row.tally.sessions > 0 ? clock(row.tally.longest) : "—"}</Cell>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </section>
   );
 }
 
@@ -324,6 +370,8 @@ const HOUR = 3600;
 interface EstimateBarProps {
   project: Project;
   periods: Periods;
+  /** the day the periods are about */
+  day: string;
   /** the running session, if it is this project's */
   running: Session | null;
   skew: number;
@@ -332,9 +380,9 @@ interface EstimateBarProps {
 }
 
 /** How much of the project's estimate the time spent on it has used up. */
-function EstimateBar({ project, periods, running, skew, onOpen, onEstimate }: EstimateBarProps) {
+function EstimateBar({ project, periods, day, running, skew, onOpen, onEstimate }: EstimateBarProps) {
   const now = useSecond(!!running) + skew;
-  const done = livePeriods(periods, running, now).overall.seconds;
+  const done = livePeriods(periods, running, now, day).overall.seconds;
   const estimate = project.estimate;
   if (estimate === null) {
     return (

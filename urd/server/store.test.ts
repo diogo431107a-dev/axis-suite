@@ -86,8 +86,8 @@ describe("no automatic stop", () => {
     at("2026-10-18T09:00");
     const s = state("2026-10-18");
     expect(s.running).toMatchObject({ endedAt: null, stop: null, seconds: 72 * 3600 });
-    expect(s.all.today).toEqual({ seconds: 9 * 3600, sessions: 1 });
-    expect(s.all.overall).toEqual({ seconds: 72 * 3600, sessions: 1 });
+    expect(s.all.today).toMatchObject({ seconds: 9 * 3600, sessions: 1 });
+    expect(s.all.overall).toMatchObject({ seconds: 72 * 3600, sessions: 1 });
     expect(store.stop("alice")).toMatchObject({ stop: "manual", seconds: 72 * 3600 });
   });
 });
@@ -97,21 +97,21 @@ describe("stats", () => {
     // Sunday 18 October, 23:00 to Monday 01:00: an hour in each day, and in each week.
     session("2026-10-18T23:00", "2026-10-19T01:00");
     let s = state("2026-10-19");
-    expect([s.all.today, s.all.week, s.all.month]).toEqual([
+    expect([s.all.today, s.all.week, s.all.month]).toMatchObject([
       { seconds: 3600, sessions: 1 },
       { seconds: 3600, sessions: 1 },
       { seconds: 7200, sessions: 1 },
     ]);
     s = state("2026-10-18");
-    expect([s.all.today, s.all.week]).toEqual([
+    expect([s.all.today, s.all.week]).toMatchObject([
       { seconds: 3600, sessions: 1 },
       { seconds: 3600, sessions: 1 },
     ]);
     // 31 October 23:00 to 1 November 01:00: an hour in each month.
     session("2026-10-31T23:00", "2026-11-01T01:00");
-    expect(state("2026-11-01").all.month).toEqual({ seconds: 3600, sessions: 1 });
-    expect(state("2026-10-31").all.month).toEqual({ seconds: 10_800, sessions: 2 });
-    expect(state("2026-11-01").all.overall).toEqual({ seconds: 14_400, sessions: 2 });
+    expect(state("2026-11-01").all.month).toMatchObject({ seconds: 3600, sessions: 1 });
+    expect(state("2026-10-31").all.month).toMatchObject({ seconds: 10_800, sessions: 2 });
+    expect(state("2026-11-01").all.overall).toMatchObject({ seconds: 14_400, sessions: 2 });
   });
 
   it("splits in the time zone a session was started in", () => {
@@ -120,8 +120,8 @@ describe("stats", () => {
     store.start("alice", { zone: "America/Sao_Paulo" });
     at("2026-10-16T05:00");
     expect(store.stop("alice").day).toBe("2026-10-15");
-    expect(state("2026-10-15").all.today).toEqual({ seconds: 7200, sessions: 1 });
-    expect(state("2026-10-16").all.today).toEqual({ seconds: 7200, sessions: 1 });
+    expect(state("2026-10-15").all.today).toMatchObject({ seconds: 7200, sessions: 1 });
+    expect(state("2026-10-16").all.today).toMatchObject({ seconds: 7200, sessions: 1 });
   });
 
   it("counts every session as an interruption, the running one included", () => {
@@ -132,12 +132,31 @@ describe("stats", () => {
     at("2026-10-15T11:30");
     // Without ?project=, the running session's project.
     const s = state("2026-10-15");
-    expect(s.all.today).toEqual({ seconds: 3600 + 1800 + 1800, sessions: 3 });
+    expect(s.all.today).toMatchObject({ seconds: 3600 + 1800 + 1800, sessions: 3 });
     expect(s.project).toMatchObject({ name: "Axis", periods: { today: { seconds: 3600 + 1800, sessions: 2 } } });
     expect(s.running?.seconds).toBe(1800);
     expect(s.last?.project).toBe("Mail");
     const mail = store.projects("alice", { day: "2026-10-15" }).find((p) => p.name === "Mail")!;
-    expect(state("2026-10-15", mail.id).project?.periods.today).toEqual({ seconds: 1800, sessions: 1 });
+    expect(state("2026-10-15", mail.id).project?.periods.today).toMatchObject({ seconds: 1800, sessions: 1 });
+  });
+
+  it("finds the longest uninterrupted work of each period, by its part in the period", () => {
+    session("2026-10-12T09:00", "2026-10-12T11:30", "Axis", [], "Long");
+    session("2026-10-15T09:00", "2026-10-15T09:40", "Axis");
+    session("2026-10-15T10:00", "2026-10-15T11:00", "Mail");
+    // 23:00 to 01:30: 1 hour on the 15th, 1.5 hours on the 16th.
+    session("2026-10-15T23:00", "2026-10-16T01:30", "Axis");
+    const s = state("2026-10-15");
+    expect([s.all.today.longest, s.all.week.longest, s.all.overall.longest]).toEqual([3600, 9000, 9000]);
+    expect(state("2026-10-16").all.today.longest).toBe(5400);
+    const axis = store.projects("alice", { day: "2026-10-15" }).find((p) => p.name === "Axis")!;
+    expect(axis.periods.today).toEqual({ seconds: 2400 + 3600, sessions: 2, longest: 3600 });
+    expect(state("2026-10-15", axis.id, "long").task?.periods.week).toEqual({
+      seconds: 9000,
+      sessions: 1,
+      longest: 9000,
+    });
+    expect(state("2026-10-14").all.today).toEqual({ seconds: 0, sessions: 0, longest: 0 });
   });
 
   it("moves on to the new day while a session runs past midnight", () => {
@@ -146,7 +165,7 @@ describe("stats", () => {
     at("2026-10-16T01:30");
     const s = state("2026-10-16");
     expect(s.day).toBe("2026-10-16");
-    expect(s.all.today).toEqual({ seconds: 5400, sessions: 1 });
+    expect(s.all.today).toMatchObject({ seconds: 5400, sessions: 1 });
     expect(s.running?.seconds).toBe(9000);
   });
 
@@ -195,7 +214,7 @@ describe("tasks", () => {
       name: "Mount printhead",
       periods: { today: { seconds: 2400 } },
     });
-    expect(s.project?.periods.today).toEqual({ seconds: 840 + 2400, sessions: 3 });
+    expect(s.project?.periods.today).toMatchObject({ seconds: 840 + 2400, sessions: 3 });
     // A task on its own: no project.
     expect(state("2026-10-15", undefined, "tax return")).toMatchObject({
       project: null,
@@ -224,7 +243,7 @@ describe("tasks", () => {
     const admin = store.updateTask("alice", { projectId: null, name: "Tax return", project: "Admin" }).projectId;
     // Into a task the project has already: the two are one.
     store.updateTask("alice", { projectId: printer, name: "Unbox", project: "admin", rename: "TAX RETURN" });
-    expect(tasks().map((t) => [t.project, t.name, t.periods.overall])).toEqual([
+    expect(tasks().map((t) => [t.project, t.name, t.periods.overall])).toMatchObject([
       ["Admin", "Tax return", { seconds: 2400 + 840, sessions: 2 }],
       ["Printer", "mount the printhead", { seconds: 1800, sessions: 1 }],
     ]);
@@ -281,8 +300,8 @@ describe("corrections", () => {
   it("moves a session to the day of its new start", () => {
     const s = session("2026-10-15T23:00", "2026-10-16T02:00");
     expect(store.updateSession("alice", s.id, { startedAt: "2026-10-16T00:30:00Z" }).day).toBe("2026-10-16");
-    expect(state("2026-10-15").all.today).toEqual({ seconds: 0, sessions: 0 });
-    expect(state("2026-10-16").all.today).toEqual({ seconds: 5400, sessions: 1 });
+    expect(state("2026-10-15").all.today).toMatchObject({ seconds: 0, sessions: 0 });
+    expect(state("2026-10-16").all.today).toMatchObject({ seconds: 5400, sessions: 1 });
   });
 
   it("deletes a session, the running one too", () => {
@@ -291,7 +310,7 @@ describe("corrections", () => {
     const running = state("2026-10-15").running!;
     store.deleteSession("alice", running.id);
     store.deleteSession("alice", s.id);
-    expect(state("2026-10-15").all.overall).toEqual({ seconds: 0, sessions: 0 });
+    expect(state("2026-10-15").all.overall).toMatchObject({ seconds: 0, sessions: 0 });
     expect(refusal(() => store.deleteSession("alice", s.id)).status).toBe(404);
   });
 
@@ -377,7 +396,7 @@ describe("projects", () => {
     const { id } = store.updateProject("alice", typo.id, { name: "axis", merge: true });
     expect(id).toBe(byName().get("Axis")!.id);
     expect([...byName().keys()]).toEqual(["Axis"]);
-    expect(byName().get("Axis")!.periods.today).toEqual({ seconds: 5400, sessions: 2 });
+    expect(byName().get("Axis")!.periods.today).toMatchObject({ seconds: 5400, sessions: 2 });
   });
 
   it("keeps a log of the estimate's changes", () => {
@@ -443,7 +462,7 @@ it("keeps the sessions of Urd 1, and lets its running one run on", () => {
     const t = state("2026-10-16");
     expect(t.running).toMatchObject({ id: "running", seconds: 24 * 3600 });
     expect(t.last).toMatchObject({ id: "late", stop: "auto", seconds: 6.5 * 3600 });
-    expect(t.all.today).toEqual({ seconds: 5 * 3600 + 15 * 3600, sessions: 2 });
+    expect(t.all.today).toMatchObject({ seconds: 5 * 3600 + 15 * 3600, sessions: 2 });
     expect(store.sessions("alice", {}).days).toEqual(["2026-10-17", "2026-10-16", "2026-10-15"]);
   } finally {
     db.close();

@@ -53,6 +53,8 @@ export interface Session {
 export interface Tally {
   seconds: number;
   sessions: number;
+  /** the longest uninterrupted work: the longest session's part in the period, in seconds */
+  longest: number;
 }
 
 /** The periods the timer shows, around a day (TimerState.day). Weeks start on Monday. */

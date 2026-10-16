@@ -78,6 +78,7 @@ interface OverallRow {
   project_id?: string | null;
   seconds: number;
   sessions: number;
+  longest: number;
 }
 
 /** A task's sessions together, from SQL. */
@@ -180,8 +181,9 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
 
   // A session's seconds: up to now while it runs.
   const SECS = "max(0, coalesce(ended_at, $now) - started_at)";
-  // Time and sessions ever.
-  const OVERALL_COLUMNS = `coalesce(sum(${SECS}), 0) AS seconds, count(*) AS sessions`;
+  // Time, sessions and the longest of them, ever.
+  const OVERALL_COLUMNS = `coalesce(sum(${SECS}), 0) AS seconds, count(*) AS sessions,
+    coalesce(max(${SECS}), 0) AS longest`;
   // Sessions with time in the days $from to $to. Only the running one has no end_day, and it is
   // never later than today.
   const REACHES = "day <= $to AND (end_day IS NULL OR end_day >= $from)";
@@ -347,15 +349,15 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
   }
 
   const emptyAround = (): Around => ({
-    today: { seconds: 0, sessions: 0 },
-    week: { seconds: 0, sessions: 0 },
-    month: { seconds: 0, sessions: 0 },
+    today: { seconds: 0, sessions: 0, longest: 0 },
+    week: { seconds: 0, sessions: 0, longest: 0 },
+    month: { seconds: 0, sessions: 0, longest: 0 },
   });
 
   /**
-   * Time and sessions in `day`, its week and its month, for each group of sessions (`group` names a
-   * session's group, or leaves it out with null). Each session is split at its midnights, and counts
-   * in a period with the part of it that fell there.
+   * Time, sessions and the longest session in `day`, its week and its month, for each group of
+   * sessions (`group` names a session's group, or leaves it out with null). Each session is split at
+   * its midnights, and counts in a period with the part of it that fell there.
    */
   function around(owner: string, day: string, group: (row: SpanRow) => string | null): Map<string, Around> {
     const monday = weekStart(day);
@@ -376,7 +378,9 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
         const parts = spans.filter((s) => inside(s.day));
         if (parts.length === 0) return;
         tally.sessions += 1;
-        tally.seconds += parts.reduce((sum, s) => sum + s.seconds, 0);
+        const part = parts.reduce((sum, s) => sum + s.seconds, 0);
+        tally.seconds += part;
+        tally.longest = Math.max(tally.longest, part);
       };
       count(totals.today, (d) => d === day);
       count(totals.week, (d) => d >= monday && d <= sunday);
@@ -388,6 +392,7 @@ export function createStore(db: DatabaseSync, clock: () => number = Date.now) {
   const toTally = (row: OverallRow | undefined): Tally => ({
     seconds: row?.seconds ?? 0,
     sessions: row?.sessions ?? 0,
+    longest: row?.longest ?? 0,
   });
 
   /**
