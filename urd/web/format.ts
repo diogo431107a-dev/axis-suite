@@ -1,5 +1,5 @@
 // Times and dates as the page shows them. Whole seconds only.
-import { pad, utcMidnight } from "../shared/dates.ts";
+import { pad, today, utcMidnight } from "../shared/dates.ts";
 
 /** A running clock: 5415 → "1:30:15"; hours go past 24 ("312:05:41"). */
 export function clock(seconds: number): string {
@@ -39,6 +39,9 @@ export const dayShort = (day: string) => DAY_SHORT.format(utcMidnight(day));
 
 /** "09:12": an instant on this computer's clock. */
 export const timeOfDay = (instant: string) => TIME.format(Date.parse(instant));
+
+/** "2026-10-15": an instant's date on this computer's clock. */
+export const localDay = (instant: string) => today(new Date(Date.parse(instant)));
 
 /** "15 Oct 2026": an instant's date on this computer's clock. */
 export const dateOf = (instant: string) => DATE.format(Date.parse(instant));

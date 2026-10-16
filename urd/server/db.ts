@@ -1,6 +1,7 @@
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { lastDayOf } from "../shared/days.ts";
 
 // systemd sets STATE_DIRECTORY (/var/lib/urd), keeping the sessions outside the app and private
 // to the service; locally it falls back to ./data.
@@ -56,10 +57,34 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ) WITHOUT ROWID;
     `);
   },
+  // v2: no automatic stop. A session runs until it is stopped, so cutoff_at goes; its time is split
+  // at each local midnight (shared/days.ts), and end_day, the last day it has time in, finds the
+  // sessions of a day without working the split out for every one. Sessions that stopped by
+  // themselves before keep their stop ('auto').
+  (db) => {
+    db.exec(`
+      ALTER TABLE sessions DROP COLUMN cutoff_at;
+      ALTER TABLE sessions ADD COLUMN end_day TEXT;     -- NULL while it runs
+      CREATE INDEX sessions_owner_end_day ON sessions (owner, end_day);
+    `);
+    const ended = db
+      .prepare("SELECT id, started_at, ended_at, zone FROM sessions WHERE ended_at IS NOT NULL")
+      .all() as {
+      id: string;
+      started_at: number;
+      ended_at: number;
+      zone: string;
+    }[];
+    const setEndDay = db.prepare("UPDATE sessions SET end_day = ? WHERE id = ?");
+    for (const s of ended) setEndDay.run(lastDayOf(s.started_at * 1000, s.ended_at * 1000, s.zone), s.id);
+  },
 ];
 
-/** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */
-export function openDatabase(file: string): DatabaseSync {
+/**
+ * Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema; or, for
+ * the tests of a migration, at an older `version`.
+ */
+export function openDatabase(file: string, version = migrations.length): DatabaseSync {
   if (file !== ":memory:") mkdirSync(dirname(file), { recursive: true, mode: 0o700 });
   const db = new DatabaseSync(file);
   db.exec("PRAGMA foreign_keys = ON");
@@ -68,7 +93,7 @@ export function openDatabase(file: string): DatabaseSync {
   db.exec("PRAGMA secure_delete = ON");
 
   const { user_version: current } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-  for (let v = current; v < migrations.length; v++) {
+  for (let v = current; v < version; v++) {
     db.exec("BEGIN");
     try {
       migrations[v]!(db);

@@ -62,7 +62,6 @@ export function useTimer({ user, today, projects, revision, onChanged, onError }
   const [skew, setSkew] = useState(0);
   const [draft, setDraftState] = useState(() => loadDraft(user));
   const [busy, setBusy] = useState(false);
-  const [reloads, setReloads] = useState(0);
   const running = state?.running ?? null;
 
   const setDraft = useCallback(
@@ -97,18 +96,7 @@ export function useTimer({ user, today, projects, revision, onChanged, onError }
     return () => {
       stale = true;
     };
-  }, [today, nextProjectId, revision, reloads, onError]);
-
-  // When the running session reaches its automatic stop, ask the server how things stand.
-  const cutoffAt = running?.cutoffAt;
-  useEffect(() => {
-    if (!cutoffAt) return;
-    const wait = Date.parse(cutoffAt) - (Date.now() + skew) + 1500;
-    // Longer than setTimeout can wait means a day or more away; a later reload sets it again.
-    if (wait > 2 ** 31 - 1) return;
-    const timer = setTimeout(() => setReloads((n) => n + 1), Math.max(0, wait));
-    return () => clearTimeout(timer);
-  }, [cutoffAt, skew]);
+  }, [today, nextProjectId, revision, onError]);
 
   const toggle = useCallback(async () => {
     if (busy) return;

@@ -10,7 +10,6 @@ const running: Session = {
   tags: [],
   startedAt: "2026-10-15T09:00:00Z",
   endedAt: null,
-  cutoffAt: "2026-10-16T00:00:00Z",
   zone: "UTC",
   day: "2026-10-15",
   stop: null,
@@ -32,9 +31,9 @@ describe("formats", () => {
 });
 
 describe("the running clock", () => {
-  it("counts from the start, and stops at the automatic stop", () => {
+  it("counts from the start for as long as the session runs", () => {
     expect(elapsed(running, Date.parse("2026-10-15T10:30:15.999Z"))).toBe(5415);
-    expect(elapsed(running, Date.parse("2026-10-16T03:00:00Z"))).toBe(15 * 3600);
+    expect(elapsed(running, Date.parse("2026-10-17T09:00:00Z"))).toBe(48 * 3600);
     expect(elapsed({ ...running, endedAt: "2026-10-15T09:00:10Z" }, Date.parse("2026-10-16T03:00:00Z"))).toBe(10);
   });
 

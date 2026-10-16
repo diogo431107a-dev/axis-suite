@@ -13,11 +13,15 @@ export function clockSkew(serverNow: string, localNow = Date.now()): number {
   return Math.abs(gap) > 2000 ? gap : 0;
 }
 
-/** A session's whole seconds at `nowMs`: up to its end, or to its automatic stop while it runs. */
+/** A session's whole seconds at `nowMs`: up to its end, or to now while it runs. */
 export function elapsed(session: Session, nowMs: number): number {
-  const end = session.endedAt ? Date.parse(session.endedAt) : Math.min(nowMs, Date.parse(session.cutoffAt));
+  const end = session.endedAt ? Date.parse(session.endedAt) : nowMs;
   return Math.max(0, Math.floor((end - Date.parse(session.startedAt)) / 1000));
 }
+
+/** Where a session ends at `nowMs` (ms): its end, or now, in whole seconds, while it runs. */
+export const endOf = (session: Session, nowMs: number) =>
+  session.endedAt ? Date.parse(session.endedAt) : Date.parse(session.startedAt) + elapsed(session, nowMs) * 1000;
 
 /**
  * Periods as they are at `nowMs`: as the server counted them, plus what the running session has

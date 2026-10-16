@@ -1,8 +1,9 @@
 import { useEffect, type ReactNode } from "react";
 import { Play, Square } from "lucide-react";
+import { addDays } from "../../shared/dates.ts";
 import type { Periods, Project, Session, TagCount, Tally, TimerState } from "../../shared/protocol.ts";
 import { elapsed, livePeriods, useSecond } from "../clock.ts";
-import { clock, dayShort, hours, sessionsText, timeOfDay } from "../format.ts";
+import { clock, dayShort, hours, localDay, sessionsText, timeOfDay } from "../format.ts";
 import { Link } from "../ui/Link.tsx";
 import { ProjectField } from "../ui/ProjectField.tsx";
 import { TagsField } from "../ui/TagsField.tsx";
@@ -67,7 +68,7 @@ export function TimerView({ timer, today, projects, tags, onOpenProject, onEstim
           )}
         </button>
         <p className="min-h-5 text-center text-sm text-zinc-500">
-          <Hint state={state} />
+          <Hint state={state} today={today} />
         </p>
       </section>
 
@@ -135,10 +136,20 @@ function BigClock({ running, skew }: { running: Session | null; skew: number }) 
   );
 }
 
-/** One line under the button: when the session stops by itself, or what the last one was. */
-function Hint({ state }: { state: TimerState | null }) {
+/** One line under the button: when the session started, or what the last one was. */
+function Hint({ state, today }: { state: TimerState | null; today: string }) {
   if (!state) return null;
-  if (state.running) return <>Stops by itself at {timeOfDay(state.running.cutoffAt)}</>;
+  if (state.running) {
+    const { startedAt } = state.running;
+    const started = localDay(startedAt);
+    const when = started === today ? "" : started === addDays(today, -1) ? " yesterday" : ` on ${dayShort(started)}`;
+    return (
+      <>
+        Started at {timeOfDay(startedAt)}
+        {when}
+      </>
+    );
+  }
   const last = state.last;
   if (!last) return <>Press Play (or Space) to start</>;
   return (

@@ -16,7 +16,10 @@ export const LIMITS = {
   estimateSeconds: 100_000 * 3600,
 } as const;
 
-/** How a session stopped: the Stop button (or a trim of its end), or by itself at midnight or 05:00. */
+/**
+ * How a session stopped: the Stop button (or a trim of its end). "auto" is only on sessions from
+ * before Urd 2.0.0, which stopped by themselves at midnight or 05:00; nothing stops one by itself now.
+ */
 export type StopKind = "manual" | "auto";
 
 /** One play/stop cycle. Instants are YYYY-MM-DDTHH:MM:SSZ. */
@@ -30,11 +33,9 @@ export interface Session {
   startedAt: string;
   /** null while it runs */
   endedAt: string | null;
-  /** when it stops by itself: the next midnight, or 05:00 for a start at 22:00 or later */
-  cutoffAt: string;
-  /** the time zone it was started in, which settled `day` and `cutoffAt` */
+  /** the time zone it was started in, whose midnights split its time between days */
   zone: string;
-  /** YYYY-MM-DD: the date it started; all its time counts for this day */
+  /** YYYY-MM-DD: the date it started there (see shared/days.ts for the days it has time in) */
   day: string;
   /** null while it runs */
   stop: StopKind | null;
@@ -42,13 +43,16 @@ export interface Session {
   seconds: number;
 }
 
-/** Time and interruptions (sessions) over a period. */
+/**
+ * Time and interruptions (sessions) over a period. A session that runs past midnight counts in
+ * every period it has time in, with the part of its time that fell there.
+ */
 export interface Tally {
   seconds: number;
   sessions: number;
 }
 
-/** The periods the timer shows, around a day (see TimerState.day). Weeks start on Monday. */
+/** The periods the timer shows, around a day (TimerState.day). Weeks start on Monday. */
 export interface Periods {
   today: Tally;
   week: Tally;
@@ -60,7 +64,7 @@ export interface Periods {
 export interface TimerState {
   /** the server's clock, so the page can tell how far off its own is */
   now: string;
-  /** the day the periods are about: the running session's day, else the page's today */
+  /** the day the periods are about: the page's today */
   day: string;
   running: Session | null;
   /** the session that ended last, if any */
@@ -98,7 +102,7 @@ export interface Project {
 
 /** POST /api/sessions/start */
 export interface StartBody {
-  /** the browser's IANA time zone, which settles the session's day and automatic stop */
+  /** the browser's IANA time zone, whose midnights split the session's time between days */
   zone: string;
   /** a project's name (found ignoring case, or made); null or "" = none yet */
   project?: string | null;
@@ -129,6 +133,9 @@ export interface ProjectPatch {
 
 /** GET /api/sessions: days of sessions, newest first. */
 export interface HistoryPage {
+  /** the days shown, newest first */
+  days: string[];
+  /** every session with time in those days, newest first; one past midnight is on each of its days */
   sessions: Session[];
   /** pass as ?before= for the next page; null when there are no older days */
   next: string | null;

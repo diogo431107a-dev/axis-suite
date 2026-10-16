@@ -29,15 +29,6 @@ const events = createEvents();
 /** Tells every open tab of `owners` to ask again. */
 const changed = (...owners: string[]) => events.send(owners, "changed", {});
 
-// Sessions that reach midnight (or 05:00) stop by themselves. Their numbers are right without this;
-// it writes the stop down and tells the open tabs. Checked now and every 15 seconds.
-function sweep() {
-  const owners = store.closeExpired();
-  if (owners.length > 0) changed(...owners);
-}
-sweep();
-setInterval(sweep, 15_000).unref();
-
 const app = express();
 app.disable("x-powered-by");
 

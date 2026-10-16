@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import type { HistoryPage, Project, Session, TagCount } from "../../shared/protocol.ts";
+import { daySpans } from "../../shared/days.ts";
 import { api, query } from "../api.ts";
-import { elapsed, useSecond } from "../clock.ts";
-import { clock, dayTitle, sessionsText, timeOfDay } from "../format.ts";
+import { elapsed, endOf, useSecond } from "../clock.ts";
+import { clock, dayShort, dayTitle, sessionsText, timeOfDay } from "../format.ts";
 import { Link } from "../ui/Link.tsx";
 import { secondaryButton } from "../ui/buttons.ts";
 import { SessionDialog } from "./SessionDialog.tsx";
@@ -33,6 +34,7 @@ export function HistoryView({
   onError,
 }: HistoryViewProps) {
   const [sessions, setSessions] = useState<Session[] | null>(null);
+  const [dayList, setDayList] = useState<string[]>([]);
   const [next, setNext] = useState<string | null>(null);
   // How many pages are shown; a change reloads all of them.
   const [pages, setPages] = useState(1);
@@ -41,18 +43,22 @@ export function HistoryView({
   useEffect(() => {
     let stale = false;
     (async () => {
-      let all: Session[] = [];
+      // A session past midnight can be on two pages: it is kept once.
+      const all = new Map<string, Session>();
+      let shownDays: string[] = [];
       let before: string | null = null;
       for (let i = 0; i < pages; i++) {
         const page: HistoryPage = await api<HistoryPage>(
           `/api/sessions${query({ before, unnamed: unnamed ? "1" : null })}`,
         );
-        all = all.concat(page.sessions);
+        for (const s of page.sessions) all.set(s.id, s);
+        shownDays = shownDays.concat(page.days);
         before = page.next;
         if (!before) break;
       }
       if (stale) return;
-      setSessions(all);
+      setSessions([...all.values()]);
+      setDayList(shownDays);
       setNext(before);
     })().catch((err: unknown) => !stale && onError(err));
     return () => {
@@ -60,15 +66,16 @@ export function HistoryView({
     };
   }, [unnamed, pages, revision, onError]);
 
+  // Each session on every shown day it has time in, newest first.
   const days = useMemo(() => {
-    const groups: { day: string; sessions: Session[] }[] = [];
+    const groups = dayList.map((day) => ({ day, sessions: [] as Session[] }));
+    const byDay = new Map(groups.map((g) => [g.day, g]));
+    const now = Date.now();
     for (const s of sessions ?? []) {
-      const last = groups.at(-1);
-      if (last?.day === s.day) last.sessions.push(s);
-      else groups.push({ day: s.day, sessions: [s] });
+      for (const span of spansOf(s, now)) byDay.get(span.day)?.sessions.push(s);
     }
-    return groups;
-  }, [sessions]);
+    return groups.filter((g) => g.sessions.length > 0);
+  }, [sessions, dayList]);
 
   return (
     <div className="mx-auto w-full max-w-2xl px-4 py-6">
@@ -108,12 +115,12 @@ export function HistoryView({
           <section key={day}>
             <h2 className="mb-1 flex items-baseline justify-between gap-3 px-1 text-sm">
               <span className="font-medium text-zinc-700">{dayTitle(day)}</span>
-              <DayTotal sessions={list} skew={skew} />
+              <DayTotal day={day} sessions={list} skew={skew} />
             </h2>
             <ul className="divide-y divide-zinc-100 rounded-xl border border-zinc-200 bg-white">
               {list.map((s) => (
                 <li key={s.id}>
-                  <SessionRow session={s} skew={skew} onOpen={() => setOpen(s)} />
+                  <SessionRow session={s} day={day} skew={skew} onOpen={() => setOpen(s)} />
                 </li>
               ))}
             </ul>
@@ -143,10 +150,17 @@ export function HistoryView({
   );
 }
 
-function DayTotal({ sessions, skew }: { sessions: Session[]; skew: number }) {
+/** A session's time split between the days it has time in, up to `nowMs` while it runs. */
+const spansOf = (s: Session, nowMs: number) => daySpans(Date.parse(s.startedAt), endOf(s, nowMs), s.zone);
+
+/** The part of a session's time that fell in `day`. */
+const partIn = (s: Session, day: string, nowMs: number) =>
+  spansOf(s, nowMs).find((span) => span.day === day)?.seconds ?? 0;
+
+function DayTotal({ day, sessions, skew }: { day: string; sessions: Session[]; skew: number }) {
   const running = sessions.some((s) => s.endedAt === null);
   const now = useSecond(running) + skew;
-  const total = sessions.reduce((sum, s) => sum + (s.endedAt === null ? elapsed(s, now) : s.seconds), 0);
+  const total = sessions.reduce((sum, s) => sum + partIn(s, day, now), 0);
   return (
     <span className="tabular-nums text-zinc-500">
       {clock(total)} · {sessionsText(sessions.length)}
@@ -154,9 +168,20 @@ function DayTotal({ sessions, skew }: { sessions: Session[]; skew: number }) {
   );
 }
 
-function SessionRow({ session: s, skew, onOpen }: { session: Session; skew: number; onOpen: () => void }) {
+interface SessionRowProps {
+  session: Session;
+  /** the day it is listed under: only its part in that day is counted there */
+  day: string;
+  skew: number;
+  onOpen: () => void;
+}
+
+function SessionRow({ session: s, day, skew, onOpen }: SessionRowProps) {
   const running = s.endedAt === null;
   const now = useSecond(running) + skew;
+  const spans = spansOf(s, now);
+  const part = spans.find((span) => span.day === day)?.seconds ?? 0;
+  const continues = spans.at(-1)!.day > day;
   return (
     <button
       type="button"
@@ -178,17 +203,32 @@ function SessionRow({ session: s, skew, onOpen }: { session: Session; skew: numb
             #{t}
           </span>
         ))}
+        {s.day < day && (
+          <span className="whitespace-nowrap rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
+            from {dayShort(s.day)}
+          </span>
+        )}
+        {continues && (
+          <span className="whitespace-nowrap rounded bg-zinc-100 px-1.5 py-0.5 text-xs text-zinc-600">
+            continues past midnight
+          </span>
+        )}
         {running && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-xs text-rose-700">running</span>}
         {s.stop === "auto" && (
           <span
             className="whitespace-nowrap rounded bg-amber-50 px-1.5 py-0.5 text-xs text-amber-800"
-            title="Nobody pressed Stop: it stopped by itself"
+            title="Before Urd 2.0.0, a session nobody stopped stopped by itself"
           >
             stopped by itself
           </span>
         )}
       </span>
-      <span className="tabular-nums text-zinc-800">{clock(running ? elapsed(s, now) : s.seconds)}</span>
+      <span
+        className="tabular-nums text-zinc-800"
+        title={spans.length > 1 ? `${clock(elapsed(s, now))} in all, ${clock(part)} on this day` : undefined}
+      >
+        {clock(part)}
+      </span>
     </button>
   );
 }
