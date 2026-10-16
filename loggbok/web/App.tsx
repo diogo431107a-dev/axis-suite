@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useRef, useState } from "react";
-import { Trash2, Plus, Search, Clock, UserRound, Users, Share2, X, Menu } from "lucide-react";
+import { Trash2, Plus, Search, Clock, UserRound, Users, Share2, X, Menu, Download } from "lucide-react";
 import {
   SignedOutError,
   apiFetch,
@@ -284,6 +284,16 @@ export default function Loggbok() {
   function patch(field: "title" | "content", value: string) {
     setDraft((d) => ({ ...d, [field]: value, dirty: true }));
   }
+  // Saves the note as on screen, unsaved edits included, to a text file named after its title.
+  function downloadNote() {
+    const name = draft.title.replace(/[\\/:*?"<>|]/g, "").trim() || "Untitled";
+    const url = URL.createObjectURL(new Blob([draft.content], { type: "text/plain;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${name}.txt`;
+    link.click();
+    setTimeout(() => URL.revokeObjectURL(url));
+  }
 
   if (!me) {
     return (
@@ -441,6 +451,16 @@ export default function Loggbok() {
             {draft.role === "editor" && ` · Shared by ${draft.owner}`}
           </span>
           <div className="flex items-center gap-2">
+            {(draft.title.trim() || draft.content.trim()) && (
+              <button
+                onClick={downloadNote}
+                title="Download as a text file"
+                aria-label="Download as a text file"
+                className="p-2 rounded-lg text-gray-400 hover:text-gray-600 hover:bg-gray-50 transition-colors"
+              >
+                <Download className="w-4 h-4" />
+              </button>
+            )}
             {draft.role === "owner" && draft.id && (
               <button
                 onClick={() => setSharing(true)}

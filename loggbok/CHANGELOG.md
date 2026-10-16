@@ -4,6 +4,8 @@ What changed in Loggbok, newest first. Each version is tagged in git as `loggbok
 
 ## Unreleased
 
+- A small download arrow in the bottom bar, next to Share, saves the open note as a text file named after its title (e.g. `Groceries.txt`). It saves what is on screen, unsaved changes included.
+
 ## 0.0.12 — 2026-10-13
 
 The first numbered version: Loggbok as it runs in production on this date. Its 12 commits so far, this one included, give the number.
