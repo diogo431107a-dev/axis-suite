@@ -1,0 +1,9 @@
+{
+  // The game in web/ is plain JavaScript, bundled by Vite and not type-checked.
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "tsBuildInfoFile": "node_modules/.tmp/tsconfig.vite.tsbuildinfo"
+  },
+  "include": ["vite.config.ts", "vitest.config.ts", "server/**/*.test.ts"]
+}

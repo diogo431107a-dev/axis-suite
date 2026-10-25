@@ -1,0 +1,37 @@
+{
+  "name": "saga",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Habits Saga — a habit tracker played as a fantasy game, with its own players and a public ranking",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "start": "node dist/server/index.js",
+    "admin": "node server/admin.ts",
+    "dev": "concurrently -k -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
+    "dev:web": "vite",
+    "dev:server": "node --watch server/index.ts"
+  },
+  "dependencies": {
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@fontsource/pixelify-sans": "^5.3.0",
+    "@fontsource/press-start-2p": "^5.3.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
+    "concurrently": "^9.1.2",
+    "happy-dom": "^20.14.0",
+    "typescript": "catalog:",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.11"
+  }
+}
