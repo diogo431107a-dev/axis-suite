@@ -1,0 +1,11 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "server",
+    "outDir": "dist/server",
+    "tsBuildInfoFile": "dist/tsconfig.server.tsbuildinfo"
+  },
+  "include": ["server"],
+  // Tests are type-checked by tsconfig.vite.json, never built.
+  "exclude": ["**/*.test.ts"]
+}

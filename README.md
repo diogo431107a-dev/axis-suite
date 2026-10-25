@@ -1,6 +1,6 @@
 # Axis Suite
 
-Small self-hosted web apps ("modules") that share one sign-in. Everything runs on a single Debian 13 server behind Caddy.
+Small self-hosted web apps ("modules") that share one sign-in (all but Saga, which has its own players). Everything runs on a single Debian 13 server behind Caddy.
 
 | Module                           | What it is                                                                                               | Port | Local port |
 | -------------------------------- | -------------------------------------------------------------------------------------------------------- | ---- | ---------- |
@@ -15,6 +15,7 @@ Small self-hosted web apps ("modules") that share one sign-in. Everything runs o
 | [Althing](althing/README.md)     | A real-time chat: a lobby, rooms anyone can open, and direct messages, all kept on record.               | 3008 | 8450       |
 | [Mimir](mimir/README.md)         | Mind maps that lay themselves out from the centre to both sides, with arrows, OPML in and out, and PNG.  | 3009 | 8451       |
 | [Urd](urd/README.md)             | A time tracker that stays open all day: one big clock, Play/Stop, and time and interruptions per period. | 3010 | 8452       |
+| [Saga](saga/README.md)           | Habits Saga, a habit tracker played as a fantasy game, with its own players and a public ranking.        | 3011 | 8453       |
 
 Shared code lives in `packages/`:
 
@@ -37,11 +38,14 @@ browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   account
                         ├──▶ valkyrie   127.0.0.1:3007   kanban API + static frontend
                         ├──▶ althing    127.0.0.1:3008   chat API, live updates + static frontend
                         ├──▶ mimir      127.0.0.1:3009   mind-map API + static frontend
-                        └──▶ urd        127.0.0.1:3010   time-tracker API, live updates + static frontend
+                        ├──▶ urd        127.0.0.1:3010   time-tracker API, live updates + static frontend
+                        └──▶ saga       127.0.0.1:3011   game API + static frontend (its own accounts)
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 althing's API     ── GET /online ──▶ heimdall (who has a live session, for the "online" list)
 ```
+
+Saga is the exception: its players are its own, so it never asks Heimdall anything. What follows is about every other module.
 
 - **Shared cookie.** Heimdall sets the session cookie `heimdall_sid`. On a real domain it is scoped to the parent domain (`COOKIE_DOMAIN`), so browsers send it to every module's subdomain. On `localhost` or an IP address all modules share one host, so the cookie needs no domain.
 - **Who is signed in.** Each module's API runs `requireUser` from `@axis-suite/heimdall-client/server`, which forwards the browser's cookie to Heimdall's `GET /whoami` on every request. Closing the session in Heimdall therefore signs the user out of every module at once. Each of those requests also counts as use: a session ends after 48 hours without any, and 14 days after sign-in at the latest.
@@ -70,6 +74,7 @@ valkyrie/            kanban
 althing/             chat
 mimir/               mind maps
 urd/                 time tracker
+saga/                Habits Saga, the game
 ```
 
 Every module has the same shape:
@@ -94,7 +99,7 @@ Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in 
 
 ```bash
 pnpm install
-pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd
+pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga
 ```
 
 Use `127.0.0.1`, not `localhost`: browsers send Heimdall's cookie (`127.0.0.1:3000`) to the other modules only on the same host. Demo accounts: `odin` / `allfather-demo`, `freya` / `folkvangr-demo`, `john` / `john-demo`. Local data goes in each module's `data/` folder, which git ignores.
@@ -148,6 +153,7 @@ sudo bash axis-suite/deploy/install.sh valkyrie
 sudo bash axis-suite/deploy/install.sh althing
 sudo bash axis-suite/deploy/install.sh mimir
 sudo bash axis-suite/deploy/install.sh urd
+sudo bash axis-suite/deploy/install.sh saga
 ```
 
 Janus's first install makes its encryption key, `/etc/axis-suite/janus.key`. Back it up right away, apart from the server: without it, nobody can read the vaults (see [Janus](janus/README.md#installing-and-data)).
@@ -172,14 +178,15 @@ sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh valkyrie
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh althing
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh mimir
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh urd
+sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh saga
 ```
 
-Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451 and Urd at https://localhost:8452. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
+Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452 and Saga at https://localhost:8453. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
 
 ## Operating it
 
 ```bash
-systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd   # running?
+systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga   # running?
 journalctl -u loggbok -f                                                          # a module's log
 sudo systemctl restart loggbok                                                    # restart one module
 cat /etc/axis-suite/suite.env                                                     # the domain, URLs and usernames every module was given
@@ -201,6 +208,7 @@ Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<modul
 | Althing   | every message, room and profile, kept on record                        | `/var/lib/althing/althing.db`   |
 | Mimir     | every user's maps                                                      | `/var/lib/mimir/mimir.db`       |
 | Urd       | every user's sessions and projects                                     | `/var/lib/urd/urd.db`           |
+| Saga      | every player's account and game, and the invite codes                  | `/var/lib/saga/saga.db`         |
 
 Back up a module's data with its service stopped, and keep the copies where only you can read them:
 
