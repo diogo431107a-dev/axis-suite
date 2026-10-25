@@ -17,6 +17,7 @@ import type { Me } from "@axis-suite/heimdall-client/browser";
 import type { EntrySummary, Group } from "../../shared/protocol.ts";
 import { compareText } from "../util.ts";
 import { iconButton } from "../ui/buttons.ts";
+import { AboutButton } from "../ui/About.tsx";
 
 /** What the entry list shows. */
 export type View = { kind: "all" } | { kind: "group"; id: string } | { kind: "bin" };
@@ -104,8 +105,10 @@ export const Sidebar = memo(function Sidebar(props: SidebarProps) {
   return (
     <nav className="flex flex-col h-full" aria-label="Vault">
       <div className="px-4 pt-4 pb-3 flex items-center justify-between gap-2">
-        <h1 className="flex items-center gap-2 text-lg font-bold text-gray-800 tracking-tight">
-          <KeyRound className="w-5 h-5 text-blue-700" /> Janus
+        <h1 className="text-lg font-bold text-gray-800 tracking-tight">
+          <AboutButton className="-mx-1 flex items-center gap-2 px-1">
+            <KeyRound className="w-5 h-5 text-blue-700" /> Janus
+          </AboutButton>
         </h1>
         <a
           href={me.accountUrl}
