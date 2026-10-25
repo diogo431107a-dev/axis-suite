@@ -1,6 +1,6 @@
 {
   "name": "axis-suite",
-  "version": "0.0.89",
+  "version": "0.0.96",
   "private": true,
   "type": "module",
   "packageManager": "pnpm@11.28.5",
