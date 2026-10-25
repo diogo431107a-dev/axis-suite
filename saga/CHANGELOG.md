@@ -8,6 +8,7 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 - Vices can be deleted the same way. The points they already took stay taken.
 - Logging a vice asks first, on the Roster and in the Log a vice window, saying what it will take right now: the points, the gold, or an ailment when the purse can't pay.
 - The number next to a companion's attribute now reads "+3 CRAFT": what the companion adds to the hero's sheet, 3 for each of its levels. Hovering over it says so.
+- `admin.js invites` no longer lists a code as unused after the player who used it was removed (it couldn't be used again anyway), and says when a code has expired.
 
 ## 0.0.5 — 2026-10-25
 
