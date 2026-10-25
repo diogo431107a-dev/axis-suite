@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { CircleCheck, PanelLeft, UserRound } from "lucide-react";
 import { SignedOutError, fetchMe, goToSignIn, watchForSignIn, type Me } from "@axis-suite/heimdall-client/browser";
+import { AboutButton } from "./About.tsx";
 import { attachFiles, isOutlineFile } from "./files/upload.ts";
 import { importFile } from "./io/importer.ts";
 import { insertDrafts } from "./model/commands.ts";
 import { Outliner } from "./model/outliner.ts";
 import { ExportDialog } from "./outline/ExportDialog.tsx";
 import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./outline/hooks.ts";
-import { focusSearch, zoomFromLocation, zoomTo } from "./outline/nav.ts";
+import { focusSearch, zoomFromLocation } from "./outline/nav.ts";
 import { Outline } from "./outline/Outline.tsx";
 import { SearchBox } from "./outline/SearchBox.tsx";
 import { ShareDialog } from "./outline/ShareDialog.tsx";
@@ -145,16 +146,12 @@ function Page({ me, notice }: { me: Me; notice: string }) {
         >
           <PanelLeft className="h-5 w-5" />
         </button>
-        <a
-          href="/"
-          onClick={(e) => {
-            e.preventDefault();
-            zoomTo(o, null);
-          }}
-          className="hidden font-semibold tracking-tight text-green-800 sm:block md:w-52"
-        >
-          Yggdrasil
-        </a>
+        <div className="flex md:w-52">
+          <AboutButton className="flex items-center gap-2 px-1 font-semibold tracking-tight text-green-800">
+            <img src="/favicon.svg" alt="" className="h-5 w-5" />
+            <span className="hidden sm:inline">Yggdrasil</span>
+          </AboutButton>
+        </div>
         <div className="flex min-w-0 flex-1 justify-center">
           <SearchBox />
         </div>
