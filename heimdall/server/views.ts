@@ -1,4 +1,5 @@
 import { idleEndsAt, type Session } from "./state.ts";
+import { VERSIONS } from "./versions.ts";
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c] ?? c);
@@ -49,6 +50,20 @@ fieldset:disabled button,fieldset:disabled input{cursor:not-allowed}
 .muted{color:var(--muted)}
 .secondary{background:transparent;color:var(--text);border:1px solid var(--line)}
 .secondary:hover{background:#1a2233}
+.logo-button{width:auto;padding:0;background:none;border-radius:12px;line-height:0}
+.logo-button:hover{background:none;opacity:.8}
+.about{width:min(340px,calc(100vw - 32px));padding:18px 22px 22px;background:var(--card);color:var(--text);border:1px solid var(--line);
+border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.about::backdrop{background:rgba(0,0,0,.5)}
+.about-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
+.about-head h2{margin:0;font-size:16px;font-weight:600}
+.about .close{width:auto;padding:2px 8px;background:transparent;color:var(--muted);font-size:20px;font-weight:400;line-height:1}
+.about .close:hover{background:#1a2233;color:var(--text)}
+.about p{margin:0}
+.versions{display:grid;grid-template-columns:auto 1fr;gap:4px 24px;margin:14px 0 0}
+.versions dt{color:var(--muted)}
+.versions dd{margin:0;font-variant-numeric:tabular-nums}
+.about .small{margin-top:12px;font-size:12px}
 `;
 
 function page(nonce: string, title: string, body: string, script = ""): string {
@@ -65,14 +80,24 @@ function page(nonce: string, title: string, body: string, script = ""): string {
 <main class="card">
 ${body}
 </main>
+${ABOUT}
 ${script ? `<script nonce="${nonce}">${script}</script>` : ""}
 </body>
 </html>`;
 }
 
+// The logo opens the About box, as in every module of the suite. A popover needs no script: the
+// browser opens it, and closes it on Esc or a click outside.
 function brand(tagline: string): string {
-  return `<header class="brand">${LOGO_SVG}<h1 class="wordmark">Heimdall</h1><p class="tagline">${esc(tagline)}</p></header>`;
+  return `<header class="brand"><button type="button" class="logo-button" popovertarget="about" title="About Heimdall">${LOGO_SVG}</button><h1 class="wordmark">Heimdall</h1><p class="tagline">${esc(tagline)}</p></header>`;
 }
+
+const ABOUT = `<div id="about" class="about" popover>
+<div class="about-head"><h2>About Heimdall</h2><button type="button" class="close" popovertarget="about" popovertargetaction="hide" aria-label="Close">×</button></div>
+<p class="muted">The sign-in service of the Axis Suite.</p>
+<dl class="versions"><dt>Version</dt><dd>${esc(VERSIONS.module)}</dd><dt>Axis Suite</dt><dd>${esc(VERSIONS.suite)}</dd></dl>
+${VERSIONS.dev ? `<p class="muted small">Development: these are the numbers of the last release.</p>` : ""}
+</div>`;
 
 export function formatCountdown(ms: number): string {
   const s = Math.ceil(ms / 1000);
