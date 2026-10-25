@@ -88,7 +88,7 @@ export function header() {
     ["account", "Account"],
   ];
   return `<header class="top">
-    <div class="logo">HABITS<br>SAGA</div>
+    <button class="logo" data-action="about" title="About Habits Saga">HABITS<br>SAGA</button>
     ${
       inBattle()
         ? ""
@@ -109,7 +109,7 @@ export function header() {
 // The top bar for visitors who aren't signed in, looking at the Hall of Fame.
 export function guestHeader() {
   return `<header class="top">
-    <div class="logo">HABITS<br>SAGA</div>
+    <button class="logo" data-action="about" title="About Habits Saga">HABITS<br>SAGA</button>
     <div class="hud"><button class="btn small primary" data-action="nav" data-view="welcome">Sign in or join</button></div>
   </header>`;
 }
@@ -926,7 +926,7 @@ export function debugStrip() {
   </footer>`;
 }
 
-/* ---------- picker dialog: items, item targets, spells, vices, travel ---------- */
+/* ---------- picker dialog: items, item targets, spells, vices, travel, About ---------- */
 export function pickerHtml() {
   const s = state,
     p = s.ui.picker;
@@ -934,7 +934,10 @@ export function pickerHtml() {
   let title,
     sub = "",
     body;
-  if (p.type === "items") {
+  if (p.type === "about") {
+    title = "About Habits Saga";
+    body = aboutHtml();
+  } else if (p.type === "items") {
     const user = p.user && findHabit(s, p.user);
     title = inBattle() && user ? `${user.name}: use an item` : "Use an item";
     if (inBattle() && user) sub = `Using an item takes ${user.name}'s action for this turn.`;
@@ -1040,6 +1043,17 @@ export function pickerHtml() {
       ${sub ? `<p class="modal-sub">${esc(sub)}</p>` : ""}
       <div class="pick-list">${body}</div>
     </section>`;
+}
+// The About box, opened from the logo. Vite writes Saga's version and the suite's into the page
+// when it builds it, from their package.json files.
+function aboutHtml() {
+  const v = __AXIS_VERSIONS__;
+  return `<p class="modal-sub">A habit tracker played as a fantasy game.</p>
+    <dl class="about">
+      <dt>Version</dt><dd>${esc(v.module)}</dd>
+      <dt>Axis Suite</dt><dd>${esc(v.suite)}</dd>
+    </dl>
+    ${import.meta.env.DEV ? '<p class="modal-sub">Development: these are the numbers of the last release.</p>' : ""}`;
 }
 export function renderModal() {
   modal.innerHTML = pickerHtml();

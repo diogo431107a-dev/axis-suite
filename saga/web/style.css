@@ -277,6 +277,15 @@ button {
   color: var(--accent);
   text-shadow: 2px 2px 0 var(--edge-dim);
   letter-spacing: 0.04em;
+  /* A button that opens the About box. */
+  background: none;
+  border: 0;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+.logo:hover {
+  opacity: 0.8;
 }
 .tabs {
   display: flex;
@@ -1220,6 +1229,19 @@ input[type="range"] {
 .modal-sub {
   font-size: 15px;
   color: var(--muted);
+}
+.about {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 4px 24px;
+  margin: 0;
+  font-size: 15px;
+}
+.about dt {
+  color: var(--muted);
+}
+.about dd {
+  margin: 0;
 }
 .modal-result {
   font-size: 15px;
