@@ -1,6 +1,6 @@
 {
   "name": "mimir",
-  "version": "0.0.4",
+  "version": "0.0.6",
   "private": true,
   "description": "Mimir — mind maps for every signed-in user",
   "type": "module",

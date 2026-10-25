@@ -4,6 +4,8 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+## 0.0.12 — 2026-10-25
+
 - Clicking HABITS SAGA at the top left opens an About box with Saga's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
 
 ## 0.0.10 — 2026-10-25

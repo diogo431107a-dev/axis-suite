@@ -4,6 +4,8 @@ What changed in Vinr, newest first. Each version is tagged in git as `vinr-v<ver
 
 ## Unreleased
 
+## 0.0.6 — 2026-10-25
+
 - Clicking Vinr at the top left opens an About box with Vinr's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
 
 ## 0.0.4 — 2026-10-13

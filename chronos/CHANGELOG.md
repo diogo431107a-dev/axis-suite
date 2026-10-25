@@ -4,6 +4,8 @@ What changed in Chronos, newest first. Each version is tagged in git as `chronos
 
 ## Unreleased
 
+## 0.0.7 — 2026-10-25
+
 - Clicking Chronos at the top left opens an About box with Chronos's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
 
 ## 0.0.5 — 2026-10-13

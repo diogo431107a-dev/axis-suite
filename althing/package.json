@@ -1,6 +1,6 @@
 {
   "name": "althing",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "private": true,
   "description": "Althing — real-time chat for every signed-in user",
   "type": "module",

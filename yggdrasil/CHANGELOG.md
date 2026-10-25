@@ -4,6 +4,8 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 
 ## Unreleased
 
+## 1.0.2 — 2026-10-25
+
 - **Fix:** Clicking Yggdrasil at the top left opens an About box with Yggdrasil's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way. The name no longer takes you Home: the house at the start of the breadcrumbs does. On a phone, the tree logo is shown where the name has no room.
 
 ## 1.0.1 — 2026-10-15

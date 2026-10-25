@@ -4,6 +4,8 @@ What changed in Althing, newest first. Each version is tagged in git as `althing
 
 ## Unreleased
 
+## 0.0.4 — 2026-10-25
+
 - Althing's logo and name are at the top of the sidebar, above your profile. Clicking them opens an About box with Althing's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
 
 ## 0.0.2 — 2026-10-13

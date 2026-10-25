@@ -4,7 +4,24 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
-Every module has an About box: click its logo or name at the top left to see its version and the Axis Suite version it was built with. A module that hasn't been reinstalled for a while shows the suite version it was last installed from.
+## 0.0.115 — 2026-10-25
+
+Every module has an About box: click its logo or name at the top left to see its version and the Axis Suite version it was built with. All twelve modules get a new version for it, and Urd 2.1.0 also brings dark mode and New task. A module that hasn't been reinstalled for a while shows the suite version it was last installed from.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.21  |
+| Loggbok   | 0.0.16  |
+| Yggdrasil | 1.0.2   |
+| Janus     | 0.0.7   |
+| Papyrus   | 0.0.7   |
+| Vinr      | 0.0.6   |
+| Chronos   | 0.0.7   |
+| Valkyrie  | 0.0.6   |
+| Althing   | 0.0.4   |
+| Mimir     | 0.0.6   |
+| Urd       | 2.1.0   |
+| Saga      | 0.0.12  |
 
 ## 0.0.101 — 2026-10-25
 

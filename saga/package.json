@@ -1,6 +1,6 @@
 {
   "name": "saga",
-  "version": "0.0.10",
+  "version": "0.0.12",
   "private": true,
   "description": "Habits Saga — a habit tracker played as a fantasy game, with its own players and a public ranking",
   "type": "module",

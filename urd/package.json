@@ -1,6 +1,6 @@
 {
   "name": "urd",
-  "version": "2.0.0",
+  "version": "2.1.0",
   "private": true,
   "description": "Urd — a time tracker that stays open all day, for every signed-in user",
   "type": "module",
