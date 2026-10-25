@@ -4,6 +4,8 @@ What changed in Valkyrie, newest first. Each version is tagged in git as `valkyr
 
 ## Unreleased
 
+- Clicking Valkyrie at the top left opens an About box with Valkyrie's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
+
 ## 0.0.4 — 2026-10-13
 
 The first numbered version: Valkyrie as it runs in production on this date. Its 4 commits so far, this one included, give the number.

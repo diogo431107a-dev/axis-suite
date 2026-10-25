@@ -4,6 +4,7 @@ import type { Me } from "@axis-suite/heimdall-client/browser";
 import type { Board } from "../shared/protocol.ts";
 import { startSort } from "./board/dnd.ts";
 import { COLOR_CLASSES } from "./colors.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton, primaryButton } from "./ui/buttons.ts";
 import { Link } from "./ui/Link.tsx";
 
@@ -33,9 +34,11 @@ export function Sidebar({ me, boards, activeId, onMoveBoard, onDialog, onNavigat
 
   return (
     <nav className="flex h-full flex-col gap-4 overflow-y-auto py-4" aria-label="Boards">
-      <div className="flex items-center gap-2 px-4">
-        <img src="/favicon.svg" alt="" className="h-6 w-6" />
-        <span className="text-lg font-semibold text-stone-800">Valkyrie</span>
+      <div className="flex px-3">
+        <AboutButton className="flex items-center gap-2 px-1">
+          <img src="/favicon.svg" alt="" className="h-6 w-6" />
+          <span className="text-lg font-semibold text-stone-800">Valkyrie</span>
+        </AboutButton>
       </div>
 
       <div className="px-3">

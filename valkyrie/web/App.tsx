@@ -17,6 +17,7 @@ import { BoardDialog } from "./dialogs/BoardDialog.tsx";
 import { KeysDialog } from "./dialogs/KeysDialog.tsx";
 import { useToday } from "./hooks.ts";
 import { go, useRoute } from "./nav.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton, primaryButton } from "./ui/buttons.ts";
 
 interface Notice {
@@ -205,7 +206,7 @@ export default function App() {
               <button type="button" className={iconButton} aria-label="Menu" onClick={() => setNavOpen(true)}>
                 <Menu className="h-5 w-5" />
               </button>
-              <span className="font-semibold text-stone-800">Valkyrie</span>
+              <AboutButton className="px-1 font-semibold text-stone-800">Valkyrie</AboutButton>
             </div>
             {boards.length === 0 && (
               <div className="m-auto max-w-sm p-8 text-center">
