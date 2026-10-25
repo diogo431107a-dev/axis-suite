@@ -652,24 +652,6 @@ export const AVATARS = [
     pal: { h: "#c25a2a", s: "#8d5a3b", a: "#d8c8a8", c: "#f4ecd8", b: "#5a4a3a", g: "#3f8f8f" },
   },
 ];
-// Made-up rivals for the Hall of Fame (no database in this demo): [name, avatar, hero level, fame, furthest foe index, dragons slain].
-// Old Marrow and Corvin Lamb are high level but rarely venture out, so fame ranks them low.
-export const RIVALS = [
-  ["Brannoc the Steady", "knight", 14, 168, 44, 2],
-  ["Ysolde Quickwick", "mystic", 11, 121, 38, 0],
-  ["Tamsin Ferrow", "ranger", 8, 82, 30, 0],
-  ["Old Marrow", "sage", 22, 64, 26, 0],
-  ["Dov the Bellringer", "minstrel", 7, 47, 21, 0],
-  ["Ilka Moss", "envoy", 9, 38, 19, 0],
-  ["Pell Ashgrove", "knight", 5, 24, 14, 0],
-  ["Wren Tallow", "mystic", 4, 15, 11, 0],
-  ["Corvin Lamb", "sage", 17, 12, 9, 0],
-  ["Nessa Brook", "ranger", 3, 7, 6, 0],
-  ["Gil Rookwood", "minstrel", 2, 3, 3, 0],
-  ["Ottie Fenn", "envoy", 2, 1, 1, 0],
-  ["Bramble", "knight", 1, 0, 0, 0],
-];
-
 export const ITEMS = {
   potion: {
     name: "Health Potion",

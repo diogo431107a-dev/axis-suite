@@ -1,18 +1,5 @@
 import { BT, startScene, stopScene, updateBattleLog, updateCmd } from "./battle.js";
-import {
-  ATTR,
-  ATTRS,
-  AVATARS,
-  ENEMIES,
-  ENEMY_BY_KEY,
-  ITEMS,
-  MOVES,
-  RIVALS,
-  SCHOOLS,
-  STATUSES,
-  TIERS,
-  TUNE,
-} from "./data.js";
+import { ATTR, ATTRS, AVATARS, ENEMIES, ENEMY_BY_KEY, ITEMS, MOVES, SCHOOLS, STATUSES, TIERS, TUNE } from "./data.js";
 import {
   actedThisTurn,
   atFront,
@@ -34,10 +21,9 @@ import {
   maxHpOf,
   maxMpOf,
   openTasks,
+  fameTitle,
   partyUnits,
-  playerRank,
   pointsOf,
-  rankings,
   regionReached,
   schoolOf,
   sheetAttr,
@@ -48,6 +34,7 @@ import {
   travelOptions,
   viceNow,
 } from "./rules.js";
+import { account, fetchRanking, refreshRank } from "./net.js";
 import { SH, SW, hydrate } from "./sprites.js";
 
 /* =====================================================================
@@ -96,6 +83,7 @@ export function header() {
     ["shop", "Shop"],
     ["bestiary", "Bestiary"],
     ["fame", "Hall of Fame"],
+    ["account", "Account"],
   ];
   return `<header class="top">
     <div class="logo">HABITS<br>SAGA</div>
@@ -110,10 +98,23 @@ export function header() {
             .join("")}</nav>`
     }
     <div class="hud">
+      <span class="chip warn" id="hud-save" title="Your progress is kept on this page and sent again every second" ${account.saveFailing ? "" : "hidden"}>Not saved · retrying</span>
       <span class="chip">Turn <span class="num" id="hud-turn">${state.turn}</span></span>
       <span class="chip" title="Gold">${coin}<span class="num" id="hud-gold">${state.hero.gold}</span></span>
     </div>
   </header>`;
+}
+// The top bar for visitors who aren't signed in, looking at the Hall of Fame.
+export function guestHeader() {
+  return `<header class="top">
+    <div class="logo">HABITS<br>SAGA</div>
+    <div class="hud"><button class="btn small primary" data-action="nav" data-view="welcome">Sign in or join</button></div>
+  </header>`;
+}
+// A message from the server side (another device saved, signed out…), dismissed with ×.
+export function noticeBar() {
+  if (!account.notice) return "";
+  return `<p class="notice" role="status"><span>${esc(account.notice)}</span><button class="linkish" data-action="dismissNotice" aria-label="Dismiss">×</button></p>`;
 }
 
 export function memberSlot(s, id) {
@@ -176,7 +177,7 @@ export function heroSheet(s) {
         <div class="hero-lv"><span>Level <b>${hi.level}</b></span><span class="num">${hi.into} / ${hi.need} pts</span></div>
         ${bar(pct(hi.into, hi.need), "var(--accent)")}
         <div class="hero-lv"><span>${hi.total} attribute points</span><span>Fame <b>${s.fame}</b></span></div>
-        <div class="hero-lv"><span>Hall of Fame</span><button class="linkish" data-action="nav" data-view="fame">Rank #${playerRank(s)} of ${RIVALS.length + 1} by fame</button></div>
+        <div class="hero-lv"><span>Hall of Fame</span><button class="linkish" data-action="nav" data-view="fame">${account.rank ? `Rank #${account.rank} by fame` : s.habits.length ? "See the ranking" : "Add a habit to be ranked"}</button></div>
       </div>
     </div>
     <h2 class="sect">Attributes <span>your companions, summed</span></h2>
@@ -209,15 +210,17 @@ export function campView() {
     const id = s.party[i];
     slots.push(id ? memberSlot(s, id) : `<div class="slot empty">Empty slot</div>`);
   }
-  const readyText = !members.length
-    ? "The party is empty. Add companions from the Roster."
-    : allDown
-      ? "Everyone is knocked out. Revive someone with a Phoenix Feather."
-      : ready === members.length
-        ? `All ${members.length} companions are ready. Each acts once per turn.`
-        : ready
-          ? `${ready} of ${members.length} still to act this turn.`
-          : "Everyone has acted. The foe answers when you return to battle.";
+  const readyText = !s.habits.length
+    ? "Every habit you keep becomes a companion who fights for you. Add your first one to start."
+    : !members.length
+      ? "The party is empty. Add companions from the Roster."
+      : allDown
+        ? "Everyone is knocked out. Revive someone with a Phoenix Feather."
+        : ready === members.length
+          ? `All ${members.length} companions are ready. Each acts once per turn.`
+          : ready
+            ? `${ready} of ${members.length} still to act this turn.`
+            : "Everyone has acted. The foe answers when you return to battle.";
   const reward = foeReward(e);
   const front = atFront(s)
     ? ""
@@ -243,7 +246,11 @@ export function campView() {
             ${bar(pct(e.hp, e.maxHp), null, "hp")}
             <div class="hp-row"><span>${e.hp < e.maxHp ? "Wounded. Damage carries over." : "Full health"}</span><span class="num" style="font-size:9px">${e.hp} / ${e.maxHp} HP</span></div>
             <div class="fight-row">
-              <button class="btn primary" data-action="fight" ${members.length && !allDown ? "" : "disabled"}>Fight</button>
+              ${
+                s.habits.length
+                  ? `<button class="btn primary" data-action="fight" ${members.length && !allDown ? "" : "disabled"}>Fight</button>`
+                  : '<button class="btn primary" data-action="firstHabit">Add your first companion</button>'
+              }
               <button class="btn small" data-action="openTravel">Travel</button>
             </div>
             <span class="ready-note">${readyText}</span>
@@ -276,7 +283,6 @@ export function campView() {
           .map((l) => `<li><span class="d">T${l.turn}</span><span>${esc(l.text)}</span></li>`)
           .join("")}</ol>
       </section>
-      <p class="example-note">The habits, tasks, vices and progress here are example data. Everything lives in memory and resets when you reload the page.</p>
     </div>
   </main>`;
 }
@@ -653,79 +659,228 @@ export function rewardsView() {
   </main>`;
 }
 
+// The hero looks to pick from, for joining and for starting over.
+function avatarPicker(pick) {
+  return `<fieldset class="field" style="border:0;padding:0;margin:0">
+    <span>Choose your look</span>
+    <div class="avatar-pick">${AVATARS.map(
+      (a) => `<label><input type="radio" name="avatar" value="${a.id}" ${a.id === pick ? "checked" : ""}>
+      <span class="av"><canvas class="px" data-sprite="avatar:${a.id}" data-s="4"></canvas><span>${a.name}</span></span></label>`,
+    ).join("")}</div>
+  </fieldset>`;
+}
+// Sign in, or join with an invite code. Errors are written into the form's .form-err in place,
+// so what was typed stays.
 export function welcomeView() {
-  const pick = state.ui.avatarPick || "knight";
+  const join = state.ui.authMode === "join";
+  const form = join
+    ? `<form id="join-form" class="welcome-form" autocomplete="off">
+        <div class="field">
+          <label for="j-invite">Invite code</label>
+          <input class="text-in" id="j-invite" name="invite" required placeholder="SAGA-XXXX-XXXX" autocapitalize="characters" spellcheck="false">
+        </div>
+        <div class="add-form">
+          <div class="field">
+            <label for="j-user">Username <span class="hint-inline">(for signing in, never shown)</span></label>
+            <input class="text-in" id="j-user" name="username" required minlength="3" maxlength="24" pattern="[A-Za-z0-9._\\-]+" autocomplete="username" autocapitalize="none" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="j-pass">Password <span class="hint-inline">(10 characters or more)</span></label>
+            <input class="text-in" id="j-pass" name="password" type="password" required minlength="10" maxlength="200" autocomplete="new-password">
+          </div>
+        </div>
+        <div class="field">
+          <label for="j-hero">Hero name <span class="hint-inline">(public, in the Hall of Fame)</span></label>
+          <input class="text-in" id="j-hero" name="heroName" required maxlength="20" placeholder="e.g. Rowan the Steadfast">
+        </div>
+        ${avatarPicker("knight")}
+        <span class="form-err" role="alert"></span>
+        <button type="submit" class="btn primary">Begin</button>
+      </form>`
+    : `<form id="signin-form" class="welcome-form">
+        <div class="add-form">
+          <div class="field">
+            <label for="s-user">Username</label>
+            <input class="text-in" id="s-user" name="username" required autocomplete="username" autocapitalize="none" spellcheck="false">
+          </div>
+          <div class="field">
+            <label for="s-pass">Password</label>
+            <input class="text-in" id="s-pass" name="password" type="password" required autocomplete="current-password">
+          </div>
+        </div>
+        <span class="form-err" role="alert"></span>
+        <button type="submit" class="btn primary">Sign in</button>
+      </form>`;
   return `<main class="welcome">
     <h1 class="welcome-title">HABITS<br>SAGA</h1>
     <p class="welcome-intro">Your habits become companions, your one-off tasks become spells, and every real repetition is a blow against the beasts of procrastination. Who will lead them?</p>
-    <section class="win">
-      <form id="welcome-form" class="welcome-form" autocomplete="off">
-        <div class="field">
-          <label for="w-name">Hero name</label>
-          <input class="text-in" id="w-name" name="name" maxlength="20" placeholder="e.g. Rowan the Steadfast" value="${esc(state.ui.nameDraft || "")}">
-        </div>
-        <fieldset class="field" style="border:0;padding:0;margin:0">
-          <span>Choose your look</span>
-          <div class="avatar-pick">${AVATARS.map(
-            (
-              a,
-            ) => `<label><input type="radio" name="avatar" id="w-av-${a.id}" value="${a.id}" ${a.id === pick ? "checked" : ""}>
-            <span class="av"><canvas class="px" data-sprite="avatar:${a.id}" data-s="4"></canvas><span>${a.name}</span></span></label>`,
-          ).join("")}</div>
-        </fieldset>
-        ${state.ui.formErr ? `<span class="form-err">${esc(state.ui.formErr)}</span>` : ""}
-        <button type="submit" class="btn primary">Begin</button>
-      </form>
-    </section>
-    <p class="example-note">Your character is remembered in this browser, so next time you go straight to camp. The party and progress are example data and still reset on reload.</p>
+    ${noticeBar()}
+    <div class="filters" role="group" aria-label="Sign in or join">
+      <button class="fchip" data-action="authMode" data-mode="signin" aria-pressed="${!join}">Sign in</button>
+      <button class="fchip" data-action="authMode" data-mode="join" aria-pressed="${join}">Join with an invite</button>
+    </div>
+    <section class="win">${form}</section>
+    <p class="example-note">${
+      join
+        ? "Joining needs an invite code from the keeper of this realm. Forgot your password later? Ask them for a new one."
+        : "Forgot your password? Ask the keeper of this realm for a temporary one."
+    } <button class="linkish" data-action="nav" data-view="fame">See the Hall of Fame</button></p>
   </main>`;
 }
 
+// After the owner resets a password, the player chooses a new one before playing on.
+export function passwordView() {
+  return `<main class="welcome">
+    <h1 class="welcome-title">HABITS<br>SAGA</h1>
+    <p class="welcome-intro">You signed in with a temporary password. Type it once more, then choose your own.</p>
+    <section class="win">
+      <form id="forced-password-form" class="welcome-form">
+        ${passwordFields("f", true)}
+        <span class="form-err" role="alert"></span>
+        <button type="submit" class="btn primary">Save and continue</button>
+      </form>
+    </section>
+  </main>`;
+}
+function passwordFields(prefix, withCurrent = false) {
+  return `<div class="add-form">
+    ${
+      withCurrent
+        ? `<div class="field full">
+          <label for="${prefix}-cur">Current password</label>
+          <input class="text-in" id="${prefix}-cur" name="current" type="password" required autocomplete="current-password">
+        </div>`
+        : ""
+    }
+    <div class="field">
+      <label for="${prefix}-new">New password <span class="hint-inline">(10 characters or more)</span></label>
+      <input class="text-in" id="${prefix}-new" name="next" type="password" required minlength="10" maxlength="200" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="${prefix}-again">The same again</label>
+      <input class="text-in" id="${prefix}-again" name="again" type="password" required minlength="10" maxlength="200" autocomplete="new-password">
+    </div>
+  </div>`;
+}
+
+export function accountView() {
+  const p = account.player;
+  return `<main style="display:flex;flex-direction:column;gap:16px;max-width:760px;width:100%;margin:0 auto">
+    <div class="page-head">
+      <div>
+        <h1 class="page-title">Account</h1>
+        <p class="page-sub">You sign in as <b>${esc(p.username)}</b>. Your hero, ${esc(p.heroName)}, is the name the Hall of Fame shows. Your game is saved on the server as you play, so you can carry on from any device.</p>
+      </div>
+      <button class="btn" data-action="signOut">Sign out</button>
+    </div>
+    <section class="win">
+      <h2 class="sect">Change password</h2>
+      <form id="password-form" class="welcome-form">
+        ${passwordFields("p", true)}
+        <div class="form-actions"><span class="form-err" role="alert"></span><button type="submit" class="btn primary">Change password</button></div>
+      </form>
+    </section>
+    <section class="win">
+      <h2 class="sect">Start over</h2>
+      ${
+        state.ui.confirmReset
+          ? `<form id="hero-form" class="welcome-form" autocomplete="off">
+          <p class="page-sub">A new hero starts from nothing: every companion, vice, task, item, foe and point of fame goes. Your account stays.</p>
+          <div class="field">
+            <label for="h-name">New hero name</label>
+            <input class="text-in" id="h-name" name="heroName" required maxlength="20" value="${esc(p.heroName)}">
+          </div>
+          ${avatarPicker(p.avatar)}
+          <div class="form-actions"><span class="form-err" role="alert"></span>
+            <button type="button" class="btn" data-action="cancelReset">Keep my game</button>
+            <button type="submit" class="btn danger">Start over</button></div>
+        </form>`
+          : `<div class="inn-row"><p class="inn-text">Leave this game behind and begin again with a new hero.</p>
+          <button class="btn small danger" data-action="newCharacter">New character</button></div>`
+      }
+    </section>
+    <section class="win">
+      <h2 class="sect">Delete account</h2>
+      <form id="delete-form" class="welcome-form">
+        <p class="page-sub">Deletes your account, your game and your place in the Hall of Fame, for good.</p>
+        <div class="field">
+          <label for="d-pass">Your password</label>
+          <input class="text-in" id="d-pass" name="password" type="password" required autocomplete="current-password">
+        </div>
+        <div class="form-actions"><span class="form-err" role="alert"></span><button type="submit" class="btn danger">Delete my account</button></div>
+      </form>
+    </section>
+  </main>`;
+}
+
+// The public ranking of real players, loaded from the server (state.ui.ranking).
 export function fameView() {
   const s = state,
-    by = s.ui.rankBy || "fame";
-  const rows = rankings(s, by);
+    by = s.ui.rankBy || "fame",
+    r = s.ui.ranking;
+  const signedIn = !!account.player;
+  const row = (r) => `<tr class="${r.you ? "you" : ""}">
+          <td class="num">${r.rank}</td>
+          <td><span class="rank-who"><canvas class="px" data-sprite="avatar:${esc(r.avatar)}" data-s="2"></canvas><span><b>${esc(r.heroName)}</b>${r.you ? " (you)" : ""}<span class="t">${esc(fameTitle({ ...r, name: r.heroName }))}</span></span></span></td>
+          <td class="r num">${r.fame}</td>
+          <td class="r num">${r.level}</td>
+          <td>${esc(regionReached(r.front))}</td>
+        </tr>`;
+  let body;
+  if (!r || r.loading) body = '<p class="page-sub">Gathering the heralds…</p>';
+  else if (r.failed) body = '<p class="page-sub">The Hall of Fame couldn\'t be loaded. Try again in a moment.</p>';
+  else if (!r.rows.length)
+    body = '<p class="page-sub">No hero has been ranked yet. A hero needs at least one habit.</p>';
+  else {
+    const below = r.you && !r.rows.some((x) => x.you);
+    body = `<table class="rank-table">
+        <thead><tr><th>#</th><th>Hero</th><th class="r ${by === "fame" ? "rank-sorted" : ""}">Fame</th><th class="r ${by === "level" ? "rank-sorted" : ""}">Level</th><th>Furthest region</th></tr></thead>
+        <tbody>${r.rows.map(row).join("")}${below ? row(r.you) : ""}</tbody>
+      </table>`;
+  }
+  const yours =
+    signedIn && r && r.rows
+      ? r.you
+        ? ` You are rank #${r.you.rank} by ${by}.`
+        : " Add a habit to your roster to appear here."
+      : "";
   return `<main style="display:flex;flex-direction:column;gap:16px">
     <div class="page-head">
       <div>
         <h1 class="page-title">Hall of Fame</h1>
-        <p class="page-sub">Fame comes from foes defeated, and bigger foes are worth far more. Level comes from your attribute sheet. A hero can be high level and still never venture past the meadows, so fame shows who actually goes out and fights. You are rank #${playerRank(s, "fame")} by fame and #${playerRank(s, "level")} by level.</p>
+        <p class="page-sub">Fame comes from foes defeated, and bigger foes are worth far more. Level comes from the attribute sheet. A hero can be high level and still never venture past the meadows, so fame shows who actually goes out and fights.${yours}</p>
       </div>
     </div>
     <div class="filters" role="group" aria-label="Rank by">
       <button class="fchip" data-action="rankBy" data-by="fame" aria-pressed="${by === "fame"}">By fame</button>
       <button class="fchip" data-action="rankBy" data-by="level" aria-pressed="${by === "level"}">By level</button>
     </div>
-    <section class="win rank-wrap">
-      <table class="rank-table">
-        <thead><tr><th>#</th><th>Hero</th><th class="r ${by === "fame" ? "rank-sorted" : ""}">Fame</th><th class="r ${by === "level" ? "rank-sorted" : ""}">Level</th><th>Furthest region</th></tr></thead>
-        <tbody>${rows
-          .map(
-            (r, i) => `<tr class="${r.you ? "you" : ""}">
-          <td class="num">${i + 1}</td>
-          <td><span class="rank-who"><canvas class="px" data-sprite="avatar:${r.avatar}" data-s="2"></canvas><span><b>${esc(r.name)}</b>${r.you ? " (you)" : ""}<span class="t">${esc(r.title)}</span></span></span></td>
-          <td class="r num">${r.fame}</td>
-          <td class="r num">${r.level}</td>
-          <td>${esc(regionReached(r.front))}</td>
-        </tr>`,
-          )
-          .join("")}</tbody>
-      </table>
-    </section>
-    <p class="example-note">The other heroes are made up for this demo. With a real database this would list real players.</p>
+    <section class="win rank-wrap">${body}</section>
   </main>`;
 }
 
+/** Loads the ranking for the Hall of Fame and shows it, if the page is still there. */
+export async function showRanking(by) {
+  state.ui.rankBy = by;
+  state.ui.ranking = { loading: true };
+  render();
+  const data = await fetchRanking(by);
+  if (state.ui.view !== "fame" || state.ui.rankBy !== by) return;
+  state.ui.ranking = data || { failed: true };
+  if (data && data.you) account.rank = by === "fame" ? data.you.rank : account.rank;
+  render();
+}
+
+// Shortcuts for trying the game out, only in development (pnpm dev): the ranking is public.
 export function debugStrip() {
-  if (inBattle()) return "";
+  if (!import.meta.env.DEV || inBattle()) return "";
   return `<footer class="debug" aria-label="Prototype tools">
-    <span>Prototype tools. Nothing is saved.</span>
+    <span>Development tools. They change the saved game.</span>
     <button class="btn small" data-action="gold">+100 gold</button>
     <button class="btn small" data-action="noGold">Gold to 0</button>
     <button class="btn small" data-action="kill">Defeat current foe</button>
     <button class="btn small" data-action="skipTier">Skip to next tier</button>
     <button class="btn small" data-action="wipe">Wipe party</button>
-    <button class="btn small danger" data-action="newCharacter">${state.ui.confirmReset ? "Click again to start over" : "New character"}</button>
   </footer>`;
 }
 
@@ -864,6 +1019,8 @@ export function closePicker() {
 
 export const VIEWS = {
   welcome: welcomeView,
+  password: passwordView,
+  account: accountView,
   camp: campView,
   roster: rosterView,
   spellbook: spellbookView,
@@ -874,8 +1031,10 @@ export const VIEWS = {
   rewards: rewardsView,
 };
 export function render() {
-  const welcome = state.ui.view === "welcome";
-  app.innerHTML = (welcome ? "" : header()) + VIEWS[state.ui.view]() + (welcome ? "" : debugStrip());
+  const view = state.ui.view;
+  const bare = view === "welcome" || view === "password";
+  const top = bare ? "" : account.player ? header() + noticeBar() : guestHeader();
+  app.innerHTML = top + VIEWS[view]() + (bare || !account.player ? "" : debugStrip());
   hydrate(app);
   if (inBattle()) {
     startScene();
@@ -889,6 +1048,9 @@ export function go(view) {
   state.ui.swapFor = null;
   state.ui.picker = null;
   state.ui.formErr = "";
-  render();
+  state.ui.confirmReset = false;
+  if (view === "fame") showRanking(state.ui.rankBy || "fame");
+  else render();
+  if (view === "camp") refreshRank();
   window.scrollTo(0, 0);
 }

@@ -5,7 +5,6 @@ import {
   ENEMY_BY_KEY,
   ITEMS,
   MOVES,
-  RIVALS,
   SCHOOLS,
   STATUSES,
   TIERS,
@@ -598,30 +597,18 @@ export function titleOf(s) {
 export const regionReached = (frontIndex) =>
   TIERS[Math.floor((frontIndex % ENEMIES.length) / 6)].region +
   (frontIndex >= ENEMIES.length ? " ★" + Math.floor(frontIndex / ENEMIES.length) : "");
-// Rivals plus the player, ranked by fame (ties by level) or by level (ties by fame). On a tie the rival stays ahead.
-export function rankings(s, by = "fame") {
-  const rows = RIVALS.map(([name, avatar, level, fame, front, dk]) => ({
-    name,
-    avatar,
-    level,
-    fame,
-    front,
-    you: false,
-    title: fameTitle({ fame, dragonKills: dk, dragonKinds: Math.min(dk, 6), loops: 0, name }),
-  }));
-  rows.push({
-    name: s.hero.name,
-    avatar: s.hero.avatar,
+// The numbers the public ranking is made of. Sent to the server with every save.
+export function summaryOf(s) {
+  return {
     level: heroInfo(s).level,
     fame: s.fame,
     front: s.frontIndex,
-    title: titleOf(s),
-    you: true,
-  });
-  const [k1, k2] = by === "level" ? ["level", "fame"] : ["fame", "level"];
-  return rows.sort((a, b) => b[k1] - a[k1] || b[k2] - a[k2] || a.you - b.you);
+    dragonKills: s.dragonKills,
+    dragonKinds: ENEMIES.filter((e) => e.tier === 8 && s.defeated[e.key]).length,
+    loops: s.loops,
+    habits: s.habits.length,
+  };
 }
-export const playerRank = (s, by = "fame") => rankings(s, by).findIndex((r) => r.you) + 1;
 
 /* ---------- items, inn ---------- */
 export function buyItem(s, key) {
@@ -854,33 +841,36 @@ export function finishSession(s) {
   };
 }
 
+// The version of the state object. A change that reshapes it raises this and adds a step to
+// MIGRATIONS in web/net.js, which brings older saves up to date when they are loaded.
+export const GAME_VERSION = 4;
+
+// What only this page needs: the view, open forms and pickers. Never saved.
+export function freshUi(view = "camp") {
+  return {
+    view,
+    filter: "all",
+    adding: false,
+    addingVice: false,
+    swapFor: null,
+    confirmReset: false,
+    formErr: "",
+    picker: null,
+    rankBy: "fame",
+    avatarPick: "knight",
+    authMode: "signin",
+  };
+}
+
+// A new game: no companions, vices or tasks yet, some gold and a starter bag.
 export function seed(character = {}) {
-  const rows = [
-    ["Pilates", "body", 150, 22],
-    ["Morning walk", "body", 40, 9],
-    ["Sleep by 23:00", "vitality", 260, 30],
-    ["Glass of water", "vitality", 90, 40],
-    ["Read 20 pages", "mind", 120, 14],
-    ["Audiobook chapter", "mind", 20, 4],
-    ["Guitar practice", "craft", 300, 26],
-    ["Sketch for 15 min", "craft", 0, 0],
-    ["Meditate 10 min", "spirit", 110, 15],
-    ["Evening journal", "spirit", 30, 5],
-    ["Tidy the kitchen", "order", 80, 11],
-    ["Clear the inbox", "order", 10, 2],
-    ["Ship a finished project", "resolve", 0, 0],
-    ["Finish a book", "resolve", 60, 3],
-    ["Call a friend", "charisma", 50, 6],
-    ["Reply to messages", "charisma", 20, 8],
-  ];
-  const habits = rows.map(([name, attr, xp, checkins], i) => newHabit("h" + (i + 1), name, attr, xp, checkins));
   const s = {
-    v: 4,
+    v: GAME_VERSION,
     turn: 1,
     hero: { name: character.name || "Wanderer", avatar: character.avatar || "knight", gold: 80 },
-    habits,
-    party: ["h1", "h3", "h5", "h7", "h11"],
-    nextId: rows.length + 1,
+    habits: [],
+    party: [],
+    nextId: 1,
     vices: [],
     nextVid: 1,
     vicePenalty: {},
@@ -901,38 +891,8 @@ export function seed(character = {}) {
     session: null,
     lastRewards: null,
     lastTurn: null,
-    ui: {
-      view: "camp",
-      filter: "all",
-      adding: false,
-      addingVice: false,
-      swapFor: null,
-      confirmReset: false,
-      formErr: "",
-      picker: null,
-      rankBy: "fame",
-      avatarPick: "knight",
-    },
+    ui: freshUi(),
   };
-  [
-    ["Doomscrolling", "mind", 10, 2],
-    ["Smoking", "body", 15, 3],
-    ["Binge TV", "vitality", 10, 2],
-  ].forEach(([name, attr, cost, drain]) => addVice(s, { name, attr, cost, drain }));
-  [
-    ["Book the dentist", "force"],
-    ["Fix the leaking tap", "ward"],
-    ["Return the parcel", "finish"],
-    ["Renew the passport", "insight"],
-    ["Write a thank-you card", "charm"],
-    ["Clean out the fridge", "mend"],
-    ["Restring the guitar", "anthem"],
-    ["Pay the electricity bill", "ward"],
-  ].forEach(([name, school]) => addTask(s, { name, school }));
-  s.log = [];
-  // a little wear so the bars have something to show
-  findHabit(s, "h7").hp = Math.round(maxHpOf(findHabit(s, "h7")) * 0.6);
-  findHabit(s, "h3").mp = Math.max(0, maxMpOf(findHabit(s, "h3")) - 6);
   s.seen[s.enemy.key] = true;
   addLog(s, "The party makes camp. Something small rustles in the grass.");
   return s;

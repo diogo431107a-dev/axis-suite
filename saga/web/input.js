@@ -15,7 +15,7 @@ import {
   wait,
 } from "./battle.js";
 import { TUNE } from "./data.js";
-import { clearCharacter, saveCharacter } from "./main.js";
+import { account, changePassword, deleteAccount, enter, signOut, startOver } from "./net.js";
 import {
   addHabit,
   addLog,
@@ -33,7 +33,6 @@ import {
   partyUnits,
   removeTask,
   restAtInn,
-  seed,
   skipTier,
   swapMember,
   turnDone,
@@ -49,7 +48,7 @@ import {
   openPicker,
   render,
   renderModal,
-  setState,
+  showRanking,
   state,
 } from "./views.js";
 
@@ -198,28 +197,35 @@ export const ACTIONS = {
     if (isWiped(state)) gameOver(state);
     render();
   },
-  rankBy: (d) => {
-    state.ui.rankBy = d.by;
-    render();
-  },
+  rankBy: (d) => showRanking(d.by),
   newCharacter: () => {
-    if (!state.ui.confirmReset) {
-      state.ui.confirmReset = true;
-      render();
-      setTimeout(() => {
-        if (state.ui.confirmReset) {
-          state.ui.confirmReset = false;
-          render();
-        }
-      }, 3000);
-      return;
-    }
-    clearCharacter();
-    setState(seed());
-    state.ui.view = "welcome";
+    state.ui.confirmReset = true;
     render();
-    window.scrollTo(0, 0);
+    const n = document.getElementById("h-name");
+    if (n) n.focus();
   },
+  cancelReset: () => {
+    state.ui.confirmReset = false;
+    render();
+  },
+  firstHabit: () => {
+    state.ui.adding = true;
+    state.ui.filter = "all";
+    go("roster");
+    const n = document.getElementById("f-name");
+    if (n) n.focus();
+  },
+  authMode: (d) => {
+    state.ui.authMode = d.mode;
+    render();
+    const first = app.querySelector("form input:not([type=hidden])");
+    if (first) first.focus();
+  },
+  dismissNotice: () => {
+    account.notice = "";
+    render();
+  },
+  signOut: () => signOut(),
 };
 document.addEventListener("click", (e) => {
   const el = e.target.closest("[data-action]");
@@ -238,27 +244,59 @@ app.addEventListener("input", (e) => {
     if (out) out.textContent = el.value;
   }
 });
+// Signing in, joining and the account page talk to the server. Their errors are written into the
+// form in place, so what was typed stays; the button is disabled while the server answers.
+const ACCOUNT_FORMS = {
+  "signin-form": (v) => enter("/login", { username: v.username, password: v.password }),
+  "join-form": (v) =>
+    enter("/signup", {
+      invite: v.invite,
+      username: v.username,
+      password: v.password,
+      heroName: v.heroName,
+      avatar: v.avatar || "knight",
+    }),
+  "forced-password-form": async (v) => {
+    const err = await changePassword(v.current, v.next);
+    if (!err) go("camp");
+    return err;
+  },
+  "password-form": async (v, f) => {
+    const err = await changePassword(v.current, v.next);
+    if (!err) {
+      f.reset();
+      account.notice = "Your password is changed. Other devices are signed out.";
+      render();
+    }
+    return err;
+  },
+  "hero-form": (v) => startOver(v.heroName, v.avatar || "knight"),
+  "delete-form": (v) => deleteAccount(v.password),
+};
+async function submitAccountForm(f) {
+  const values = Object.fromEntries(new FormData(f));
+  if ("again" in values && values.again !== values.next) return showFormError(f, "The two new passwords don't match.");
+  const button = f.querySelector("button[type=submit]");
+  button.disabled = true;
+  try {
+    const err = await ACCOUNT_FORMS[f.id](values, f);
+    if (err) showFormError(f, err);
+  } finally {
+    if (button.isConnected) button.disabled = false;
+  }
+}
+function showFormError(f, text) {
+  const out = f.querySelector(".form-err");
+  if (out && out.isConnected) out.textContent = text;
+}
 app.addEventListener("submit", (e) => {
   e.preventDefault();
   const f = e.target;
-  const name = f.elements.name.value.trim();
-  if (f.id === "welcome-form") {
-    const avatar = (f.querySelector('input[name="avatar"]:checked') || {}).value || "knight";
-    if (!name) {
-      state.ui.avatarPick = avatar;
-      state.ui.formErr = "Give your hero a name first.";
-      render();
-      document.getElementById("w-name").focus();
-      return;
-    }
-    const character = { name, avatar };
-    saveCharacter(character);
-    setState(seed(character));
-    addLog(state, `${name} takes up the lead. The road begins in the Cellar Meadows.`);
-    render();
-    window.scrollTo(0, 0);
+  if (ACCOUNT_FORMS[f.id]) {
+    submitAccountForm(f);
     return;
   }
+  const name = f.elements.name.value.trim();
   if (!name) {
     state.ui.formErr = "Give it a name first.";
     render();
