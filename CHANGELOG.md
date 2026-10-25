@@ -4,6 +4,25 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.99 — 2026-10-25
+
+Saga 0.0.8: companions and vices can be deleted, logging a vice asks first, and the number next to a companion's attribute reads "+3 CRAFT".
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.17  |
+| Loggbok   | 0.0.14  |
+| Yggdrasil | 1.0.1   |
+| Janus     | 0.0.5   |
+| Papyrus   | 0.0.5   |
+| Vinr      | 0.0.4   |
+| Chronos   | 0.0.5   |
+| Valkyrie  | 0.0.4   |
+| Althing   | 0.0.2   |
+| Mimir     | 0.0.4   |
+| Urd       | 2.0.0   |
+| Saga      | 0.0.8   |
+
 ## 0.0.96 — 2026-10-25
 
 Saga 0.0.5: Habits Saga joins the suite at `saga.<domain>`, a habits game with its own players (by invite code), saved games and a public Hall of Fame. It is the one module that doesn't sign in through Heimdall.
