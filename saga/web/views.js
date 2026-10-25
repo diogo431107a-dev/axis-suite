@@ -33,6 +33,7 @@ import {
   titleOf,
   travelOptions,
   viceNow,
+  vicePreview,
 } from "./rules.js";
 import { account, fetchRanking, refreshRank } from "./net.js";
 import { SH, SW, hydrate } from "./sprites.js";
@@ -321,7 +322,7 @@ export function compCard(h) {
       <canvas class="px" data-sprite="comp:${h.id}" data-s="3"></canvas>
       <div class="comp-id">
         <h3 class="comp-name">${esc(h.name)}</h3>
-        <div class="comp-meta"><span class="attr-chip">${a.icon} ${a.name} ${pointsOf(h)}</span><span>${a.cls}</span></div>
+        <div class="comp-meta"><span class="attr-chip" title="What ${esc(h.name)} adds to the hero's ${a.name}: ${TUNE.pointsPerLevel} points for each of its levels">${a.icon} +${pointsOf(h)} ${a.name}</span><span>${a.cls}</span></div>
         <div class="lvline"><span>LV ${l.level}</span>${bar(pct(l.into, l.need), a.color, "thin")}<span>${l.into}/${l.need}</span></div>
         <div class="lvline"><span>HP</span>${hpBar(h)}<span>${h.hp}/${maxHpOf(h)}</span></div>
         <div class="lvline"><span>MP</span>${mpBar(h)}<span>${h.mp}/${maxMpOf(h)}</span></div>
@@ -337,8 +338,14 @@ export function compCard(h) {
       inParty
         ? `<button class="btn small" data-action="bench" data-id="${h.id}">Bench</button>`
         : `<button class="btn small primary" data-action="join" data-id="${h.id}">Join party</button>`
-    }</div>
+    }<button class="btn small danger" data-action="askDelete" data-kind="habit" data-id="${h.id}">Delete</button></div>
     ${swapBox(s, h.id)}
+    ${confirmBox(
+      s,
+      "habit",
+      h.id,
+      `Delete ${esc(h.name)} for good? Its level, skills and XP are lost, and its +${pointsOf(h)} ${a.name} leaves the hero's sheet, so the hero's level may drop.`,
+    )}
   </article>`;
 }
 export function viceCard(v) {
@@ -352,8 +359,36 @@ export function viceCard(v) {
     </div>
     ${rangeField(v, "drain", `${a.name} points taken (base)`, 1, 10, 1)}
     ${rangeField(v, "cost", "Gold it costs (base)", 0, 50, 1)}
-    <div class="comp-foot"><span class="foot-note">No gold to pay means a random ailment.</span><button class="btn small vice" data-action="logVice" data-id="${v.id}">Log it</button></div>
+    <div class="comp-foot"><span class="foot-note">No gold to pay means a random ailment.</span><span class="acts"><button class="btn small danger" data-action="askDelete" data-kind="vice" data-id="${v.id}">Delete</button><button class="btn small vice" data-action="logVice" data-id="${v.id}">Log it</button></span></div>
+    ${viceConfirm(state, v)}
+    ${confirmBox(state, "vice", v.id, `Stop tracking ${esc(v.name)}? The points it already took stay taken.`)}
   </article>`;
+}
+// Asks before deleting a companion or a vice (state.ui.confirmDelete).
+export function confirmBox(s, kind, id, text) {
+  const c = s.ui.confirmDelete;
+  if (!c || c.kind !== kind || c.id !== id) return "";
+  return `<div class="swap confirm">
+    <p>${text}</p>
+    <div class="swap-list"><button class="btn small danger" data-action="confirmDelete">Delete</button>
+    <button class="btn small" data-action="cancelConfirm">Keep</button></div>
+  </div>`;
+}
+// Asks before logging a vice (state.ui.confirmVice), saying what it will cost right now.
+export function viceConfirm(s, v) {
+  if (s.ui.confirmVice !== v.id) return "";
+  const a = ATTR[v.attr],
+    p = vicePreview(s, v);
+  const points = p.drain
+    ? `It takes ${p.drain} ${a.name} from the hero${p.cost && p.canPay ? ` and costs ${p.cost} gold` : ""}.`
+    : `The hero has no ${a.name} left for it to take.${p.cost && p.canPay ? ` It costs ${p.cost} gold.` : ""}`;
+  const purse =
+    p.cost && !p.canPay ? ` The purse can't pay its ${p.cost} gold, so an ailment will strike the party instead.` : "";
+  return `<div class="swap confirm vice">
+    <p>Log ${esc(v.name)}? ${points}${purse}</p>
+    <div class="swap-list"><button class="btn small vice" data-action="confirmVice">Log it</button>
+    <button class="btn small" data-action="cancelConfirm">Cancel</button></div>
+  </div>`;
 }
 
 export function attrPicker(prefix, withClass) {
@@ -956,7 +991,7 @@ export function pickerHtml() {
           return `<button class="pick" style="--c:var(--vice)" data-action="logVice" data-id="${v.id}">
         <span class="ico" aria-hidden="true">${a.icon}</span>
         <span><span class="pk-name">${esc(v.name)}</span><span class="pk-meta">−${now.drain} ${a.name} · −${now.cost} gold · heat ${v.heat} · logged ${v.count}×</span></span>
-        <span class="cmd-key">LOG</span></button>`;
+        <span class="cmd-key">LOG</span></button>${viceConfirm(s, v)}`;
         })
         .join("") || '<p class="modal-sub">No vices yet.</p>') +
       (inBattle()
@@ -1010,10 +1045,12 @@ export function renderModal() {
 }
 export function openPicker(p) {
   state.ui.picker = p;
+  state.ui.confirmVice = null;
   renderModal();
 }
 export function closePicker() {
   state.ui.picker = null;
+  state.ui.confirmVice = null;
   renderModal();
 }
 
@@ -1049,6 +1086,8 @@ export function go(view) {
   state.ui.picker = null;
   state.ui.formErr = "";
   state.ui.confirmReset = false;
+  state.ui.confirmDelete = null;
+  state.ui.confirmVice = null;
   if (view === "fame") showRanking(state.ui.rankBy || "fame");
   else render();
   if (view === "camp") refreshRank();

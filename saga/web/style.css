@@ -1713,3 +1713,19 @@ input[type="range"] {
 .example-note .linkish {
   margin-left: 4px;
 }
+
+/* ---------- questions before deleting or logging ---------- */
+.swap.confirm {
+  border-color: var(--hp);
+}
+.swap.confirm.vice {
+  border-color: var(--vice);
+}
+.comp-foot .acts {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.pick + .swap.confirm {
+  margin-top: -2px;
+}

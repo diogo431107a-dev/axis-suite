@@ -31,7 +31,9 @@ import {
   joinParty,
   logVice,
   partyUnits,
+  removeHabit,
   removeTask,
+  removeVice,
   restAtInn,
   skipTier,
   swapMember,
@@ -114,6 +116,26 @@ export const ACTIONS = {
     restAtInn(state);
     render();
   },
+  askDelete: (d) => {
+    state.ui.confirmDelete = { kind: d.kind, id: d.id };
+    state.ui.confirmVice = null;
+    render();
+  },
+  confirmDelete: () => {
+    const c = state.ui.confirmDelete;
+    state.ui.confirmDelete = null;
+    if (c.kind === "habit") {
+      removeHabit(state, c.id);
+      if (state.ui.swapFor === c.id) state.ui.swapFor = null;
+    } else removeVice(state, c.id);
+    render();
+  },
+  cancelConfirm: () => {
+    state.ui.confirmDelete = null;
+    state.ui.confirmVice = null;
+    if (state.ui.picker) renderModal();
+    else render();
+  },
   removeTask: (d) => {
     removeTask(state, d.id);
     render();
@@ -139,8 +161,17 @@ export const ACTIONS = {
   openVices: () => {
     if (!busyInBattle()) openPicker({ type: "vices" });
   },
+  // Logging a vice asks first: the button shows what it will cost, and Log it confirms.
   logVice: (d) => {
-    const r = logVice(state, d.id);
+    state.ui.confirmVice = d.id;
+    state.ui.confirmDelete = null;
+    if (state.ui.picker) renderModal();
+    else render();
+  },
+  confirmVice: () => {
+    const id = state.ui.confirmVice;
+    state.ui.confirmVice = null;
+    const r = logVice(state, id);
     if (state.ui.picker && state.ui.picker.type === "vices") {
       state.ui.picker.result = r && r.text;
     }

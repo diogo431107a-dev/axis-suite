@@ -4,6 +4,11 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- Companions can be deleted, from a Delete button on their card in the Roster. It asks first, and says what goes: the companion's level, skills and XP, and the attribute points it gave the hero, so the hero's level (and place in the Hall of Fame by level) can drop. Fame stays.
+- Vices can be deleted the same way. The points they already took stay taken.
+- Logging a vice asks first, on the Roster and in the Log a vice window, saying what it will take right now: the points, the gold, or an ailment when the purse can't pay.
+- The number next to a companion's attribute now reads "+3 CRAFT": what the companion adds to the hero's sheet, 3 for each of its levels. Hovering over it says so.
+
 ## 0.0.5 — 2026-10-25
 
 The first numbered version: Saga as it is first installed on the server. Its 5 commits, this one included, give the number.
