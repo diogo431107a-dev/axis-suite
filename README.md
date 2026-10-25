@@ -190,7 +190,7 @@ systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie 
 journalctl -u loggbok -f                                                          # a module's log
 sudo systemctl restart loggbok                                                    # restart one module
 cat /etc/axis-suite/suite.env                                                     # the domain, URLs and usernames every module was given
-grep '"version"' /opt/*/package.json                                             # the version of each installed module
+grep '"version"' /opt/*/package.json                                             # the version of each installed module (also in its About box)
 ```
 
 Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<module>`, outside `/opt` and readable only by that module's service:
@@ -270,6 +270,7 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
    - `package.json` with `dev`, `build`, `typecheck` and `start` scripts, `"files": ["dist"]`, and `"@axis-suite/heimdall-client": "workspace:*"` in `dependencies`. Shared tools (`typescript`, `@types/node`) use `"catalog:"`. Anything only the frontend uses goes in `devDependencies`, since the build bundles it.
    - `server/index.ts`: put `sameOriginWrites` and `requireUser` in front of `/api`, serve `GET /api/me` with `me`, answer `GET /healthz`, and keep data under `STATE_DIRECTORY`. Store users by `username`, and at startup delete the data of owners not in `knownUsers()` (see Loggbok's `removeUnknownOwners`).
    - `web/`: use `apiFetch`, `fetchMe` and `goToSignIn` from `@axis-suite/heimdall-client/browser`.
+   - The About box: the module's logo and name at the top left are a button that opens it, with the module's version and the suite's it was built with. Copy `web/ui/About.tsx` from Papyrus (or `web/About.tsx` from Loggbok, for a module without a `Dialog`) and the `define` of `__AXIS_VERSIONS__` in its `vite.config.ts`.
    - Narrow windows (below Tailwind's `md`, 768px, e.g. a window snapped to half the screen): the sidebar becomes a slide-in drawer over a dimmed backdrop. A menu button opens it; the backdrop, an X, or picking something closes it. Copy the drawer from Loggbok or Papyrus.
    - `deploy/<module>.service` (copy Loggbok's, change the names) and `deploy/<module>.caddy`.
 3. For local development, add its dev-server origin to `heimdall/dev.env` as `RETURN_ORIGIN_<MODULE>`.
