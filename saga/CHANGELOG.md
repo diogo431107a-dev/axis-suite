@@ -4,6 +4,8 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+## 0.0.10 — 2026-10-25
+
 - Habits Saga has sound: a fanfare for victories, a sad tune for Game Over, coins at the shop and the inn, and sounds for hits, misses, spells, items, guarding, fleeing, vices and level-ups. The volume is a slider at the top of the Account page, remembered on each device (0 is silent).
 
 ## 0.0.8 — 2026-10-25

@@ -4,6 +4,25 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.101 — 2026-10-25
+
+Saga 0.0.10: Habits Saga has sound, with a fanfare for victories, a sad tune for Game Over, coins at the shop, battle sounds, and a volume slider on the Account page.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.17  |
+| Loggbok   | 0.0.14  |
+| Yggdrasil | 1.0.1   |
+| Janus     | 0.0.5   |
+| Papyrus   | 0.0.5   |
+| Vinr      | 0.0.4   |
+| Chronos   | 0.0.5   |
+| Valkyrie  | 0.0.4   |
+| Althing   | 0.0.2   |
+| Mimir     | 0.0.4   |
+| Urd       | 2.0.0   |
+| Saga      | 0.0.10  |
+
 ## 0.0.99 — 2026-10-25
 
 Saga 0.0.8: companions and vices can be deleted, logging a vice asks first, and the number next to a companion's attribute reads "+3 CRAFT".
