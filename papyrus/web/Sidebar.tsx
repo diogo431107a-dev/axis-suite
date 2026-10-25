@@ -18,6 +18,7 @@ import type { Journal, TagCount } from "../shared/protocol.ts";
 import { MiniCalendar } from "./calendar/MiniCalendar.tsx";
 import { JOURNAL_COLORS } from "./colors.ts";
 import { go, type Route } from "./nav.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton } from "./ui/buttons.ts";
 import { Link } from "./ui/Link.tsx";
 
@@ -68,9 +69,11 @@ export function Sidebar(props: SidebarProps) {
 
   return (
     <nav className="flex h-full flex-col gap-4 overflow-y-auto py-4" aria-label="Journals">
-      <div className="flex items-center gap-2 px-4">
-        <img src="/favicon.svg" alt="" className="h-6 w-6" />
-        <span className="font-serif text-lg font-semibold text-stone-800">Papyrus</span>
+      <div className="flex px-3">
+        <AboutButton className="flex items-center gap-2 px-1">
+          <img src="/favicon.svg" alt="" className="h-6 w-6" />
+          <span className="font-serif text-lg font-semibold text-stone-800">Papyrus</span>
+        </AboutButton>
       </div>
 
       <div className="px-3">

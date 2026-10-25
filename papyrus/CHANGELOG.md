@@ -4,6 +4,8 @@ What changed in Papyrus, newest first. Each version is tagged in git as `papyrus
 
 ## Unreleased
 
+- Clicking Papyrus at the top left opens an About box with Papyrus's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
+
 ## 0.0.5 — 2026-10-13
 
 The first numbered version: Papyrus as it runs in production on this date. Its 5 commits so far, this one included, give the number.
