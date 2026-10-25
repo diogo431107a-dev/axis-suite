@@ -71,9 +71,15 @@ async function main(args: string[]) {
         note: string;
         expiresAt: string;
         usedBy: string | null;
+        usedAt: string | null;
       }[];
       for (const i of list) {
-        const status = i.usedBy ? `used by ${i.usedBy}` : `unused, valid until ${day(i.expiresAt)}`;
+        // A code stays used when its player is removed later; only usedBy is cleared then.
+        const status = i.usedAt
+          ? `used by ${i.usedBy ?? "a player since removed"}`
+          : i.expiresAt <= new Date().toISOString()
+            ? `expired on ${day(i.expiresAt)}`
+            : `unused, valid until ${day(i.expiresAt)}`;
         console.log(`${i.code}  ${status}${i.note ? `  (${i.note})` : ""}`);
       }
       if (list.length === 0) console.log("No invite codes yet.");

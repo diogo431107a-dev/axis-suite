@@ -683,6 +683,19 @@ export function addVice(s, { name, attr, cost, drain }) {
   addLog(s, `${name} is now tracked as a vice.`);
   return v;
 }
+// Stops tracking a vice. The points it already took from the hero's sheet stay taken.
+export function removeVice(s, id) {
+  const v = findVice(s, id);
+  if (!v) return null;
+  s.vices = s.vices.filter((x) => x.id !== id);
+  addLog(s, `${v.name} is no longer tracked as a vice.`);
+  return v;
+}
+// What logging a vice would do now, for asking before it is logged.
+export function vicePreview(s, v) {
+  const now = viceNow(v);
+  return { drain: Math.min(now.drain, sheetAttr(s, v.attr)), cost: now.cost, canPay: s.hero.gold >= now.cost };
+}
 // Logging a vice is never blocked and never uses a turn. It takes points from the hero's sheet,
 // charges gold, and if the purse can't cover it, an ailment strikes.
 export function logVice(s, id, rng = Math.random) {
@@ -762,6 +775,16 @@ export function addHabit(s, { name, attr }) {
   const h = newHabit("h" + s.nextId++, name, attr);
   s.habits.push(h);
   addLog(s, `${name} joins the roster as a ${ATTR[attr].cls}.`);
+  return h;
+}
+// Deletes a companion for good: it leaves the party and the roster, and the attribute points it
+// carried leave the hero's sheet with it, so the hero's level may drop. Fame stays.
+export function removeHabit(s, id) {
+  const h = findHabit(s, id);
+  if (!h) return null;
+  s.habits = s.habits.filter((x) => x.id !== id);
+  s.party = s.party.filter((x) => x !== id);
+  addLog(s, `${h.name} leaves the roster for good.`);
   return h;
 }
 
@@ -854,6 +877,8 @@ export function freshUi(view = "camp") {
     addingVice: false,
     swapFor: null,
     confirmReset: false,
+    confirmDelete: null,
+    confirmVice: null,
     formErr: "",
     picker: null,
     rankBy: "fame",
