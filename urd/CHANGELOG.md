@@ -6,6 +6,7 @@ What changed in Urd, newest first. Each version is tagged in git as `urd-v<versi
 
 - **Minor:** Dark mode. Urd follows the computer's or phone's light or dark setting, and a switch in the header (System, Light, Dark) overrides it, remembered on each computer. Urd is the first app in the suite to have one.
 - **Minor:** New task, above Resume: it empties the project, task and tags, for a task that isn't in the list. A running session stops for it; the new one starts on Play.
+- **Fix:** Clicking Urd at the top left opens an About box with Urd's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way. It used to take you to the Timer; the Timer tab next to it still does.
 
 ## 2.0.0 — 2026-10-16
 

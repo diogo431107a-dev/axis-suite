@@ -10,6 +10,7 @@ import {
   type Me,
 } from "@axis-suite/heimdall-client/browser";
 import ShareDialog from "./ShareDialog.tsx";
+import { AboutButton } from "./About.tsx";
 
 /** The signed-in user's access to a note: theirs, shared with them to edit, or to read. */
 type Role = "owner" | "editor" | "viewer";
@@ -316,7 +317,9 @@ export default function Loggbok() {
       >
         <div className="p-4 border-b border-gray-200">
           <div className="flex items-center justify-between gap-2 mb-4">
-            <h1 className="text-xl font-bold text-gray-800 tracking-tight">📒 Loggbok</h1>
+            <h1 className="text-xl font-bold text-gray-800 tracking-tight">
+              <AboutButton className="px-1 -mx-1">📒 Loggbok</AboutButton>
+            </h1>
             <div className="flex items-center gap-2 min-w-0">
               <a
                 href={me.accountUrl}
@@ -385,7 +388,7 @@ export default function Loggbok() {
           >
             <Menu className="w-5 h-5" />
           </button>
-          <span className="font-bold text-gray-800 tracking-tight">📒 Loggbok</span>
+          <AboutButton className="px-1 font-bold text-gray-800 tracking-tight">📒 Loggbok</AboutButton>
         </div>
         {signedOut && (
           <div role="alert" className="px-4 md:px-10 py-3 bg-amber-50 border-b border-amber-200 text-sm text-amber-800">

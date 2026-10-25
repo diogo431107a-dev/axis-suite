@@ -38,6 +38,7 @@ import { go, useRoute } from "./nav.ts";
 import { PageSync, type PageApi, type SyncStatus } from "./pages/sync.ts";
 import { promptList } from "./prompts/prompts.ts";
 import { SearchView } from "./search/SearchView.tsx";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton, label, primaryButton, textInput } from "./ui/buttons.ts";
 import { Link } from "./ui/Link.tsx";
 
@@ -449,7 +450,7 @@ export default function App() {
           <button type="button" className={iconButton} aria-label="Menu" onClick={() => setNavOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-serif font-semibold text-stone-800">Papyrus</span>
+          <AboutButton className="px-1 font-serif font-semibold text-stone-800">Papyrus</AboutButton>
         </div>
 
         {signedOut && (

@@ -4,6 +4,8 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 
 ## Unreleased
 
+- **Fix:** Clicking Yggdrasil at the top left opens an About box with Yggdrasil's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way. The name no longer takes you Home: the house at the start of the breadcrumbs does. On a phone, the tree logo is shown where the name has no room.
+
 ## 1.0.1 — 2026-10-15
 
 - **Fix:** Letters typed just before a short pause could disappear a moment later, and the next key you pressed saved the bullet without them. It happened when an older copy of the bullet came back from the server after the newer text was already saved. The older copy no longer replaces it.

@@ -15,6 +15,7 @@ import type { Me } from "@axis-suite/heimdall-client/browser";
 import type { Group } from "../shared/protocol.ts";
 import { GROUP_COLORS } from "./colors.ts";
 import { HOME, type Filter, type Route } from "./nav.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton, primaryButton } from "./ui/buttons.ts";
 import { Link } from "./ui/Link.tsx";
 
@@ -51,9 +52,11 @@ export function Sidebar({ me, route, groups, counts, onDialog, onNavigate }: Sid
 
   return (
     <nav className="flex h-full flex-col gap-4 overflow-y-auto py-4" aria-label="Contacts">
-      <div className="flex items-center gap-2 px-4">
-        <img src="/favicon.svg" alt="" className="h-6 w-6" />
-        <span className="text-lg font-semibold text-stone-800">Vinr</span>
+      <div className="flex px-3">
+        <AboutButton className="flex items-center gap-2 px-1">
+          <img src="/favicon.svg" alt="" className="h-6 w-6" />
+          <span className="text-lg font-semibold text-stone-800">Vinr</span>
+        </AboutButton>
       </div>
 
       <div className="px-3">

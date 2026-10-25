@@ -34,6 +34,7 @@ import { useToday } from "./hooks.ts";
 import { writeVcard } from "./io/vcard.ts";
 import { ContactList } from "./list/ContactList.tsx";
 import { HOME, go, useRoute, withOpen, type Filter } from "./nav.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton } from "./ui/buttons.ts";
 import { upcoming } from "./upcoming/upcoming.ts";
 import { UpcomingView } from "./upcoming/UpcomingView.tsx";
@@ -457,7 +458,7 @@ export default function App() {
           <button type="button" className={iconButton} aria-label="Menu" onClick={() => setNavOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold text-stone-800">Vinr</span>
+          <AboutButton className="px-1 font-semibold text-stone-800">Vinr</AboutButton>
         </div>
 
         {signedOut && (

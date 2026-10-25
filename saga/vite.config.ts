@@ -1,6 +1,14 @@
 import { defineConfig } from "vite";
+import { readFileSync } from "node:fs";
+
+// The About box shows the module's version and the suite's, as their package.json files say.
+const version = (file: string): string =>
+  (JSON.parse(readFileSync(new URL(file, import.meta.url), "utf8")) as { version: string }).version;
 
 export default defineConfig({
+  define: {
+    __AXIS_VERSIONS__: JSON.stringify({ module: version("./package.json"), suite: version("../package.json") }),
+  },
   build: {
     // dist/server holds the compiled API; Caddy serves only this folder.
     outDir: "dist/web",

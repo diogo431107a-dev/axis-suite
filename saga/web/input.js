@@ -141,6 +141,7 @@ export const ACTIONS = {
     removeTask(state, d.id);
     render();
   },
+  about: () => openPicker({ type: "about" }),
   openItems: (d) => {
     if (!busyInBattle()) openPicker({ type: "items", user: d.user });
   },

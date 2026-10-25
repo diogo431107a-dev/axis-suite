@@ -37,6 +37,7 @@ import { EventEditor, type SaveOutcome } from "./event/EventEditor.tsx";
 import { useToday } from "./hooks.ts";
 import { MonthView } from "./month/MonthView.tsx";
 import { go, useRoute, withOpen, type Route, type View } from "./nav.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton } from "./ui/buttons.ts";
 
 type DialogState =
@@ -483,7 +484,7 @@ export default function App() {
           <button type="button" className={iconButton} aria-label="Menu" onClick={() => setNavOpen(true)}>
             <Menu className="h-5 w-5" />
           </button>
-          <span className="font-semibold text-stone-800">Chronos</span>
+          <AboutButton className="px-1 font-semibold text-stone-800">Chronos</AboutButton>
         </div>
 
         {signedOut && (

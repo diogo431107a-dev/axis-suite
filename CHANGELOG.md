@@ -4,6 +4,8 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+Every module has an About box: click its logo or name at the top left to see its version and the Axis Suite version it was built with. A module that hasn't been reinstalled for a while shows the suite version it was last installed from.
+
 ## 0.0.101 — 2026-10-25
 
 Saga 0.0.10: Habits Saga has sound, with a fanfare for victories, a sad tune for Game Over, coins at the shop, battle sounds, and a volume slider on the Account page.

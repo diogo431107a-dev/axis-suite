@@ -22,6 +22,7 @@ import { TaskDialog } from "./projects/TaskDialog.tsx";
 import { TimerView } from "./timer/TimerView.tsx";
 import { useTimer, type Timer } from "./timer/useTimer.ts";
 import { NEXT_THEME, useTheme, type Theme } from "./theme.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { Link } from "./ui/Link.tsx";
 import { iconButton } from "./ui/buttons.ts";
 
@@ -179,13 +180,10 @@ function SignedIn({ me }: { me: Me }) {
       <TitleAndIcon timer={timer} />
       <header className="sticky top-0 z-20 border-b border-zinc-200 bg-zinc-50/95 backdrop-blur dark:border-zinc-800 dark:bg-zinc-950/95">
         <div className="mx-auto flex max-w-2xl items-center gap-1 px-3 py-2 sm:gap-2">
-          <Link
-            to={{ kind: "timer" }}
-            className="mr-2 flex items-center gap-2 font-semibold text-zinc-800 dark:text-zinc-100"
-          >
+          <AboutButton className="mr-2 flex items-center gap-2 px-1 font-semibold text-zinc-800 dark:text-zinc-100">
             <img src="/favicon.svg" alt="" className="h-6 w-6" />
             <span className="hidden min-[400px]:inline">Urd</span>
-          </Link>
+          </AboutButton>
           <NavLink route={route} to={{ kind: "timer" }}>
             Timer
           </NavLink>

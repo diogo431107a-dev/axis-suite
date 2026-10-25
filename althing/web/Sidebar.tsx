@@ -3,6 +3,7 @@ import { LOBBY_ID, LOBBY_KEY, dmKey, roomKey, type Dm, type Person, type Room } 
 import { Avatar } from "./Avatar.tsx";
 import { badge } from "./format.ts";
 import { nameOf } from "./people.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { Link } from "./ui/Link.tsx";
 import { iconButton } from "./ui/buttons.ts";
 
@@ -45,17 +46,20 @@ export function Sidebar(props: SidebarProps) {
 
   return (
     <nav className="flex h-full flex-col overflow-y-auto p-3" aria-label="Conversations">
+      <div className="mb-3 flex px-0.5">
+        <AboutButton className="flex items-center gap-2 px-1">
+          <img src="/favicon.svg" alt="" className="h-6 w-6" />
+          <span className="text-lg font-semibold text-stone-800">Althing</span>
+        </AboutButton>
+      </div>
       <button
         type="button"
         onClick={props.onProfile}
-        className="mb-2 flex items-center gap-2 rounded-lg p-1.5 pr-10 text-left hover:bg-stone-200/70 md:pr-1.5"
+        className="mb-2 flex items-center gap-2 rounded-lg p-1.5 text-left hover:bg-stone-200/70"
         title="Your profile"
       >
         <Avatar person={me} size="h-9 w-9" />
-        <span className="min-w-0">
-          <span className="block truncate text-sm font-semibold text-stone-800">{me.nickname}</span>
-          <span className="block text-xs text-stone-400">Althing</span>
-        </span>
+        <span className="min-w-0 truncate text-sm font-semibold text-stone-800">{me.nickname}</span>
       </button>
 
       <Link to={LOBBY_KEY} current={current === LOBBY_KEY} className={item} onClick={props.onNavigate}>

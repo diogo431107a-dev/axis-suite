@@ -2,6 +2,7 @@ import { useRef } from "react";
 import { Database, FileUp, Keyboard, Plus, User } from "lucide-react";
 import type { Me } from "@axis-suite/heimdall-client/browser";
 import type { MapSummary } from "../shared/protocol.ts";
+import { AboutButton } from "./ui/About.tsx";
 import { iconButton, primaryButton } from "./ui/buttons.ts";
 import { Link } from "./ui/Link.tsx";
 import { startSort } from "./ui/sort.ts";
@@ -47,9 +48,11 @@ export function Sidebar({
 
   return (
     <nav className="flex h-full flex-col gap-4 overflow-y-auto py-4" aria-label="Maps">
-      <div className="flex items-center gap-2 px-4">
-        <img src="/favicon.svg" alt="" className="h-6 w-6" />
-        <span className="text-lg font-semibold text-stone-800">Mimir</span>
+      <div className="flex px-3">
+        <AboutButton className="flex items-center gap-2 px-1">
+          <img src="/favicon.svg" alt="" className="h-6 w-6" />
+          <span className="text-lg font-semibold text-stone-800">Mimir</span>
+        </AboutButton>
       </div>
 
       <div className="px-3">
