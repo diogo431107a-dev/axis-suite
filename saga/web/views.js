@@ -35,6 +35,7 @@ import {
   viceNow,
   vicePreview,
 } from "./rules.js";
+import { volume } from "./sound.js";
 import { account, fetchRanking, refreshRank } from "./net.js";
 import { SH, SW, hydrate } from "./sprites.js";
 
@@ -808,6 +809,12 @@ export function accountView() {
       </div>
       <button class="btn" data-action="signOut">Sign out</button>
     </div>
+    <section class="win">
+      <h2 class="sect">Sound</h2>
+      <div class="slider"><label for="volume">Volume <output id="volume-v">${volume()}</output></label>
+        <input type="range" id="volume" min="0" max="100" step="5" value="${volume()}" data-out="volume-v"></div>
+      <p class="hint">Sounds play at this volume on this device. 0 is silent.</p>
+    </section>
     <section class="win">
       <h2 class="sect">Change password</h2>
       <form id="password-form" class="welcome-form">

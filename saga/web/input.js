@@ -15,6 +15,7 @@ import {
   wait,
 } from "./battle.js";
 import { TUNE } from "./data.js";
+import { play, setVolume } from "./sound.js";
 import { account, changePassword, deleteAccount, enter, signOut, startOver } from "./net.js";
 import {
   addHabit,
@@ -109,11 +110,11 @@ export const ACTIONS = {
     render();
   },
   buy: (d) => {
-    buyItem(state, d.item);
+    if (buyItem(state, d.item)) play("buy");
     render();
   },
   inn: () => {
-    restAtInn(state);
+    if (restAtInn(state)) play("inn");
     render();
   },
   askDelete: (d) => {
@@ -154,7 +155,7 @@ export const ACTIONS = {
       doMemberItem(p.user, p.item, d.id);
       return;
     }
-    applyItem(state, p.item, d.id);
+    if (applyItem(state, p.item, d.id)) play("heal");
     closePicker();
     render();
   },
@@ -172,6 +173,7 @@ export const ACTIONS = {
     const id = state.ui.confirmVice;
     state.ui.confirmVice = null;
     const r = logVice(state, id);
+    if (r) play("vice");
     if (state.ui.picker && state.ui.picker.type === "vices") {
       state.ui.picker.result = r && r.text;
     }
@@ -270,10 +272,15 @@ app.addEventListener("input", (e) => {
     const v = findVice(state, el.dataset.id);
     if (v) v[el.dataset.field] = +el.value;
   }
+  if (el.id === "volume") setVolume(el.value);
   if (el.dataset.out) {
     const out = document.getElementById(el.dataset.out);
     if (out) out.textContent = el.value;
   }
+});
+// Letting go of the volume slider plays a sample at the new volume.
+app.addEventListener("change", (e) => {
+  if (e.target.id === "volume") play("buy");
 });
 // Signing in, joining and the account page talk to the server. Their errors are written into the
 // form in place, so what was typed stays; the button is disabled while the server answers.
