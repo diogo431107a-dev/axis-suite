@@ -26,6 +26,7 @@ import {
   travelTo,
   turnDone,
 } from "./rules.js";
+import { play } from "./sound.js";
 import { ambient, companionSprite, enemySprite, hydrate, makeBg, paintAtFeet, tombSprite } from "./sprites.js";
 import {
   RM,
@@ -319,6 +320,7 @@ export async function playFoeTurn(rep) {
     await tween(dur(200), (t) => {
       BT.ex = 30 * ease(t);
     });
+    if (rep.events.length) play("hurt");
     rep.events.forEach((ev) => {
       BT.hits[ev.id] = 1;
       const p = slotPos(ev.id);
@@ -332,6 +334,7 @@ export async function playFoeTurn(rep) {
   }
   if (rep.ticks.length) {
     await wait(dur(350));
+    play("hurt");
     rep.ticks.forEach((k) => {
       const p = slotPos(k.id);
       addFloater("-" + k.dmg, p[0], p[1] - 40, "#7ccf5a", false);
@@ -352,22 +355,31 @@ export async function playFoeTurn(rep) {
 }
 export async function finishGameOver() {
   BT.allDown = true;
+  play("gameOver");
   await showBanner("<b>Game Over</b>The party falls… and wakes at camp. The foe recovers.", 2200);
   BT.allDown = false;
   state.lastRewards = finishSession(state);
   go(state.lastRewards ? "rewards" : "camp");
 }
 export async function finishVictory(kill) {
+  play("foeDown");
   await tween(dur(900), (t) => {
     BT.dissolve = t;
   });
+  play("victory");
   await showBanner(
     `<b>Victory!</b>${esc(enemyName(kill.killed))} defeated · +${kill.pay.xp} XP · +${kill.pay.gold} gold`,
     1600,
   );
-  state.lastRewards = finishSession(state);
+  const r = (state.lastRewards = finishSession(state));
   go("rewards");
+  if (r && grewUp(r)) play("levelUp", 150);
 }
+// Whether the battle report shows anything going up: a companion's level or skills, the hero, a title.
+const grewUp = (r) =>
+  r.hero1 > r.hero0 ||
+  r.title1 !== r.title0 ||
+  r.members.some((c) => c.lv1 > c.lv0 || c.m1 > c.m0 || c.sp1 > c.sp0 || c.fl1 > c.fl0);
 // Runs the foe's turn (animated) and handles Game Over. Returns true if the battle ended.
 export async function runFoeTurn() {
   BT.busy = true;
@@ -400,6 +412,7 @@ export async function resolveOutcome(id, res) {
   if (res.burn) {
     const p = slotPos(id);
     BT.hits[id] = 1;
+    play("hurt");
     addFloater("-" + res.burn, p[0], p[1] - 40, "#f08a3a", false);
     await wait(dur(300));
   }
@@ -407,6 +420,7 @@ export async function resolveOutcome(id, res) {
     await tween(dur(160), (t) => {
       BT.ex = 24 * ease(t);
     });
+    play("hurt");
     res.counter.forEach((ev) => {
       BT.hits[ev.id] = 1;
       const p = slotPos(ev.id);
@@ -451,8 +465,11 @@ export async function doAct(id) {
   BT.busy = true;
   updateCmd();
   await lunge(id);
-  if (res.miss) addFloater("MISS", ENEMY_FEET[0], foeTop(), "#b8b2c8", false);
-  else {
+  if (res.miss) {
+    play("miss");
+    addFloater("MISS", ENEMY_FEET[0], foeTop(), "#b8b2c8", false);
+  } else {
+    play(res.crit ? "crit" : "hit");
     BT.flash = 1;
     BT.shake = 1;
     addFloater(
@@ -464,6 +481,7 @@ export async function doAct(id) {
     );
   }
   if (res.masteryUp) {
+    play("levelUp", 120);
     const p = slotPos(id);
     addFloater("MASTERY UP", p[0], p[1] - 48, "#ffd23f", false);
   }
@@ -481,9 +499,11 @@ export async function doCast(id, taskId) {
   BT.busy = true;
   updateCmd();
   const p = slotPos(id);
+  play("spell");
   addFloater(SCHOOLS[res.school].name.toUpperCase(), p[0], p[1] - 48, "#8fb8ff", false);
   if (res.school === "force" || res.school === "finish") {
     await lunge(id, -30);
+    play("hit");
     BT.flash = 1;
     BT.shake = 1;
     addFloater(String(res.dmg), ENEMY_FEET[0], foeTop(), "#c8dcff", true);
@@ -501,8 +521,10 @@ export async function doCast(id, taskId) {
     });
     await wait(dur(500));
   }
-  if (res.levelUp)
+  if (res.levelUp) {
+    play("levelUp");
     addFloater(`${SCHOOLS[res.school].name.toUpperCase()} LV ${res.level + 1}`, p[0], p[1] - 56, "#ffd23f", false);
+  }
   updateBattleLog();
   updateCmd();
   await resolveOutcome(id, res);
@@ -514,6 +536,7 @@ export async function doMemberItem(userId, key, id) {
   BT.busy = true;
   updateCmd();
   const p = slotPos(id);
+  play("heal");
   addFloater(
     key === "potion" ? "+HP" : key === "ether" ? "+MP" : key === "antidote" || key === "remedy" ? "CURED" : "RISE",
     p[0],
@@ -530,6 +553,7 @@ export async function doGuard(id) {
   const r = memberGuard(state, id);
   if (!r) return;
   BT.busy = true;
+  play("guard");
   updateCmd();
   updateBattleLog();
   await wait(dur(300));
@@ -552,6 +576,7 @@ export async function doFlee() {
   updateCmd();
   const r = attemptFlee(state);
   if (r.ok) {
+    play("flee");
     await tween(dur(450), (t) => {
       for (const id of state.party) BT.offsets[id] = { x: 70 * ease(t), y: 0 };
     });
@@ -565,6 +590,8 @@ export async function doFlee() {
     go(state.lastRewards ? "rewards" : "camp");
     return;
   }
+  play("fleeFail");
+  if (r.dropped) play("coins", 320);
   await tween(dur(200), (t) => {
     for (const id of state.party) BT.offsets[id] = { x: 14 * Math.sin(Math.PI * t), y: 0 };
   });

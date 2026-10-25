@@ -26,6 +26,7 @@ web/
   sprites.js         grids into pixels, the battle backgrounds
   views.js           every screen, as HTML strings
   battle.js          the battle scene: the canvas loop and the turn's choreography
+  sound.js           the sound effects, as note lists the browser plays, and the volume
   input.js           clicks, keys and forms
   net.js             the account, loading and saving the game, the ranking
   main.js            start-up
@@ -37,6 +38,8 @@ deploy/
 ## How it works
 
 **The game runs in the browser.** All of a player's game is one object (`state`). The rules in `web/rules.js` change it, and the screens are drawn from it. The server never plays the game. It keeps it: about a second after anything changes, the page sends the whole game to `PUT /api/save` (and again as the tab closes), so a reload or another device carries on exactly where you were, in the middle of a battle included.
+
+**Sound** is made in code too: each effect is a short list of notes in `web/sound.js`, played by the browser's Web Audio, so there are no sound files. It is always on. The volume slider on the Account page is kept in that browser only, not in the saved game.
 
 **Trust.** An attack means "I just did this habit", so the game is played on trust anyway. The server checks only the shape and size of a save, not whether the moves in it were fair.
 

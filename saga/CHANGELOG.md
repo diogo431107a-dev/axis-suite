@@ -4,6 +4,8 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- Habits Saga has sound: a fanfare for victories, a sad tune for Game Over, coins at the shop and the inn, and sounds for hits, misses, spells, items, guarding, fleeing, vices and level-ups. The volume is a slider at the top of the Account page, remembered on each device (0 is silent).
+
 ## 0.0.8 — 2026-10-25
 
 - Companions can be deleted, from a Delete button on their card in the Roster. It asks first, and says what goes: the companion's level, skills and XP, and the attribute points it gave the hero, so the hero's level (and place in the Hall of Fame by level) can drop. Fame stays.
