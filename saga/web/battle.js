@@ -282,7 +282,7 @@ export function updateCmd() {
       <span><span class="cmd-name">${esc(u.name)}</span><span class="cmd-meta">${a.icon} ${a.cls} · LV ${lvOf(u).level} · ${rowStatus(s, u)}</span>
         <span class="cmd-bars">${hpBar(u)}<span>${u.hp}/${maxHpOf(u)}</span>${mpBar(u)}<span>${u.mp} MP</span></span>${statusChips(u)}</span>
       <span class="row-cmds">
-        <button class="btn small primary" data-action="act" data-id="${id}" title="I just did this habit" ${off ? "disabled" : ""}>Attack${off ? "" : ` ${i + 1}`}</button>
+        <button class="btn small primary" data-action="act" data-id="${id}" title="A deed done" ${off ? "disabled" : ""}>Attack${off ? "" : ` ${i + 1}`}</button>
         <button class="btn small magic" data-action="openSpells" data-user="${id}" title="${SCHOOLS[sc].name} LV ${spellLvOf(u).level}" ${off || !canSpell ? "disabled" : ""}>Spell</button>
         <button class="btn small" data-action="openItems" data-user="${id}" ${off || !bagCount(s) ? "disabled" : ""}>Item</button>
         <button class="btn small" data-action="guard" data-id="${id}" ${off ? "disabled" : ""}>Guard</button>
@@ -356,7 +356,7 @@ export async function playFoeTurn(rep) {
 export async function finishGameOver() {
   BT.allDown = true;
   play("gameOver");
-  await showBanner("<b>Game Over</b>The party falls… and wakes at camp. The foe recovers.", 2200);
+  await showBanner("<b>The party falls</b>…and wakes at camp. The foe stands whole.", 2200);
   BT.allDown = false;
   state.lastRewards = finishSession(state);
   go(state.lastRewards ? "rewards" : "camp");

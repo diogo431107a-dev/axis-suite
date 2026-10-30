@@ -2,7 +2,7 @@
 
 The reference for the game. Part 1 is what you need to play well, above all how to classify your habits. Part 2 is how everything works underneath, and it spoils what the game means you to discover.
 
-The game itself explains very little, on purpose. [The philosophy](philosophy.md) says why.
+The game itself explains very little, on purpose. [The philosophy](philosophy.md) says why. The **?** at the top of every screen opens a short help.
 
 ## Part 1: Playing
 
@@ -95,7 +95,9 @@ The hero has no powers of their own. The sheet sums up your companions: every le
 
 ### Companions and the party
 
-Add a habit on the Roster and it becomes a companion. Up to five fight in the party at once, and the rest wait on the bench. Only the party can act, and only those who fight share in the rewards.
+Call a companion on the Roster, and your habit becomes one. Up to five fight in the party at once, and the rest wait on the bench. A new companion joins the party if there is room, and waits on the bench if not. Only the party can act, and only those who fight share in the rewards.
+
+Each companion's card has two small buttons. **Note** keeps your own words on the habit: why you keep it, what counts as doing it, what the goal is now. **Skills** shows its mastery, spell and flee levels.
 
 Choose your five according to what you are working on now, not what you wish you were. Swap them whenever your focus changes.
 
@@ -112,14 +114,14 @@ Each companion gets one action per turn:
 
 Do the habit first, and then attack. If you did it twice, you still only get one attack per turn. End the turn and take the next one.
 
-Once a battle starts, the only ways out are winning or fleeing.
+Once a battle starts, the only ways out are winning or running.
 
-### Winning, falling and fleeing
+### Winning, falling and running
 
 - **Victory** pays XP, gold and fame, and moves the road on to the next foe.
 - **Knocked out:** a companion at 0 HP can't act and loses some XP. Only a Phoenix Feather brings them back.
-- **Game Over:** when the whole party falls, everyone wakes at camp with 1 HP. The foe recovers fully. You lose no gold.
-- **Fleeing** may fail. If it does, the party loses its turn and may drop some gold. A foe you escape keeps its wounds until you come back.
+- **The party falls:** when everyone is down, they all wake at camp with 1 HP. The foe stands whole again. You lose no gold.
+- **Running** may fail. If it does, the party loses its turn and may drop some gold. A foe you escape keeps its wounds until you come back.
 
 ### Tasks and the Spellbook
 
@@ -129,7 +131,7 @@ If you have a task and no companion of its school, you'll need to recruit one or
 
 ### Vices
 
-A vice is a bad habit you track and log honestly each time it happens, in or out of battle. Logging one never uses a turn. It takes points from one attribute on the hero's sheet and costs gold. If you can't pay, an ailment strikes the party instead.
+A vice is a bad habit you name on the Roster. Each time it gets the better of you, **pay the tithe**, honestly, in or out of battle. Paying never uses a turn. It takes points from one attribute on the hero's sheet and costs gold. If you can't pay, an ailment strikes the party instead. The game always says what a tithe will cost before you confirm.
 
 Points taken by a vice stay taken. Repeating a vice makes it cost more for a while, and victories cool it down.
 
@@ -224,7 +226,7 @@ XP is shared when a foe falls, and only among party members still standing and n
 - A charmed foe's lost turn.
 - A bonus for the first hit (10% of the foe's max HP) and the last hit (15%).
 
-Engagement against a foe carries over if you flee and come back, and it is lost at Game Over. Attacking and casting pay no XP in themselves. They train mastery and spell level.
+Engagement against a foe carries over if you flee and come back, and it is lost when the whole party falls. Attacking and casting pay no XP in themselves. They train mastery and spell level.
 
 ### Foes
 
@@ -243,6 +245,21 @@ A foe's move multiplies the damage unit by its size (small ×0.6, medium ×1, la
 
 Counters land right after a foe is hit, if it survives. Some foes have them, and all bosses except the first do.
 
+| Move        | Hits                 | Size   |
+| ----------- | -------------------- | ------ |
+| Bite        | One member, 1–3×     | Small  |
+| Savage bite | One member, 1–2×     | Medium |
+| Maul        | One member, 3–5×     | Small  |
+| Swipe       | The whole party      | Small  |
+| Sweep       | The whole party      | Medium |
+| Slam        | The whole party      | Large  |
+| Breath      | The whole party      | Heavy  |
+| Bite back   | Whoever hit it       | Small  |
+| Lash        | Whoever hit it, 1–2× | Medium |
+| Backlash    | The whole party      | Small  |
+
+Rats bite. Beetles, slugs and toadstools swipe. Centipedes, bats and skeletons maul. Spiders and serpents bite and bite back. Beasts and chests savage. Imps bite or swipe. Ghosts and slimes sweep. Giants slam. Dragons breathe. Bosses and some dragons combine these.
+
 ### Knockouts
 
 A knockout costs XP: 10% of the current level's requirement, plus 5% for each repeat, up to 30%. It never takes a companion below the start of their level. The repeat count clears at the next level-up.
@@ -255,7 +272,7 @@ A failed escape costs the party its turn. It may also drop gold, with a chance o
 
 ### Vices and ailments
 
-A vice's cost and drain grow by ×1.25 per point of **heat**. Each log adds 1 heat, and each victory cools every vice by 1. New vices default to 2 points and 10 gold.
+A vice's cost and drain grow by ×1.25 per point of **heat**. Each tithe paid adds 1 heat, and each victory cools every vice by 1. New vices default to 2 points and 10 gold.
 
 If the purse can't pay, one random ailment strikes one random standing member, or the whole party one time in three. **Ailments come only from unpaid vices.** Foes never inflict them.
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { ENEMIES } from "./data.js";
+import { ENEMIES, TIERS, TUNE } from "./data.js";
 import {
   addHabit,
   addVice,
@@ -9,6 +9,7 @@ import {
   removeHabit,
   removeVice,
   seed,
+  setHabitNote,
   sheetAttr,
   summaryOf,
   vicePreview,
@@ -57,6 +58,37 @@ describe("deleting", () => {
     removeVice(s, v.id);
     expect(s.vices).toEqual([]);
     expect(sheetAttr(s, "body")).toBe(1);
+  });
+});
+
+describe("a companion's note", () => {
+  it("starts empty, is trimmed and has a limit", () => {
+    const s = seed();
+    const h = addHabit(s, { name: "Pilates", attr: "body" });
+    expect(h.note).toBe("");
+    setHabitNote(s, h.id, "  Twice a week counts.  ");
+    expect(h.note).toBe("Twice a week counts.");
+    setHabitNote(s, h.id, "x".repeat(TUNE.noteMax + 10));
+    expect(h.note.length).toBe(TUNE.noteMax);
+  });
+});
+
+describe("the road", () => {
+  it("tells of a region when the party first reaches it", () => {
+    const s = seed();
+    addHabit(s, { name: "Pilates", attr: "body" });
+    for (let i = 0; i < 6; i++) defeatEnemy(s);
+    expect(s.enemy.key).toBe(ENEMIES[6].key);
+    expect(s.log.map((l) => l.text)).toContain(TIERS[1].lore);
+  });
+
+  it("begins again after the last foe", () => {
+    const s = seed();
+    addHabit(s, { name: "Pilates", attr: "body" });
+    for (let i = 0; i < ENEMIES.length; i++) defeatEnemy(s);
+    expect(s.loops).toBe(1);
+    expect(s.enemy.star).toBe(1);
+    expect(s.log[0].text).toContain("the rats are bigger");
   });
 });
 
