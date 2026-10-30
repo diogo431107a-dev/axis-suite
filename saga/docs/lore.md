@@ -28,9 +28,9 @@ The story that the priests don't tell, and the devils tell only when drunk, is w
 
 Two messengers met on a bare hill under a full moon, in the one place where the old treaty lets their kind stand together.
 
-One was **Aurael of the Last Light**, of the white wings and the golden ring. She had come to say that Heaven would rather lose a soul to Hell than see it lost to no one.
+One was **Lunaria**, of the white wings and the golden ring. She had come to say that Heaven would rather lose a soul to Hell than see it lost to no one.
 
-The other was **Vesper of the Low Moon**, of the bat's wings and the dark blue mail, who sat on a dead tree above a sleeping city and had been waiting some time. She had come to say the same thing, with a better turn of phrase.
+The other was **Alecta**, of the bat's wings and the dark blue mail, who sat on a dead tree above a sleeping city and had been waiting some time. She had come to say the same thing, with a better turn of phrase.
 
 Neither of them may fight. That is the oldest law, and even the Dragon's rise did not break it: no angel or devil may strike a blow in the world of the living. They may only lean. They may whisper, and they may open a door or close one, and for a very short time they may stand beside someone who has already come a long way on their own.
 
@@ -76,19 +76,23 @@ Everything you do on the road has a price, and the road keeps accounts.
 
 **The fallen** can't get up alone. Phoenix feathers are shed, it is said, by things that have died and thought better of it. They aren't cheap, and the inn won't help. An innkeeper can do many things, but raising the dead has never been on the bill.
 
-**Defeat** is not the end. That is the strangest part, and the part both Aurael and Vesper were counting on. When your whole party falls and the foe stands over you, you wake at camp, with almost nothing left, and everything you had won against that foe is gone. The foe is whole again. It is still there, and so are you.
+**Defeat** is not the end. That is the strangest part, and the part both Lunaria and Alecta were counting on. When your whole party falls and the foe stands over you, you wake at camp, with almost nothing left, and everything you had won against that foe is gone. The foe is whole again. It is still there, and so are you.
 
 No one on this road has ever died of losing. People only stop. It looks the same from a distance, but it's a very different thing.
 
-### The ones who lean
+### The Angel's place
 
-Aurael and Vesper keep watching. They are not your friends.
+Lunaria and Alecta keep watching. They are not your friends.
 
-Aurael will tell you that you're worth saving, and she means it, and she hopes you'll be grateful. Vesper will tell you that you're worth having, and she means that too, and she has noticed things about you that Aurael has been too polite to mention.
+Lunaria will tell you that you're worth saving, and she means it, and she hopes you'll be grateful. Alecta will tell you that you're worth having, and she means that too, and she has noticed things about you that Lunaria has been too polite to mention.
 
-It is said that a hero who has walked long enough, and struck often enough, may hear one of them answer. The law still holds: she will not strike a blow. But for a short time she may stand with you, and those are the times the songs remember. Then the law drags her back, and you must walk that whole long way again before she can return.
+Beside every hero there is one place that no companion can fill. It is called the Angel's place, and by every right it is Lunaria's. But the law gives the hero the choosing of who stands there, and the law, as Alecta likes to point out, says nothing about wings.
 
-Heaven's angel gives strength and shelter. Hell's envoy gives her attention to your enemy, which your enemy will not enjoy. Which one you heed, nobody can decide for you. Both will claim the credit either way.
+Choose Lunaria, and the rightful Angel takes her place. Choose Alecta, and she sits down in it as if it had been built for her. She answers to Angel, wears the title with no right to it at all, and loves every moment. Lunaria has not forgiven this, and Alecta would be disappointed if she did.
+
+It is said that a hero who has walked long enough, and struck often enough, will find the Angel's place filled. The law still holds: whoever stands there will not strike a blow. But for a short time she may stand with you, and those are the times the songs remember. Then the law drags her back, and you must walk that whole long way again before she can return.
+
+Lunaria gives strength and shelter. Alecta gives her attention to your enemy, which your enemy will not enjoy. Both will claim the credit either way.
 
 ### The Hero of a Thousand Mornings
 
@@ -126,7 +130,7 @@ The notes below are for us, not for the player. Phase 4 of the [roadmap](roadmap
 | Game Over         | Waking at camp. The word "over" never appears     |
 | Stars on the road | The road again, and the rats are bigger           |
 | Hall of Fame      | What the heralds sing                             |
-| Patron (later)    | The one who leans: Aurael or Vesper               |
+| The Angel (later) | Lunaria by right, or Alecta usurping her place    |
 | The server owner  | The keeper of this realm (already in the game)    |
 
 ### Foe lines: samples of the rewrite

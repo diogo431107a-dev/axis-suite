@@ -119,24 +119,23 @@ Any change here needs the balance simulated again. `TUNE` in `web/data.js` was t
 
 ### Phase 8: Angel mode
 
-Like Trance in Final Fantasy IX: a bar fills slowly and, once full, gives benefits for a few turns before resetting to zero. It matches the patron chosen at the start.
+Like Trance in Final Fantasy IX: a bar fills slowly and, once full, gives benefits for a few turns before resetting to zero. It matches the Angel chosen at the start: Lunaria, whose rightful place it is, or Alecta, who usurps it and loves it. The game has no neutral word such as "patron". Whoever holds the place is the Angel.
 
 - **Build-up:** about 33 turns, faster with engagement and damage dealt.
 - **Duration:** about 6 turns. Short, but long enough to be missed.
-- **The patron arrives and delivers the benefits, and doesn't attack.** The lore explains why: angels and devils may not strike a blow.
-- **The holy angel:** an extra attack for each party member after using their action, damage reduction, HP and MP regeneration each turn.
-- **The succubus:** negative effects on the foe, and extra critical chance for the party.
+- **The Angel arrives and delivers the benefits, and doesn't attack.** The lore explains why: angels and devils may not strike a blow.
+- **Lunaria, the rightful Angel:** an extra attack for each party member after using their action, damage reduction, HP and MP regeneration each turn.
+- **Alecta, the usurper:** negative effects on the foe, and extra critical chance for the party.
 
 Things to settle:
 
 - **The extra attack must not count as a check-in**, or the game records a repetition that never happened. It should add damage only, not raise mastery.
-- **Existing players** need a way to choose a patron, since it is otherwise chosen when starting. Suggested: the first time the bar would start to fill, or an event on the road.
-- **Saved game:** the patron and the bar need a new upgrade step.
-- **"The angel joins the party in a special place":** assumed to be a slot apart from the five, shown only while the patron is present. **The owner should confirm.**
-- **Art:** `holy_angel.png` and `succubus.png` are in `C:\Users\diogo\Claude\assets\angels`, but they are detailed paintings and the game is pixel art. Two options: show the painting as a full-screen moment when the patron arrives, or draw pixel sprites from it. Suggested: both, the painting for the arrival and a sprite for the turns that follow. The succubus file is 2.4 MB and needs shrinking for the web. Neither goes into the repository before this phase, and the repository is public.
+- **Existing players** need a way to choose their Angel, since it is otherwise chosen when starting. Suggested: the first time the bar would start to fill, or an event on the road.
+- **Saved game:** the choice of Angel and the bar need a new upgrade step.
+- **"The angel joins the party in a special place":** assumed to be a slot apart from the five, shown only while the Angel is present. **The owner should confirm.**
+- **Art:** `holy_angel.png` (Lunaria) and `succubus.png` (Alecta) are in `C:\Users\diogo\Claude\assets\angels`, but they are detailed paintings and the game is pixel art. Two options: show the painting as a full-screen moment when the Angel arrives, or draw pixel sprites from it. Suggested: both, the painting for the arrival and a sprite for the turns that follow. The succubus file is 2.4 MB and needs shrinking for the web. Neither goes into the repository before this phase, and the repository is public.
 
 ## Open questions from the documents
 
 - **Charisma's "Likes".** The notes say "Likes and social things". The manual reads this as sharing your work where people can respond to it, plus plain social contact. The owner should confirm what "likes" meant.
-- **Names in the lore.** Aurael and Vesper are invented for the draft.
 - **Tasks and the Finish school.** The manual says a task that took unusual effort goes in Finish, whatever its subject. This means a task's school now depends on effort for this one school and on subject for the other seven. Worth seeing how it plays.
