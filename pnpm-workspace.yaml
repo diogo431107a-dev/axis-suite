@@ -13,6 +13,7 @@ packages:
   - mimir
   - urd
   - saga
+  - star
   - packages/*
 
 # One version of each shared tool for the whole suite. Packages ask for these with "catalog:".
