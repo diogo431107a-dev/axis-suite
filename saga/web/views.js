@@ -499,6 +499,8 @@ export function spellbookView() {
     .sort((a, b) => b.doneTurn - a.doneTurn)
     .slice(0, 15);
   const casters = (sc) => s.habits.filter((h) => schoolOf(h) === sc);
+  // Stays on the school last picked. Until one is picked, it follows the Roster's filter.
+  const school = s.ui.taskSchool || (ATTR[s.ui.filter] ? ATTR[s.ui.filter].school : ATTRS[0].school);
   return `<main style="display:flex;flex-direction:column;gap:18px">
     <div class="page-head">
       <div>
@@ -515,7 +517,7 @@ export function spellbookView() {
         </div>
         <fieldset class="field full" style="border:0;padding:0;margin:0">
           <span>School</span>
-          <div class="attr-pick">${ATTRS.map((a, i) => `<label style="--c:${a.color}"><input type="radio" name="school" id="tf-${a.school}" value="${a.school}" ${i === 0 ? "checked" : ""}><span>${a.icon} ${SCHOOLS[a.school].name} · ${a.cls}</span></label>`).join("")}</div>
+          <div class="attr-pick">${ATTRS.map((a) => `<label style="--c:${a.color}"><input type="radio" name="school" id="tf-${a.school}" value="${a.school}" ${a.school === school ? "checked" : ""}><span>${a.icon} ${SCHOOLS[a.school].name} · ${a.cls}</span></label>`).join("")}</div>
         </fieldset>
         <div class="form-actions full">${formErr()}<button type="submit" class="btn primary">Add task</button></div>
       </form>

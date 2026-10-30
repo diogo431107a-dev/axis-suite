@@ -86,6 +86,7 @@ export const ACTIONS = {
   },
   filter: (d) => {
     state.ui.filter = d.attr;
+    state.ui.taskSchool = null;
     render();
   },
   toggleAdd: () => {
@@ -299,6 +300,7 @@ app.addEventListener("input", (e) => {
 // Letting go of the volume slider plays a sample at the new volume.
 app.addEventListener("change", (e) => {
   if (e.target.id === "volume") play("buy");
+  if (e.target.name === "school") state.ui.taskSchool = e.target.value;
 });
 // Signing in, joining and the account page talk to the server. Their errors are written into the
 // form in place, so what was typed stays; the button is disabled while the server answers.
@@ -379,6 +381,11 @@ app.addEventListener("submit", (e) => {
   } else if (f.id === "task-form") {
     const school = (f.querySelector('input[name="school"]:checked') || {}).value || "force";
     addTask(state, { name, school });
+    state.ui.taskSchool = school;
+    render();
+    const n = document.getElementById("tf-name");
+    if (n) n.focus();
+    return;
   }
   render();
 });

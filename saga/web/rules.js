@@ -885,6 +885,7 @@ export function freshUi(view = "camp") {
   return {
     view,
     filter: "all",
+    taskSchool: null,
     adding: false,
     addingVice: false,
     swapFor: null,

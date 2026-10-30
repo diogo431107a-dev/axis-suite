@@ -10,6 +10,7 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 - Each companion's card has a **Note** for your own words on the habit, and its mastery, spell and flee levels are now behind a **Skills** button.
 - Creating a habit with a full party no longer asks who steps out: the new companion waits on the bench.
 - New companions and vices start on the attribute you are viewing, not always Body, and the Roster stays on that attribute afterwards.
+- The Spellbook stays on the school you picked after you add a task, so you can write several in a row. It starts on the attribute the Roster is showing.
 - Resolve now means exceptional work and extra effort, not only finished projects.
 - New documents in `saga/docs`, for you to review: the philosophy behind the game and its attributes, a player's manual, a draft of the lore, the text for an in-game help, and a roadmap of what changes next. A credits file names the Civitai users the art of Lunaria and Alecta came from.
 
