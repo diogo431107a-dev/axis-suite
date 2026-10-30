@@ -1,6 +1,6 @@
 {
   "name": "fafnir",
-  "version": "0.0.2",
+  "version": "0.0.4",
   "private": true,
   "description": "Fafnir Personal Finances — what you have, what you owe and where your money goes, in US dollars",
   "type": "module",
