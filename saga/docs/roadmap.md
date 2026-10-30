@@ -111,5 +111,4 @@ Things to settle:
 
 ## Open questions from the documents
 
-- **Charisma's "Likes".** The notes say "Likes and social things". The manual reads this as sharing your work where people can respond to it, plus plain social contact. The owner should confirm what "likes" meant.
 - **Tasks and the Finish school.** The manual says a task that took unusual effort goes in Finish, whatever its subject. This means a task's school now depends on effort for this one school and on subject for the other seven. Worth seeing how it plays.

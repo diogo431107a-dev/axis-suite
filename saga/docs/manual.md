@@ -79,7 +79,7 @@ Resolve is for what goes beyond what you normally do. It covers the extra hour, 
 - **Tasks too:** a task in the Finish school is one that took unusual effort, however it's filed otherwise. Calling the plumber is an Order task. Finally having the call you've dreaded for a year is a Finish task.
 - **Boundary:** the activity doesn't decide this, the effort does. Writing a page a day is Craft. Staying at the desk to write the page you didn't want to is Resolve.
 
-#### 🎭 Charisma: likes and social things
+#### 🎭 Charisma: what passes between people
 
 Class: Envoy. School: Charm.
 
