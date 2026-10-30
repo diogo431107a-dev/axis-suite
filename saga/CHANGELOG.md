@@ -4,6 +4,8 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- New documents in `saga/docs`, for you to review: the philosophy behind the game and its attributes, a player's manual, a draft of the lore, the text for an in-game help, and a roadmap of what changes next. Nothing in the game changes yet.
+
 ## 0.0.12 — 2026-10-25
 
 - Clicking HABITS SAGA at the top left opens an About box with Saga's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.

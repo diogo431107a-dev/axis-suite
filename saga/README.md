@@ -4,6 +4,8 @@
 
 Saga is the one module that **doesn't use Heimdall**. It has its own players, who join with an invite code, and it is meant for people outside the suite. It only shares the server, the installer and Caddy with the other modules.
 
+The thinking behind the game is in `docs/`: the [philosophy](docs/philosophy.md), the [player's manual](docs/manual.md), the [lore](docs/lore.md), the [in-game help text](docs/help.md) and the [roadmap](docs/roadmap.md).
+
 | Layer    | Technology                                                                |
 | -------- | ------------------------------------------------------------------------- |
 | Frontend | Plain JavaScript and a canvas, bundled by Vite 8; pixel fonts bundled too |
