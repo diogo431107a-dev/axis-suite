@@ -4,6 +4,8 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+- Development only: signing in on the development server (`pnpm dev`) can send you back to Star's, at 127.0.0.1:5184. Nothing changes on a server, so this alone needs no new install.
+
 ## 0.0.21 — 2026-10-25
 
 - Development only: signing in on the development server (`pnpm dev`) can send you back to Mimir's, at 127.0.0.1:5181. Nothing changes on a server, so this alone needs no new install.
