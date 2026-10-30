@@ -6,6 +6,8 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 /** A rate this old means the sources have been failing, not just a weekend or a holiday. */
 const STALE_DAYS = 5;
 
+const signedMoney = (cents: number) => `${cents > 0 ? "+" : ""}${money(cents)}`;
+
 /** A card's negative balance reads as what is owed; everything else as a plain balance. */
 export function BalanceText({ account }: { account: MoneyAccount }) {
   const owed = account.kind === "card" && account.balance < 0;
@@ -61,7 +63,7 @@ export function Home({
 }) {
   const accounts = book.accounts.filter((a) => !a.closed);
   const names = new Map(book.categories.map((c) => [c.id, c.name]));
-  const { moneyIn, moneyOut, spending } = book.month;
+  const { moneyIn, moneyOut, spending, change } = book.month;
   const biggest = spending[0]?.usd ?? 1;
   const thisMonth = localDate().slice(0, 7);
   const rateAge = book.rate ? (Date.parse(localDate()) - Date.parse(book.rate.date)) / DAY_MS : 0;
@@ -147,6 +149,40 @@ export function Home({
             <dd>{money(moneyIn - moneyOut)}</dd>
           </div>
         </dl>
+        {change && (change.start !== 0 || change.end !== 0) && (
+          <>
+            <h3>What you're worth, start to end</h3>
+            <dl className="change">
+              <div>
+                <dt>At the start</dt>
+                <dd>{money(change.start)}</dd>
+              </div>
+              <div>
+                <dt>Money in, less money out</dt>
+                <dd>{signedMoney(moneyIn - moneyOut)}</dd>
+              </div>
+              {change.added !== 0 && (
+                <div>
+                  <dt>Starting balances and balance checks</dt>
+                  <dd>{signedMoney(change.added)}</dd>
+                </div>
+              )}
+              {change.rates !== 0 && (
+                <div>
+                  <dt>
+                    Exchange rate changes
+                    <small>Your reais worth more or fewer dollars, and what exchanging cost.</small>
+                  </dt>
+                  <dd>{signedMoney(change.rates)}</dd>
+                </div>
+              )}
+              <div className="change-end">
+                <dt>{month === thisMonth ? "Now" : "At the end"}</dt>
+                <dd>{money(change.end)}</dd>
+              </div>
+            </dl>
+          </>
+        )}
         {spending.length > 0 && (
           <>
             <h3>Where it went</h3>

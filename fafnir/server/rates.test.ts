@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { DatabaseSync } from "node:sqlite";
 import { openDatabase } from "./db.ts";
-import { addDays, createRates, type DayRate, type RateSource } from "./rates.ts";
+import { addDays, createRates, lastDayOf, type DayRate, type RateSource } from "./rates.ts";
 
 let db: DatabaseSync;
 let bank: ReturnType<typeof vi.fn<RateSource["fetch"]>>;
@@ -83,5 +83,13 @@ describe("rates", () => {
     const rates = createRates(db, sources());
     await rates.ensure("2026-10-23");
     expect(rates.lookup("2026-10-23")).toBeNull();
+  });
+});
+
+describe("months", () => {
+  it("knows their last day", () => {
+    expect(lastDayOf("2026-02")).toBe("2026-02-28");
+    expect(lastDayOf("2024-02")).toBe("2024-02-29");
+    expect(lastDayOf("2026-12")).toBe("2026-12-31");
   });
 });

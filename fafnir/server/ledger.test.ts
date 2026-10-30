@@ -12,6 +12,8 @@ const DAY = "2026-10-05";
 
 let db: DatabaseSync;
 let rate: Rate | null;
+/** When set, the rate of each day instead of `rate`. */
+let rateOn: ((date: string) => Rate | null) | null;
 let ledger: Ledger;
 let nextId = 0;
 const id = () => `id-00000-${++nextId}`;
@@ -66,7 +68,8 @@ function expectEverythingBalances() {
 beforeEach(() => {
   db = openDatabase(":memory:");
   rate = RATE;
-  ledger = createLedger(db, () => rate);
+  rateOn = null;
+  ledger = createLedger(db, (date) => (rateOn ? rateOn(date) : rate));
 });
 
 describe("a new user", () => {
@@ -349,6 +352,297 @@ describe("accounts", () => {
     ledger.changeEntry(ME, entry!.id, { kind: "starting", date: DAY, account: card, amount: -2_000 });
     expect(account(card).balance).toBe(-2_000);
     expectEverythingBalances();
+  });
+});
+
+describe("Exchanged", () => {
+  it("takes one currency out and puts the other in, adding up to zero in each", () => {
+    const brl = addAccount("Itaú", "BRL", "bank", 100_000);
+    const usd = addAccount("Chase", "USD");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: brl,
+      other: usd,
+      amount: 55_000,
+      arrived: 10_000,
+    });
+    expect(account(brl).balance).toBe(45_000);
+    expect(account(usd).balance).toBe(10_000);
+    expect(entry).toMatchObject({
+      kind: "exchanged",
+      account: brl,
+      other: usd,
+      currency: "BRL",
+      amount: 55_000,
+      usd: 10_000,
+      arrived: { currency: "USD", amount: 10_000 },
+      rate: null,
+    });
+    expectEverythingBalances();
+  });
+
+  it("values it by the dollars, going either way", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD", "bank", 50_000);
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: usd,
+      other: brl,
+      amount: 10_000,
+      arrived: 53_000,
+    });
+    expect(entry.usd).toBe(10_000);
+    expect(account(brl).balance).toBe(53_000);
+    expectEverythingBalances();
+  });
+
+  it("needs no rate, and isn't money in or out", () => {
+    rate = null;
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: brl,
+      other: usd,
+      amount: 500,
+      arrived: 100,
+    });
+    const { month } = ledger.load(ME, "2026-10");
+    expect(month.moneyIn).toBe(0);
+    expect(month.moneyOut).toBe(0);
+  });
+
+  it("is listed under both accounts and can be changed or deleted", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: brl,
+      other: usd,
+      amount: 500,
+      arrived: 100,
+    });
+    expect(ledger.listEntries(ME, { account: usd }).total).toBe(1);
+    expect(ledger.listEntries(ME, { account: brl }).total).toBe(1);
+    expect(ledger.listEntries(ME, { q: "Chase" }).total).toBe(1);
+
+    const changed = ledger.changeEntry(ME, entry.id, {
+      kind: "exchanged",
+      date: DAY,
+      account: brl,
+      other: usd,
+      amount: 1_000,
+      arrived: 180,
+    });
+    expect(changed.usd).toBe(180);
+    expect(account(usd).balance).toBe(180);
+    expectEverythingBalances();
+
+    ledger.removeEntry(ME, entry.id);
+    expect(account(brl).balance).toBe(0);
+    expect(account(usd).balance).toBe(0);
+  });
+
+  it("can turn into a plain entry, which has two postings again", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: brl,
+      other: usd,
+      amount: 500,
+      arrived: 100,
+    });
+    const changed = ledger.changeEntry(ME, entry.id, {
+      kind: "spent",
+      date: DAY,
+      account: brl,
+      other: category("Food"),
+      amount: 500,
+    });
+    expect(changed.arrived).toBeNull();
+    expect(account(usd).balance).toBe(0);
+    expectEverythingBalances();
+  });
+
+  it("refuses the same currency, a missing amount, and a move across currencies", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const other = addAccount("Caixa", "BRL");
+    const usd = addAccount("Chase", "USD");
+    const base = { kind: "exchanged" as const, date: DAY, account: brl, amount: 500 };
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), other, arrived: 100 }))).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), other: usd }))).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), other: usd, arrived: 0 }))).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), other: category("Food"), arrived: 100 }))).toBe(
+      "invalid",
+    );
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "moved", other: usd }))).toBe("invalid");
+  });
+
+  it("keeps the hidden account out of the page", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: brl,
+      other: usd,
+      amount: 500,
+      arrived: 100,
+    });
+    const book = ledger.load(ME, "2026-10");
+    expect(book.accounts.map((a) => a.name).sort()).toEqual(["Chase", "Itaú"]);
+    expect(book.categories.map((c) => c.name)).not.toContain("Currency exchange");
+  });
+});
+
+describe("in another currency", () => {
+  it("records a dollar price charged to an account in reais", () => {
+    const card = addAccount("Nubank", "BRL", "card");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "spent",
+      date: DAY,
+      account: card,
+      other: category("Fun"),
+      amount: 11_500,
+      paid: { currency: "USD", amount: 2_000 },
+    });
+    expect(entry.usd).toBe(2_000);
+    expect(entry.rate).toBeNull();
+    expect(entry.paid).toEqual({ currency: "USD", amount: 2_000 });
+    expect(account(card).balance).toBe(-11_500);
+    expectEverythingBalances();
+  });
+
+  it("records a price in reais taken from an account in dollars, needing no rate", () => {
+    rate = null;
+    const usd = addAccount("Chase", "USD");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: DAY,
+      account: usd,
+      other: category("Salary"),
+      amount: 1_850,
+      paid: { currency: "BRL", amount: 10_000 },
+    });
+    expect(entry.usd).toBe(1_850);
+    expect(account(usd).balance).toBe(1_850);
+    expectEverythingBalances();
+  });
+
+  it("works the dollars out again when the price is taken off", () => {
+    const card = addAccount("Nubank", "BRL", "card");
+    const food = category("Food");
+    const base = { kind: "spent" as const, date: DAY, account: card, other: food, amount: 10_000 };
+    const entry = ledger.addEntry(ME, { ...base, id: id(), paid: { currency: "USD", amount: 1_900 } });
+    const changed = ledger.changeEntry(ME, entry.id, base);
+    expect(changed.paid).toBeNull();
+    expect(changed.usd).toBe(2_000);
+  });
+
+  it("refuses its own currency, and moves", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const other = addAccount("Caixa", "BRL");
+    const base = { date: DAY, account: brl, amount: 100 };
+    const paid = (currency: "USD" | "BRL") => ({ currency, amount: 100 });
+    expect(
+      code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "spent", other: category("Food"), paid: paid("BRL") })),
+    ).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "moved", other, paid: paid("USD") }))).toBe(
+      "invalid",
+    );
+  });
+});
+
+describe("why what you're worth changed", () => {
+  // The rate is 5 until the end of September, when it is 4.
+  const fiveThenFour = (date: string): Rate => ({ value: date >= "2026-09-30" ? 4 : 5, date, source: "test" });
+
+  it("shows reais becoming worth more dollars as rate changes", () => {
+    rateOn = fiveThenFour;
+    const brl = addAccount("Itaú", "BRL");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: "2026-08-15",
+      account: brl,
+      other: category("Salary"),
+      amount: 100_000,
+    });
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({ start: 20_000, end: 25_000, added: 0, rates: 5_000 });
+  });
+
+  it("adds up, with money in and out, starting balances and balance checks", () => {
+    rateOn = fiveThenFour;
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    const food = category("Food");
+    const add = (date: string, kind: "spent" | "received", account: string, other: string, amount: number) =>
+      ledger.addEntry(ME, { id: id(), kind, date, account, other, amount });
+    add("2026-08-10", "received", brl, category("Salary"), 100_000);
+    add("2026-09-10", "received", usd, category("Salary"), 30_000);
+    add("2026-09-11", "spent", brl, food, 5_000);
+    ledger.checkBalance(ME, usd, { id: id(), date: "2026-09-12", actual: 29_000 });
+
+    const { change, moneyIn, moneyOut } = ledger.load(ME, "2026-09").month;
+    expect(moneyIn).toBe(30_000);
+    expect(moneyOut).toBe(1_000);
+    expect(change!.start).toBe(20_000);
+    expect(change!.added).toBe(-1_000);
+    // Itaú's R$ 950 at 4, and Chase's $290.
+    expect(change!.end).toBe(23_750 + 29_000);
+    expect(change!.end).toBe(change!.start + moneyIn - moneyOut + change!.added + change!.rates);
+  });
+
+  it("counts what an exchange cost", () => {
+    const brl = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: "2026-08-10",
+      account: brl,
+      other: category("Salary"),
+      amount: 100_000,
+    });
+    // R$ 1,000 is $200 at the rate, but only $180 arrived.
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: "2026-09-10",
+      account: brl,
+      other: usd,
+      amount: 100_000,
+      arrived: 18_000,
+    });
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({ start: 20_000, end: 18_000, added: 0, rates: -2_000 });
+  });
+
+  it("gives up rather than guess when a rate it needs is unknown", () => {
+    const brl = addAccount("Itaú", "BRL");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: "2026-08-10",
+      account: brl,
+      other: category("Salary"),
+      amount: 100_000,
+    });
+    rate = null;
+    expect(ledger.load(ME, "2026-09").month.change).toBeNull();
   });
 });
 

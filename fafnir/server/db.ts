@@ -23,7 +23,7 @@ const migrations: ((db: DatabaseSync) => void)[] = [
         id         TEXT PRIMARY KEY,
         owner      TEXT NOT NULL,
         name       TEXT NOT NULL,
-        kind       TEXT NOT NULL,                    -- cash, bank, savings, card, expense, income, starting, adjustment
+        kind       TEXT NOT NULL,                    -- cash, bank, savings, card, expense, income, starting, adjustment, exchange
         currency   TEXT,                             -- NULL unless it is one of cash, bank, savings, card
         grp        TEXT NOT NULL DEFAULT '',
         closed     INTEGER NOT NULL DEFAULT 0,
@@ -80,6 +80,16 @@ const migrations: ((db: DatabaseSync) => void)[] = [
         fetched_at TEXT NOT NULL,
         PRIMARY KEY (base, quote, date)
       ) WITHOUT ROWID;
+    `);
+  },
+  // v2: exchanges (through one hidden account per user, which holds whatever currencies pass through
+  // it) and the price of a purchase made in another currency.
+  (db) => {
+    db.exec(`
+      ALTER TABLE transactions ADD COLUMN paid_currency TEXT;
+      ALTER TABLE transactions ADD COLUMN paid_amount INTEGER;
+      INSERT INTO accounts (id, owner, name, kind, created_at, updated_at)
+        SELECT lower(hex(randomblob(16))), owner, 'Currency exchange', 'exchange', created_at, created_at FROM books;
     `);
   },
 ];

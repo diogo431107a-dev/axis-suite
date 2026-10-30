@@ -3,8 +3,8 @@ import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
 import { USER_HEADER, type ApiError, type Entry } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { StoreError } from "./errors.ts";
-import { createLedger } from "./ledger.ts";
-import { createRates, today } from "./rates.ts";
+import { createLedger, isMonth } from "./ledger.ts";
+import { createRates, monthSpan, today } from "./rates.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3013);
@@ -62,8 +62,14 @@ async function ensureRate(req: Request): Promise<void> {
 // The signed-in user
 app.get("/api/me", auth.me);
 
-app.get("/api/book", (req, res) => {
-  res.json(ledger.load(owner(req), param(req.query.month) ?? today().slice(0, 7)));
+app.get("/api/book", async (req, res) => {
+  const month = param(req.query.month) ?? today().slice(0, 7);
+  // Why what the user is worth changed takes the rates of the days the month runs between.
+  if (isMonth(month)) {
+    const { start, end } = monthSpan(month);
+    await Promise.all([rates.ensure(start), rates.ensure(end)]);
+  }
+  res.json(ledger.load(owner(req), month));
 });
 
 // The rate a form is about to use.
@@ -144,9 +150,11 @@ app.get("/api/export.csv", (req, res) => {
       decimal(e.amount),
       decimal(e.usd),
       e.rate ? e.rate.value : "",
+      (e.paid ?? e.arrived)?.currency ?? "",
+      e.paid || e.arrived ? decimal((e.paid ?? e.arrived)!.amount) : "",
       csvText(e.memo),
     ].join(",");
-  const header = "date,kind,account,category or destination,currency,amount,usd,rate,note";
+  const header = "date,kind,account,category or destination,currency,amount,usd,rate,other currency,other amount,note";
   res.type("text/csv");
   res.set("Content-Disposition", `attachment; filename="fafnir-${today()}.csv"`);
   res.send([header, ...ledger.allEntries(me).map(row)].join("\r\n") + "\r\n");

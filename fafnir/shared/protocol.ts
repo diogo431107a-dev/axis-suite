@@ -61,8 +61,15 @@ export interface Rate {
   source: string;
 }
 
-export const ENTRY_KINDS = ["spent", "received", "moved"] as const;
+export const ENTRY_KINDS = ["spent", "received", "moved", "exchanged"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
+
+/** An amount in a currency other than the account's. */
+export interface Foreign {
+  currency: Currency;
+  /** In cents. */
+  amount: number;
+}
 
 export interface Entry {
   id: string;
@@ -72,7 +79,7 @@ export interface Entry {
   memo: string;
   /** The account the money left (spent, moved) or reached (received); the one a balance is for. */
   account: string;
-  /** The category, or where a move went. Null on "starting" and "adjustment". */
+  /** The category, or where a move or exchange went. Null on "starting" and "adjustment". */
   other: string | null;
   currency: Currency;
   /** In cents. Above zero, except on "starting" and "adjustment", where it can be either. */
@@ -81,6 +88,10 @@ export interface Entry {
   usd: number;
   /** The rate behind `usd`. Null if it was in dollars, or the user typed the dollars. */
   rate: Rate | null;
+  /** On spent and received: the price in the other currency, if that's what it was in. */
+  paid: Foreign | null;
+  /** On exchanged: what arrived in the other account. */
+  arrived: Foreign | null;
 }
 
 export interface NewEntry {
@@ -94,6 +105,10 @@ export interface NewEntry {
   amount: number;
   /** The dollars, typed by the user instead of worked out from the rate. */
   usd?: number;
+  /** Spent or received in the other currency; `amount` is then what the account was charged or got. */
+  paid?: Foreign;
+  /** Required on exchanged: what arrived, in cents of the `other` account's currency. */
+  arrived?: number;
 }
 
 /** Changing an entry. "starting" takes only a date, an amount (which can be below zero) and a memo. */
@@ -158,6 +173,20 @@ export interface MonthSummary {
   moneyIn: number;
   moneyOut: number;
   spending: CategoryTotal[];
+  /** Why what the user is worth changed; null if a rate it needs isn't known. */
+  change: WorthChange | null;
+}
+
+/** end = start + moneyIn - moneyOut + added + rates, all in US cents. */
+export interface WorthChange {
+  /** What the user was worth as the month began, at that day's rate. */
+  start: number;
+  /** What the user was worth as it ended (or today), at that day's rate. */
+  end: number;
+  /** Starting balances and balance checks. */
+  added: number;
+  /** What's left: reais worth more or fewer dollars, and what exchanging cost. */
+  rates: number;
 }
 
 export interface Book {

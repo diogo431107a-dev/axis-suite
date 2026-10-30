@@ -4,6 +4,7 @@ import {
   ENTRY_KINDS,
   type Account,
   type Book,
+  type Currency,
   type Entry,
   type EntryChange,
   type EntryKind,
@@ -15,9 +16,14 @@ import { ApiFailure, api, describeError } from "../api.ts";
 import { localDate, money, parseAmount, plainAmount, showDate } from "../format.ts";
 import { Dialog } from "../ui/Dialog.tsx";
 import { Dollars } from "./Dollars.tsx";
-import { typedUsd, useTypedDollars } from "./typed.ts";
+import { convert, typedUsd, useRate, useTypedDollars } from "./typed.ts";
 
-const KIND_LABELS: Record<EntryKind, string> = { spent: "Spent", received: "Received", moved: "Moved" };
+const KIND_LABELS: Record<EntryKind, string> = {
+  spent: "Spent",
+  received: "Received",
+  moved: "Moved",
+  exchanged: "Exchanged",
+};
 const NEW_CATEGORY = "new";
 const LAST_ACCOUNT_KEY = "fafnir.lastAccount";
 
@@ -47,6 +53,53 @@ function AccountOptions({ accounts }: { accounts: MoneyAccount[] }) {
   ));
 }
 
+const symbol = (currency: Currency | undefined) => (currency === "BRL" ? "R$" : "$");
+
+function AmountInput({
+  currency,
+  value,
+  onChange,
+}: {
+  currency: Currency | undefined;
+  value: string;
+  onChange: (text: string) => void;
+}) {
+  return (
+    <div className="amount-input">
+      <span aria-hidden>{symbol(currency)}</span>
+      <input
+        inputMode="decimal"
+        autoComplete="off"
+        required
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="0.00"
+      />
+    </div>
+  );
+}
+
+/** The rate that two amounts come to, next to the day's, so a bad exchange shows. */
+function RateNote({
+  first,
+  second,
+  dayRate,
+}: {
+  first: { currency: Currency | undefined; cents: number | null };
+  second: { currency: Currency | undefined; cents: number | null };
+  dayRate: number | undefined;
+}) {
+  const brl = first.currency === "BRL" ? first.cents : second.cents;
+  const usd = first.currency === "USD" ? first.cents : second.cents;
+  if (brl === null || usd === null || brl <= 0 || usd <= 0) return null;
+  return (
+    <p className="dollars muted">
+      That comes to R$ {(brl / usd).toFixed(4)} per dollar
+      {dayRate !== undefined && `. The day's reference rate is R$ ${dayRate.toFixed(4)}`}.
+    </p>
+  );
+}
+
 /** Adds an entry or changes one. A balance check can only be deleted; a starting balance has fewer fields. */
 export function EntryDialog({
   book,
@@ -68,6 +121,8 @@ export function EntryDialog({
     if (!entry) return "";
     return `${entry.amount < 0 ? "-" : ""}${plainAmount(entry.amount)}`;
   });
+  // An amount worked out from the rate follows the other one until the user types over it.
+  const [amountTyped, setAmountTyped] = useState(entry !== undefined);
   const [account, setAccount] = useState(() => {
     if (entry) return entry.account;
     const last = lastAccount();
@@ -75,6 +130,10 @@ export function EntryDialog({
   });
   const [other, setOther] = useState(entry?.other ?? "");
   const [newCategory, setNewCategory] = useState("");
+  const [foreign, setForeign] = useState(Boolean(entry?.paid));
+  const [paidText, setPaidText] = useState(entry?.paid ? plainAmount(entry.paid.amount) : "");
+  const [arrivedText, setArrivedText] = useState(entry?.arrived ? plainAmount(entry.arrived.amount) : "");
+  const [arrivedTyped, setArrivedTyped] = useState(Boolean(entry?.arrived));
   const [date, setDate] = useState(entry?.date ?? localDate());
   const [memo, setMemo] = useState(entry?.memo ?? "");
   const typed = useTypedDollars();
@@ -83,30 +142,65 @@ export function EntryDialog({
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const from = book.accounts.find((a) => a.id === account);
-  const cents = parseAmount(amountText);
+  const to = book.accounts.find((a) => a.id === other);
+  const exchanging = kind === "exchanged";
+  const inForeign = foreign && (kind === "spent" || kind === "received");
+  const foreignCurrency: Currency = from?.currency === "USD" ? "BRL" : "USD";
+  const { rate } = useRate(date, everyday && (exchanging || inForeign));
+
+  const paid = inForeign ? parseAmount(paidText) : null;
+  // Charged to the account: follows the price at the day's rate until typed over.
+  const amountShown =
+    inForeign && !amountTyped
+      ? paid && rate && from
+        ? plainAmount(convert(paid, foreignCurrency, from.currency, rate))
+        : ""
+      : amountText;
+  const cents = parseAmount(amountShown);
+  // What arrived: follows what left at the day's rate until typed over.
+  const arrivedShown =
+    exchanging && !arrivedTyped
+      ? cents && rate && from && to
+        ? plainAmount(convert(cents, from.currency, to.currency, rate))
+        : ""
+      : arrivedText;
+  const arrived = exchanging ? parseAmount(arrivedShown) : null;
+
   const categoryKind: Account["kind"] = kind === "spent" ? "expense" : "income";
   const categories = book.categories.filter((c) => c.kind === categoryKind && (!c.closed || c.id === entry?.other));
-  const destinations = open.filter((a) => a.id !== account && a.currency === from?.currency);
-  const creatingCategory = kind !== "moved" && other === NEW_CATEGORY;
-  const unchanged = entry && cents === entry.amount && date === entry.date && from?.currency === entry.currency;
+  const takesCategory = kind === "spent" || kind === "received";
+  const destinations = open.filter(
+    (a) => a.id !== account && (exchanging ? a.currency !== from?.currency : a.currency === from?.currency),
+  );
+  const creatingCategory = takesCategory && other === NEW_CATEGORY;
+  const unchanged =
+    entry &&
+    !entry.paid &&
+    !inForeign &&
+    cents === entry.amount &&
+    date === entry.date &&
+    from?.currency === entry.currency;
 
   const switchKind = (next: EntryKind) => {
     setKind(next);
     setOther("");
+    setForeign(false);
     setError("");
   };
 
   async function save(e: FormEvent) {
     e.preventDefault();
     setError("");
+    if (inForeign && (paid === null || paid <= 0)) return setError("Type the price, like 19.99.");
     if (cents === null) return setError("Type the amount, like 25.90.");
     if (everyday && cents <= 0) return setError("The amount must be above zero.");
     if (!date) return setError("Pick a date.");
     if (everyday && !other) {
-      return setError(kind === "moved" ? "Pick where the money went." : "Pick a category.");
+      return setError(takesCategory ? "Pick a category." : "Pick where the money went.");
     }
+    if (exchanging && (arrived === null || arrived <= 0)) return setError("Type how much arrived, like 180.00.");
     if (creatingCategory && !newCategory.trim()) return setError("Give the new category a name.");
-    const usd = typedUsd(typed, from?.currency, cents);
+    const usd = inForeign || exchanging ? undefined : typedUsd(typed, from?.currency, cents);
     if (usd === null) return setError("Type the US dollar amount, like 18.45.");
 
     setSaving(true);
@@ -122,7 +216,15 @@ export function EntryDialog({
         target = category.id;
         setOther(target);
       }
-      const common = { date, memo, account, amount: cents, ...(usd === undefined ? {} : { usd }) };
+      const common = {
+        date,
+        memo,
+        account,
+        amount: cents,
+        ...(usd === undefined ? {} : { usd }),
+        ...(inForeign && paid !== null ? { paid: { currency: foreignCurrency, amount: paid } } : {}),
+        ...(exchanging && arrived !== null ? { arrived } : {}),
+      };
       if (entry) {
         const change: EntryChange = everyday ? { ...common, kind, other: target } : { ...common, kind: "starting" };
         await api(`/api/entries/${entry.id}`, { method: "PUT", body: change });
@@ -191,6 +293,11 @@ export function EntryDialog({
   }
 
   const title = entry ? (everyday ? "Change entry" : "Change starting balance") : "Add an entry";
+  let amountLabel = "How much?";
+  if (!everyday) amountLabel = `Balance${from?.kind === "card" ? " (below zero for what you owe)" : ""}`;
+  else if (exchanging) amountLabel = "How much left?";
+  else if (inForeign) amountLabel = kind === "spent" ? `Charged to ${from?.name}` : `Reached ${from?.name}`;
+
   return (
     <Dialog title={title} onClose={onClose}>
       <form onSubmit={(e) => void save(e)} noValidate>
@@ -211,29 +318,65 @@ export function EntryDialog({
           </div>
         )}
 
+        {inForeign && (
+          <label className="field">
+            <span>
+              {kind === "spent" ? "The price" : "The amount"} in {foreignCurrency === "USD" ? "US dollars" : "reais"}
+            </span>
+            <AmountInput currency={foreignCurrency} value={paidText} onChange={setPaidText} />
+          </label>
+        )}
+
         <label className="field">
-          <span>
-            {everyday ? "How much?" : `Balance${from?.kind === "card" ? " (below zero for what you owe)" : ""}`}
-          </span>
-          <div className="amount-input">
-            <span aria-hidden>{from?.currency === "BRL" ? "R$" : "$"}</span>
-            <input
-              inputMode="decimal"
-              autoComplete="off"
-              required
-              value={amountText}
-              onChange={(e) => setAmountText(e.target.value)}
-              placeholder="0.00"
-            />
-          </div>
+          <span>{amountLabel}</span>
+          <AmountInput
+            currency={from?.currency}
+            value={amountShown}
+            onChange={(text) => {
+              setAmountText(text);
+              setAmountTyped(true);
+            }}
+          />
+          {inForeign && !amountTyped && (
+            <small>
+              Worked out from the day's rate. Your {kind === "spent" ? "statement" : "bank"} may show a different
+              amount: type it here if so.
+            </small>
+          )}
         </label>
-        <Dollars
-          currency={from?.currency}
-          cents={cents}
-          date={date}
-          typed={typed}
-          saved={unchanged ? entry.usd : undefined}
-        />
+
+        {inForeign
+          ? amountTyped && (
+              <RateNote
+                first={{ currency: foreignCurrency, cents: paid }}
+                second={{ currency: from?.currency, cents }}
+                dayRate={rate?.value}
+              />
+            )
+          : !exchanging && (
+              <Dollars
+                currency={from?.currency}
+                cents={cents}
+                date={date}
+                typed={typed}
+                saved={unchanged ? entry.usd : undefined}
+              />
+            )}
+
+        {takesCategory && (
+          <button
+            type="button"
+            className="link foreign-toggle"
+            onClick={() => {
+              setForeign(!foreign);
+              setAmountTyped(foreign);
+            }}
+          >
+            {foreign
+              ? "It wasn't in another currency"
+              : `It was in ${foreignCurrency === "USD" ? "US dollars" : "reais"}`}
+          </button>
+        )}
 
         {everyday && (
           <label className="field">
@@ -242,7 +385,7 @@ export function EntryDialog({
               value={account}
               onChange={(e) => {
                 setAccount(e.target.value);
-                if (kind === "moved") setOther("");
+                if (!takesCategory) setOther("");
               }}
             >
               <AccountOptions accounts={open} />
@@ -250,7 +393,7 @@ export function EntryDialog({
           </label>
         )}
 
-        {everyday && kind === "moved" && (
+        {everyday && !takesCategory && (
           <label className="field">
             <span>To</span>
             <select value={other} onChange={(e) => setOther(e.target.value)}>
@@ -259,13 +402,41 @@ export function EntryDialog({
             </select>
             {destinations.length === 0 && (
               <small>
-                You have no other {from?.currency} account. Moving money between currencies arrives in a later version.
+                {exchanging
+                  ? `You have no account in another currency yet. Add one in Accounts.`
+                  : `You have no other ${from?.currency} account. To change money into another currency, use Exchanged.`}
               </small>
             )}
           </label>
         )}
 
-        {everyday && kind !== "moved" && (
+        {exchanging && (
+          <>
+            <label className="field">
+              <span>How much arrived?</span>
+              <AmountInput
+                currency={to?.currency}
+                value={arrivedShown}
+                onChange={(text) => {
+                  setArrivedText(text);
+                  setArrivedTyped(true);
+                }}
+              />
+              {!arrivedTyped && (
+                <small>Worked out from the day's rate. Type what actually arrived if it differs.</small>
+              )}
+            </label>
+            {arrivedTyped && (
+              <RateNote
+                first={{ currency: from?.currency, cents }}
+                second={{ currency: to?.currency, cents: arrived }}
+                dayRate={rate?.value}
+              />
+            )}
+          </>
+        )}
+
+        {everyday && takesCategory && (
           <label className="field">
             <span>Category</span>
             <select value={other} onChange={(e) => setOther(e.target.value)}>
