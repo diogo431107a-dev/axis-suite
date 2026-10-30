@@ -123,6 +123,12 @@ Once a battle starts, the only ways out are winning or running.
 - **The party falls:** when everyone is down, they all wake at camp with 1 HP. The foe stands whole again. You lose no gold.
 - **Running** may fail. If it does, the party loses its turn and may drop some gold. A foe you escape keeps its wounds until you come back.
 
+### The Angel's place
+
+Beside every hero there is one place no companion can fill. You choose who stands there, once, for this hero's whole road: Lunaria, whose place it is by right, or Alecta, who takes it anyway. Starting over with a new hero gives a new choice.
+
+A gold bar fills slowly as you do your deeds. When it is full, she arrives and stays for a few turns. She never strikes a blow, but the party fights differently while she is there. Lunaria gives strength and shelter. Alecta gives her attention to your enemy. Then the bar starts again from nothing.
+
 ### Tasks and the Spellbook
 
 Tasks are one-off things to do. Each belongs to a school, and only a companion of that school can cast it. A cast is how you record the task as done. It pays nothing directly, but the companion's spell level grows with every cast.
@@ -177,7 +183,7 @@ After the Elder Dragon, the road starts again, one star stronger.
 
 ## Part 2: Behind the scenes
 
-**Spoilers.** The game means you to discover this by playing. These are the numbers in version 0.0.12, and they will change.
+**Spoilers.** The game means you to discover this by playing. These are the numbers in version 1.0.0, and they will change.
 
 ### Levels
 
@@ -263,6 +269,15 @@ Rats bite. Beetles, slugs and toadstools swipe. Centipedes, bats and skeletons m
 ### Knockouts
 
 A knockout costs XP: 10% of the current level's requirement, plus 5% for each repeat, up to 30%. It never takes a companion below the start of their level. The repeat count clears at the next level-up.
+
+### The Angel
+
+The bar holds 100. A turn with at least one deed (an attack or a spell) adds `2 + 0.5 per deed`, plus up to 1 for the share of the foe's HP dealt that turn. A turn with no deed adds nothing. That makes about 33 turns with one or two companions acting, and about 22 with a full party.
+
+She stays for 6 turns, and they carry over between battles. The bar doesn't fill while she is there. If the party falls, she leaves.
+
+- **Lunaria:** after any action (attack, spell, item or guard), the companion strikes again at half power. This records nothing, raises no mastery and draws no counter. It can win the battle. The party takes 25% less damage and recovers 10% of max HP and MP at the end of each turn.
+- **Alecta:** the foe takes 30% more damage and deals 20% less. The chance of a critical attack rises from 10% to 40%.
 
 ### Fleeing
 

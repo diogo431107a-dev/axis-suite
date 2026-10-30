@@ -1,4 +1,5 @@
 import {
+  ANGELS,
   ATTR,
   ATTRS,
   ENEMIES,
@@ -117,6 +118,7 @@ export function gameOver(s) {
   e.firstHit = null;
   e.insight = null;
   e.charmed = null;
+  Object.assign(s.angel, { left: 0, arriving: false, deeds: 0, dealt: 0 });
   addLog(s, `The party falls, and wakes at camp with 1 HP each. ${enemyName(e)} stands whole again.`);
   if (s.session) s.session.gameOver = true;
 }
@@ -168,6 +170,70 @@ export function tickStatuses(s) {
   return ticks;
 }
 
+/* ---------- the Angel's place ---------- */
+// The hero's one choice of who stands there. It holds for this hero's whole road.
+export function chooseAngel(s, who) {
+  if (s.angel.who || !ANGELS[who]) return false;
+  s.angel.who = who;
+  addLog(
+    s,
+    who === "lunaria" ? "Lunaria takes what is hers by right." : "Alecta takes what was never hers, and smiles.",
+  );
+  return true;
+}
+export const angelHere = (s, who) => s.angel.left > 0 && (!who || s.angel.who === who);
+// What the bar gains from a turn: nothing without a deed, or it could be filled without doing a habit.
+export function angelFill(deeds, dealt) {
+  const F = TUNE.angel.fill;
+  return deeds ? F.turn + F.perDeed * deeds + F.damage * Math.min(1, dealt) : 0;
+}
+// End of turn. While she stays, Lunaria restores the party and the turns count down. Otherwise the bar
+// fills, and a full bar brings her for the turns that follow. Returns what was restored, by member.
+export function angelTurn(s) {
+  const a = s.angel,
+    A = TUNE.angel,
+    gain = angelFill(a.deeds, a.dealt);
+  a.deeds = 0;
+  a.dealt = 0;
+  if (!a.who) return [];
+  if (a.left === 0) {
+    a.bar = Math.min(A.bar, a.bar + gain);
+    if (a.bar === A.bar) {
+      a.bar = 0;
+      a.left = A.turns;
+      a.arriving = true;
+      addLog(s, ANGELS[a.who].arrives);
+    }
+    return [];
+  }
+  const regen = [];
+  if (a.who === "lunaria")
+    for (const u of standing(s)) {
+      const hp = Math.min(maxHpOf(u) - u.hp, Math.ceil(maxHpOf(u) * A.lunaria.regen));
+      const mp = Math.min(maxMpOf(u) - u.mp, Math.ceil(maxMpOf(u) * A.lunaria.regen));
+      u.hp += hp;
+      u.mp += mp;
+      if (hp || mp) regen.push({ id: u.id, hp, mp });
+    }
+  a.left--;
+  if (a.left === 0) addLog(s, ANGELS[a.who].leaves);
+  return regen;
+}
+// Beside Lunaria, whoever has just acted strikes once more. It is a blow and no more: the habit was
+// not done again, so it records nothing and raises no mastery.
+export function angelEcho(s, u, res, rng) {
+  if (!angelHere(s, "lunaria") || res.kill || res.gameOver || isKO(u)) return res;
+  let dmg = attackPower(u) * TUNE.angel.lunaria.echo * (0.9 + rng() * 0.2);
+  if (hasStatus(u, "shock")) dmg /= 2;
+  const target = enemyName(s.enemy);
+  const hit = hitFoe(s, u, Math.round(dmg), rng, { counters: false });
+  addLog(s, `${u.name} strikes ${target} again for ${hit.dmg}.`);
+  res.echo = { dmg: hit.dmg, hpAfter: hit.hpAfter };
+  res.kill = hit.kill;
+  res.gameOver = hit.gameOver;
+  return res;
+}
+
 /* ---------- foes ---------- */
 export function spawnEnemy(index) {
   const def = ENEMIES[index % ENEMIES.length];
@@ -205,6 +271,8 @@ export function strike(s, u, move, rng, insight) {
   if (s.ward && s.ward.turn === s.turn) shave(s.ward.share, s.ward.by);
   const guarded = u.guardTurn === s.turn;
   if (guarded) shave(TUNE.guardShare, u.id);
+  if (angelHere(s, "lunaria")) shave(1 - TUNE.angel.lunaria.shelter);
+  if (angelHere(s, "alecta")) shave(1 - TUNE.angel.alecta.unnerved);
   const r = applyDamage(s, u, dmg);
   if (s.session) s.session.dmgTaken += dmg;
   return { id: u.id, name: u.name, move: move.name, hits, dmg, ko: r.ko, loss: r.loss, guarded };
@@ -253,10 +321,11 @@ export function turnDone(s) {
 export function closeTurn(s) {
   const ticks = tickStatuses(s);
   const over = isWiped(s);
+  const regen = over ? [] : angelTurn(s);
   if (over) gameOver(s);
   s.turn++;
   if (s.session) s.session.turns++;
-  return { ticks, over };
+  return { ticks, over, regen };
 }
 // The foe takes its turn, then the turn closes.
 export function endTurn(s, rng = Math.random) {
@@ -272,8 +341,8 @@ export function endTurn(s, rng = Math.random) {
         .filter((m, i, a) => a.indexOf(m) === i)
         .join(", ")} for ${total} damage.`,
     );
-  const { ticks, over } = closeTurn(s);
-  s.lastTurn = { turn, foe, events, ticks, charmed, gameOver: over, dismissed: false };
+  const { ticks, over, regen } = closeTurn(s);
+  s.lastTurn = { turn, foe, events, ticks, regen, charmed, gameOver: over, dismissed: false };
   return s.lastTurn;
 }
 
@@ -293,10 +362,11 @@ export function attackPower(u) {
     (D.base + D.perLevel * lvOf(u).level + D.perPoint * pointsOf(u)) * Math.pow(1 + D.mastery, masteryOf(u).level - 1)
   );
 }
-// Damage landing on the foe: Anthem bonus, first/last-hit credit, then victory or a counter.
-export function hitFoe(s, u, dmg, rng) {
+// Damage landing on the foe: Alecta's attention, Anthem bonus, first/last-hit credit, then victory or a counter.
+export function hitFoe(s, u, dmg, rng, { counters = true } = {}) {
   const e = s.enemy,
     hpBefore = e.hp;
+  if (angelHere(s, "alecta")) dmg = Math.round(dmg * TUNE.angel.alecta.exposed);
   if (s.anthem && s.anthem.turn === s.turn) {
     const extra = Math.round(dmg * s.anthem.bonus);
     dmg += extra;
@@ -305,6 +375,7 @@ export function hitFoe(s, u, dmg, rng) {
   e.hp = Math.max(0, e.hp - dmg);
   const dealt = hpBefore - e.hp;
   credit(s, u.id, dealt);
+  s.angel.dealt += dealt / e.maxHp;
   if (dealt > 0 && !e.firstHit) {
     e.firstHit = u.id;
     credit(s, u.id, Math.round(e.maxHp * TUNE.share.firstHit));
@@ -318,7 +389,7 @@ export function hitFoe(s, u, dmg, rng) {
     kill = defeatEnemy(s);
     over = closeTurn(s).over; // victory ends the battle and the turn
   } else {
-    counter = enemyCounter(s, u, rng);
+    if (counters) counter = enemyCounter(s, u, rng);
     over = isWiped(s);
     if (over) gameOver(s);
   }
@@ -330,12 +401,13 @@ export function attack(s, id, rng = Math.random) {
   if (!u || !s.party.includes(id) || !canAct(s, u)) return null;
   const m0 = masteryOf(u).level;
   let dmg = attackPower(u) * (0.9 + rng() * 0.2);
-  const crit = rng() < 0.1;
+  const crit = rng() < (angelHere(s, "alecta") ? TUNE.angel.alecta.crit : TUNE.crit);
   if (crit) dmg *= 1.5;
   if (hasStatus(u, "shock")) dmg /= 2;
   const miss = hasStatus(u, "blind") && rng() < TUNE.status.blindMiss;
   const target = enemyName(s.enemy);
   u.checkins++;
+  s.angel.deeds++;
   const masteryUp = masteryOf(u).level > m0;
   const burn = spendAction(s, u);
   if (s.session) s.session.acted.push(id);
@@ -348,7 +420,7 @@ export function attack(s, id, rng = Math.random) {
     hit = hitFoe(s, u, Math.round(dmg), rng);
     addLog(s, `${u.name} hits ${target} for ${hit.dmg}${crit ? " (critical!)" : ""}.`);
   }
-  return { u, crit, miss, burn, masteryUp, ...hit };
+  return angelEcho(s, u, { u, crit, miss, burn, masteryUp, ...hit }, rng);
 }
 // Casting = "I just finished this task". The task leaves the spellbook and the companion's spell level grows.
 export function castSpell(s, id, taskId, rng = Math.random) {
@@ -362,6 +434,7 @@ export function castSpell(s, id, taskId, rng = Math.random) {
     sc = t.school;
   u.mp -= cost;
   u.casts++;
+  s.angel.deeds++;
   const levelUp = spellLvOf(u).level > L;
   t.done = true;
   t.doneTurn = s.turn;
@@ -389,7 +462,7 @@ export function castSpell(s, id, taskId, rng = Math.random) {
     let dmg = attackPower(u) * mult * (0.9 + rng() * 0.2);
     if (hasStatus(u, "shock")) dmg /= 2;
     Object.assign(res, hitFoe(s, u, Math.round(dmg), rng));
-    return res;
+    return angelEcho(s, u, res, rng);
   }
   if (sc === "mend" || sc === "purge") {
     const cures =
@@ -430,10 +503,10 @@ export function castSpell(s, id, taskId, rng = Math.random) {
   }
   res.gameOver = isWiped(s);
   if (res.gameOver) gameOver(s);
-  return res;
+  return angelEcho(s, u, res, rng);
 }
 // Any member can spend its action on an item for a party member, or on guarding.
-export function memberItem(s, userId, key, targetId) {
+export function memberItem(s, userId, key, targetId, rng = Math.random) {
   const user = findHabit(s, userId);
   if (!user || !s.party.includes(userId) || !canAct(s, user) || !s.party.includes(targetId)) return null;
   const r = applyItem(s, key, targetId);
@@ -442,9 +515,9 @@ export function memberItem(s, userId, key, targetId) {
   r.burn = spendAction(s, user);
   r.gameOver = isWiped(s);
   if (r.gameOver) gameOver(s);
-  return r;
+  return angelEcho(s, user, r, rng);
 }
-export function memberGuard(s, id) {
+export function memberGuard(s, id, rng = Math.random) {
   const u = findHabit(s, id);
   if (!u || !s.party.includes(id) || !canAct(s, u)) return null;
   u.guardTurn = s.turn;
@@ -452,7 +525,7 @@ export function memberGuard(s, id) {
   addLog(s, `${u.name} guards.`);
   const over = isWiped(s);
   if (over) gameOver(s);
-  return { burn, gameOver: over };
+  return angelEcho(s, u, { burn, gameOver: over }, rng);
 }
 
 /* ---------- victory ---------- */
@@ -878,13 +951,14 @@ export function finishSession(s) {
 
 // The version of the state object. A change that reshapes it raises this and adds a step to
 // MIGRATIONS in web/net.js, which brings older saves up to date when they are loaded.
-export const GAME_VERSION = 5;
+export const GAME_VERSION = 6;
 
 // What only this page needs: the view, open forms and pickers. Never saved.
 export function freshUi(view = "camp") {
   return {
     view,
     filter: "all",
+    taskSchool: null,
     adding: false,
     addingVice: false,
     swapFor: null,
@@ -900,6 +974,9 @@ export function freshUi(view = "camp") {
     authMode: "signin",
   };
 }
+
+// The Angel's place, before anyone stands in it. deeds and dealt are this turn's, for the bar.
+export const freshAngel = () => ({ who: null, bar: 0, left: 0, arriving: false, deeds: 0, dealt: 0 });
 
 // A new game: no companions, vices or tasks yet, some gold and a starter bag.
 export function seed(character = {}) {
@@ -926,6 +1003,7 @@ export function seed(character = {}) {
     bag: { potion: 3, ether: 1, feather: 1, eliteFeather: 0, antidote: 1, remedy: 0 },
     anthem: null,
     ward: null,
+    angel: freshAngel(),
     log: [],
     openingSeen: false,
     session: null,

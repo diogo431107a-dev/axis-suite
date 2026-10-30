@@ -1,4 +1,4 @@
-import { ATTR, AVATARS, CLASSES, ENEMY_BY_KEY, ITEMS, SKINS } from "./data.js";
+import { ANGELS, ATTR, AVATARS, CLASSES, ENEMY_BY_KEY, ITEMS, SKINS } from "./data.js";
 import { BGS, GRIDS, HAND, PROPS, PROP_PAL } from "./grids.js";
 import { findHabit } from "./rules.js";
 import { RM, state } from "./views.js";
@@ -110,6 +110,7 @@ export function heroSprite(avatarId) {
 export const tombSprite = () =>
   cellsFor("tomb", [{ rows: GRIDS.tomb, pal: { a: "#8a8698", b: "#4a4658", c: "#b5b2c2", d: "#4f7a3a" } }]);
 export const itemSprite = (key) => cellsFor("i:" + key, [{ rows: GRIDS[ITEMS[key].grid], pal: ITEMS[key].pal }]);
+export const angelSprite = (who) => cellsFor("a:" + who, [{ rows: GRIDS[who], pal: ANGELS[who].pal }]);
 export function paint(g, sp, x, y, s, opt) {
   x = Math.round(x);
   y = Math.round(y);
@@ -135,6 +136,7 @@ export function spriteFor(spec) {
     return h && companionSprite(h);
   }
   if (kind === "item") return ITEMS[id] && itemSprite(id);
+  if (kind === "angel") return ANGELS[id] && angelSprite(id);
   return null;
 }
 // Paint every <canvas data-sprite="…" data-s="scale"> inside root.

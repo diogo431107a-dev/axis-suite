@@ -70,6 +70,14 @@ export const SFX = {
     n("triangle", "C6", 180, 280, 0.3),
   ],
   vice: [n("sawtooth", "B3", 0, 180, 0.2), n("sawtooth", "F3", 180, 380, 0.2)],
+  angel: [
+    n("triangle", "A4", 0, 500, 0.3),
+    n("triangle", "E5", 200, 500, 0.3),
+    n("triangle", "A5", 400, 500, 0.3),
+    n("triangle", "C#6", 600, 1100, 0.3),
+    n("square", "E6", 600, 1100, 0.05),
+    n("triangle", "A3", 600, 1100, 0.4),
+  ],
 };
 // How long a sound lasts, in ms.
 export const lengthOf = (name) => Math.max(...SFX[name].map((s) => s.at + s.len));

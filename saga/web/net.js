@@ -1,4 +1,4 @@
-import { GAME_VERSION, addLog, freshUi, seed, summaryOf } from "./rules.js";
+import { GAME_VERSION, addLog, freshAngel, freshUi, seed, summaryOf } from "./rules.js";
 import { render, setState, state } from "./views.js";
 
 /* =====================================================================
@@ -17,6 +17,10 @@ const MIGRATIONS = {
       h.note = "";
     });
     s.openingSeen = false;
+  },
+  // The Angel's place stands empty until the hero chooses who stands there.
+  5: (s) => {
+    s.angel = freshAngel();
   },
 };
 
@@ -88,11 +92,13 @@ function newGame() {
   savedJson = null;
 }
 
-/** The story's opening, shown once to each hero. */
+/** The story's opening, shown once to each hero, and then the choice of who stands in the Angel's place. */
 function offerOpening() {
-  if (state.openingSeen || account.player.mustChangePassword) return;
-  state.openingSeen = true;
-  state.ui.picker = { type: "opening" };
+  if (account.player.mustChangePassword) return;
+  if (!state.openingSeen) {
+    state.openingSeen = true;
+    state.ui.picker = { type: "opening" };
+  } else if (!state.angel.who) state.ui.picker = { type: "angel" };
 }
 
 function updateSaveChip() {

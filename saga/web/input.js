@@ -25,6 +25,7 @@ import {
   applyDamage,
   benchMember,
   buyItem,
+  chooseAngel,
   defeatEnemy,
   findVice,
   gameOver,
@@ -86,6 +87,7 @@ export const ACTIONS = {
   },
   filter: (d) => {
     state.ui.filter = d.attr;
+    state.ui.taskSchool = null;
     render();
   },
   toggleAdd: () => {
@@ -145,6 +147,23 @@ export const ACTIONS = {
   about: () => openPicker({ type: "about" }),
   help: () => openPicker({ type: "help" }),
   opening: () => openPicker({ type: "opening" }),
+  // A hero who hasn't chosen an Angel chooses straight after the story.
+  afterOpening: () => {
+    if (state.angel.who) closePicker();
+    else openPicker({ type: "angel" });
+  },
+  openAngel: () => {
+    if (!busyInBattle()) openPicker({ type: "angel" });
+  },
+  pickAngel: (d) => {
+    if (chooseAngel(state, d.who)) play("angel");
+    closePicker();
+    render();
+  },
+  fillAngel: () => {
+    state.angel.bar = TUNE.angel.bar - 0.5;
+    render();
+  },
   toggleSkills: (d) => {
     state.ui.skillsOpen[d.id] = !state.ui.skillsOpen[d.id];
     render();
@@ -299,6 +318,7 @@ app.addEventListener("input", (e) => {
 // Letting go of the volume slider plays a sample at the new volume.
 app.addEventListener("change", (e) => {
   if (e.target.id === "volume") play("buy");
+  if (e.target.name === "school") state.ui.taskSchool = e.target.value;
 });
 // Signing in, joining and the account page talk to the server. Their errors are written into the
 // form in place, so what was typed stays; the button is disabled while the server answers.
@@ -379,6 +399,11 @@ app.addEventListener("submit", (e) => {
   } else if (f.id === "task-form") {
     const school = (f.querySelector('input[name="school"]:checked') || {}).value || "force";
     addTask(state, { name, school });
+    state.ui.taskSchool = school;
+    render();
+    const n = document.getElementById("tf-name");
+    if (n) n.focus();
+    return;
   }
   render();
 });
