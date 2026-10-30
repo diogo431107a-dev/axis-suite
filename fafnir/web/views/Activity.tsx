@@ -10,6 +10,7 @@ function title(entry: Entry, names: Map<string, string>) {
   const other = entry.other ? (names.get(entry.other) ?? "") : "";
   switch (entry.kind) {
     case "moved":
+    case "exchanged":
       return (
         <>
           {account} <ArrowRight aria-label="to" className="inline-icon" /> {other}
@@ -24,7 +25,7 @@ function title(entry: Entry, names: Map<string, string>) {
   }
 }
 
-/** Money coming in shows as positive, going out as negative, and a move as neither. */
+/** Money coming in shows as positive, going out as negative, and a move or exchange as neither. */
 function signed(entry: Entry): number {
   return entry.kind === "spent" ? -entry.amount : entry.amount;
 }
@@ -126,6 +127,7 @@ export function Activity({
       <ul className="rows">
         {page?.entries.map((e) => {
           const amount = signed(e);
+          const neutral = e.kind === "moved" || e.kind === "exchanged";
           return (
             <li key={e.id}>
               <button type="button" className="row" onClick={() => onOpen(e)}>
@@ -134,16 +136,21 @@ export function Activity({
                   <small className="muted">
                     {showDate(e.date)}
                     {e.kind === "spent" || e.kind === "received" ? ` · ${names.get(e.account) ?? ""}` : ""}
+                    {e.paid ? ` · ${money(e.paid.amount, e.paid.currency)}` : ""}
                     {e.memo ? ` · ${e.memo}` : ""}
                   </small>
                 </span>
                 <span className="row-end">
-                  <span className={`amount ${e.kind !== "moved" && amount > 0 ? "pos" : ""}`}>
-                    {e.kind !== "moved" && amount > 0 ? "+" : ""}
+                  <span className={`amount ${!neutral && amount > 0 ? "pos" : ""}`}>
+                    {!neutral && amount > 0 ? "+" : ""}
                     {money(amount, e.currency)}
                   </span>
-                  {e.currency !== "USD" && (
-                    <small className="muted">{money(e.kind === "spent" ? -e.usd : e.usd)}</small>
+                  {e.arrived ? (
+                    <small className="muted">became {money(e.arrived.amount, e.arrived.currency)}</small>
+                  ) : (
+                    e.currency !== "USD" && (
+                      <small className="muted">{money(e.kind === "spent" ? -e.usd : e.usd)}</small>
+                    )
                   )}
                 </span>
               </button>

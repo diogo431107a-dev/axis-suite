@@ -67,6 +67,18 @@ export function addDays(date: IsoDate, days: number): IsoDate {
   return d.toISOString().slice(0, 10);
 }
 
+/** The last day of a month (YYYY-MM). */
+export function lastDayOf(month: string): IsoDate {
+  const [year, number] = month.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(year, number, 0)).toISOString().slice(0, 10);
+}
+
+/** The days a month's change in worth runs between: the eve of its first day, and its end or today. */
+export function monthSpan(month: string): { start: IsoDate; end: IsoDate } {
+  const last = lastDayOf(month);
+  return { start: addDays(`${month}-01`, -1), end: last > today() ? today() : last };
+}
+
 export interface Rates {
   /** The rate of `date`, or of the closest day before it that has one. */
   lookup(date: IsoDate): Rate | null;

@@ -18,6 +18,7 @@ import {
   type Entry,
   type EntryChange,
   type EntryPage,
+  type Foreign,
   type IsoDate,
   type MoneyAccount,
   type MoneyKind,
@@ -26,9 +27,10 @@ import {
   type NewCategory,
   type NewEntry,
   type Rate,
+  type WorthChange,
 } from "../shared/protocol.ts";
 import { StoreError, conflict, invalid, notFound, tooMany, transaction } from "./errors.ts";
-import { addDays, today } from "./rates.ts";
+import { addDays, monthSpan, today } from "./rates.ts";
 
 const STARTING_CATEGORIES: Record<CategoryKind, string[]> = {
   expense: ["Food", "Home", "Transport", "Health", "Fun", "Shopping", "Bills", "Other"],
@@ -56,10 +58,13 @@ interface TxRow {
   rate_source: string | null;
   account_id: string;
   other_id: string | null;
-  other_kind: string | null;
   currency: Currency;
   amount: number;
   usd: number;
+  paid_currency: Currency | null;
+  paid_amount: number | null;
+  arrived_currency: Currency | null;
+  arrived_amount: number | null;
 }
 
 interface Posting {
@@ -71,6 +76,7 @@ interface Posting {
 
 const isMoneyKind = (kind: unknown): kind is MoneyKind => MONEY_KINDS.includes(kind as MoneyKind);
 const isCategoryKind = (kind: unknown): kind is CategoryKind => CATEGORY_KINDS.includes(kind as CategoryKind);
+export const isMonth = (month: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(month);
 
 function checkId(id: unknown): string {
   if (typeof id !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(id)) invalid("That id isn't valid");
@@ -159,6 +165,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       `);
       add.run(randomUUID(), owner, "Starting balance", "starting", at, at);
       add.run(randomUUID(), owner, "Balance check", "adjustment", at, at);
+      add.run(randomUUID(), owner, "Currency exchange", "exchange", at, at);
       for (const kind of CATEGORY_KINDS) {
         for (const name of STARTING_CATEGORIES[kind]) add.run(randomUUID(), owner, name, kind, at, at);
       }
@@ -171,26 +178,32 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       AccountRow | undefined;
   }
 
-  function systemAccount(owner: string, kind: "starting" | "adjustment"): string {
+  function systemAccount(owner: string, kind: "starting" | "adjustment" | "exchange"): string {
     const row = db.prepare("SELECT id FROM accounts WHERE owner = ? AND kind = ?").get(owner, kind) as { id: string };
     return row.id;
   }
 
-  const ENTRY_SELECT = `
-    SELECT t.id, t.kind, t.date, t.memo, t.rate, t.rate_date, t.rate_source,
-           p0.account_id, p0.currency, p0.amount, p0.usd,
-           p1.account_id AS other_id, a1.kind AS other_kind
+  // An exchange has four postings, and the money reaches the other account in the last one.
+  const ENTRY_JOINS = `
     FROM transactions t
     JOIN postings p0 ON p0.tx_id = t.id AND p0.seq = 0
     JOIN postings p1 ON p1.tx_id = t.id AND p1.seq = 1
-    JOIN accounts a1 ON a1.id = p1.account_id
+    LEFT JOIN postings p3 ON p3.tx_id = t.id AND p3.seq = 3
+    JOIN accounts a1 ON a1.id = COALESCE(p3.account_id, p1.account_id)
+  `;
+  const ENTRY_SELECT = `
+    SELECT t.id, t.kind, t.date, t.memo, t.rate, t.rate_date, t.rate_source, t.paid_currency, t.paid_amount,
+           p0.account_id, p0.currency, p0.amount, p0.usd,
+           COALESCE(p3.account_id, p1.account_id) AS other_id,
+           p3.currency AS arrived_currency, p3.amount AS arrived_amount
+    ${ENTRY_JOINS}
   `;
 
   function toEntry(row: TxRow): Entry {
     const system = row.kind === "starting" || row.kind === "adjustment";
-    // The first posting is the account's: money leaving it is below zero, but a spent or moved
-    // entry reads as a positive amount.
-    const flip = row.kind === "spent" || row.kind === "moved";
+    // The first posting is the account's: money leaving it is below zero, but a spent, moved or
+    // exchanged entry reads as a positive amount.
+    const flip = row.kind === "spent" || row.kind === "moved" || row.kind === "exchanged";
     return {
       id: row.id,
       kind: row.kind,
@@ -202,6 +215,8 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       amount: flip ? -row.amount : row.amount,
       usd: flip ? -row.usd : row.usd,
       rate: row.rate === null ? null : { value: row.rate, date: row.rate_date!, source: row.rate_source! },
+      paid: row.paid_currency === null ? null : { currency: row.paid_currency, amount: row.paid_amount! },
+      arrived: row.arrived_currency === null ? null : { currency: row.arrived_currency, amount: row.arrived_amount! },
     };
   }
 
@@ -242,23 +257,51 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
     rate: Rate | null,
     postings: Posting[],
     isNew: boolean,
+    paid: Foreign | null = null,
   ): void {
     assertBalanced(postings);
     const at = now();
     if (isNew) {
       db.prepare(
         `
-        INSERT INTO transactions (id, owner, kind, date, memo, rate, rate_date, rate_source, created_at, updated_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        INSERT INTO transactions
+          (id, owner, kind, date, memo, rate, rate_date, rate_source, paid_currency, paid_amount, created_at, updated_at)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
-      ).run(id, owner, kind, date, memo, rate?.value ?? null, rate?.date ?? null, rate?.source ?? null, at, at);
+      ).run(
+        id,
+        owner,
+        kind,
+        date,
+        memo,
+        rate?.value ?? null,
+        rate?.date ?? null,
+        rate?.source ?? null,
+        paid?.currency ?? null,
+        paid?.amount ?? null,
+        at,
+        at,
+      );
     } else {
       db.prepare(
         `
-        UPDATE transactions SET kind = ?, date = ?, memo = ?, rate = ?, rate_date = ?, rate_source = ?, updated_at = ?
+        UPDATE transactions SET kind = ?, date = ?, memo = ?, rate = ?, rate_date = ?, rate_source = ?,
+          paid_currency = ?, paid_amount = ?, updated_at = ?
         WHERE id = ? AND owner = ?
       `,
-      ).run(kind, date, memo, rate?.value ?? null, rate?.date ?? null, rate?.source ?? null, at, id, owner);
+      ).run(
+        kind,
+        date,
+        memo,
+        rate?.value ?? null,
+        rate?.date ?? null,
+        rate?.source ?? null,
+        paid?.currency ?? null,
+        paid?.amount ?? null,
+        at,
+        id,
+        owner,
+      );
       db.prepare("DELETE FROM postings WHERE tx_id = ?").run(id);
     }
     const insert = db.prepare(`
@@ -285,7 +328,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
     return row;
   }
 
-  /** Checks what a spent, received or moved entry names. */
+  /** Checks what a spent, received, moved or exchanged entry names. */
   function everydayPostings(
     owner: string,
     input: { kind: unknown; account: unknown; other?: unknown; amount: unknown },
@@ -303,10 +346,81 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       if (!isMoneyKind(other.kind)) invalid("Pick the account the money went to");
       if (other.id === account.id) invalid("Pick two different accounts");
       if (other.currency !== account.currency) {
-        invalid("A move stays in one currency. Exchanging between currencies comes in a later version.");
+        invalid("A move stays in one currency. Use Exchanged to change money into another currency.");
       }
     }
+    if (kind === "exchanged") {
+      if (!isMoneyKind(other.kind)) invalid("Pick the account the money went to");
+      if (other.currency === account.currency) invalid("An exchange is between two currencies. Use Moved instead.");
+    }
     return { kind, account, other, amount };
+  }
+
+  /** The price of a spent or received entry in the other currency, if it has one. */
+  function checkPaid(kind: Entry["kind"], paid: unknown, currency: Currency): Foreign | null {
+    if (paid === undefined || paid === null) return null;
+    if (kind !== "spent" && kind !== "received") invalid("Only spending and income can be in another currency");
+    const { currency: paidCurrency, amount } = paid as Partial<Foreign>;
+    if (!CURRENCIES.includes(paidCurrency as Currency)) invalid("That currency isn't available");
+    if (paidCurrency === currency) invalid("That's already the account's currency");
+    return { currency: paidCurrency as Currency, amount: checkCents(amount, "The price") };
+  }
+
+  /**
+   * The postings of an exchange. Each currency goes through the hidden exchange account, so each adds
+   * up to zero, and no rate is needed for the books to balance. The US dollar side is what it was worth.
+   */
+  function exchangePostings(
+    owner: string,
+    from: { id: string; currency: Currency; amount: number },
+    to: { id: string; currency: Currency; amount: number },
+  ): Posting[] {
+    const exchange = systemAccount(owner, "exchange");
+    const usd = from.currency === "USD" ? from.amount : to.amount;
+    return [
+      { account: from.id, currency: from.currency, amount: -from.amount, usd: -usd },
+      { account: exchange, currency: from.currency, amount: from.amount, usd },
+      { account: exchange, currency: to.currency, amount: -to.amount, usd: -usd },
+      { account: to.id, currency: to.currency, amount: to.amount, usd },
+    ];
+  }
+
+  /** What a spent, received, moved or exchanged entry is written as. `before` is the entry it replaces. */
+  function everydayTx(owner: string, input: NewEntry | EntryChange, date: IsoDate, before?: Entry) {
+    const { kind, account, other, amount } = everydayPostings(
+      owner,
+      input,
+      before ? [before.account, before.other] : [],
+    );
+    const currency = account.currency as Currency;
+
+    if (kind === "exchanged") {
+      const arrived = checkCents(input.arrived, "What arrived");
+      const postings = exchangePostings(
+        owner,
+        { id: account.id, currency, amount },
+        { id: other.id, currency: other.currency as Currency, amount: arrived },
+      );
+      return { kind, rate: null, paid: null, postings };
+    }
+
+    const paid = checkPaid(kind, input.paid, currency);
+    let usd: number;
+    let rate: Rate | null;
+    if (paid) {
+      // The US dollar side is what it cost, whichever side that is.
+      usd = paid.currency === "USD" ? paid.amount : amount;
+      rate = null;
+    } else {
+      // Dollars stay as they were saved unless what they depend on changed.
+      const same =
+        before?.paid === null && before.date === date && before.amount === amount && before.currency === currency;
+      ({ usd, rate } =
+        same && input.usd === undefined
+          ? { usd: before.usd, rate: before.rate }
+          : dollars(currency, amount, date, input.usd));
+    }
+    return { kind, rate, paid, postings: postingsOf(kind, account.id, other.id, currency, amount, usd) };
   }
 
   function postingsOf(
@@ -368,6 +482,48 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
     if (taken) conflict(`You already have ${name}`);
   }
 
+  /** What the user was worth at the end of a day, at that day's rate; null if the rate is needed and unknown. */
+  function worthOn(owner: string, date: IsoDate): number | null {
+    const rows = db
+      .prepare(
+        `
+        SELECT a.currency AS currency, SUM(p.amount) AS balance
+        FROM postings p
+        JOIN transactions t ON t.id = p.tx_id
+        JOIN accounts a ON a.id = p.account_id
+        WHERE t.owner = ? AND t.date <= ? AND a.kind IN ('cash', 'bank', 'savings', 'card')
+        GROUP BY a.id
+      `,
+      )
+      .all(owner, date) as unknown as { currency: Currency; balance: number }[];
+    const rate = lookupRate(date);
+    let worth = 0;
+    for (const { currency, balance } of rows) {
+      if (currency === "USD") worth += balance;
+      else if (balance !== 0 && !rate) return null;
+      else if (rate) worth += Math.round(balance / rate.value);
+    }
+    return worth;
+  }
+
+  function worthChange(owner: string, month: string, moneyIn: number, moneyOut: number): WorthChange | null {
+    const { start: startDay, end: endDay } = monthSpan(month);
+    if (startDay >= endDay) return null;
+    const start = worthOn(owner, startDay);
+    const end = worthOn(owner, endDay);
+    if (start === null || end === null) return null;
+    const { added } = db
+      .prepare(
+        `
+        SELECT COALESCE(SUM(p.usd), 0) AS added
+        FROM transactions t JOIN postings p ON p.tx_id = t.id AND p.seq = 0
+        WHERE t.owner = ? AND t.date > ? AND t.date <= ? AND t.kind IN ('starting', 'adjustment')
+      `,
+      )
+      .get(owner, startDay, endDay) as { added: number };
+    return { start, end, added, rates: end - start - moneyIn + moneyOut - added };
+  }
+
   function monthSummary(owner: string, month: string): MonthSummary {
     const from = `${month}-01`;
     const to = `${month}-31`;
@@ -387,24 +543,21 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       .filter((r) => r.kind === "expense" && r.usd !== 0)
       .map((r) => ({ category: r.category, usd: r.usd }))
       .sort((a, b) => b.usd - a.usd);
-    return {
-      month,
-      moneyIn: rows.filter((r) => r.kind === "income").reduce((sum, r) => sum - r.usd, 0),
-      moneyOut: spending.reduce((sum, r) => sum + r.usd, 0),
-      spending,
-    };
+    const moneyIn = rows.filter((r) => r.kind === "income").reduce((sum, r) => sum - r.usd, 0);
+    const moneyOut = spending.reduce((sum, r) => sum + r.usd, 0);
+    return { month, moneyIn, moneyOut, spending, change: worthChange(owner, month, moneyIn, moneyOut) };
   }
 
   return {
     load(owner, month) {
-      if (!/^\d{4}-\d{2}$/.test(month)) invalid("That month isn't valid");
+      if (!isMonth(month)) invalid("That month isn't valid");
       ensureBook(owner);
       const rows = db
         .prepare(
           `
           SELECT a.*, COUNT(p.tx_id) AS entries, COALESCE(SUM(p.amount), 0) AS balance
           FROM accounts a LEFT JOIN postings p ON p.account_id = a.id
-          WHERE a.owner = ? AND a.kind NOT IN ('starting', 'adjustment')
+          WHERE a.owner = ? AND a.kind NOT IN ('starting', 'adjustment', 'exchange')
           GROUP BY a.id
           ORDER BY a.grp COLLATE NOCASE, a.name COLLATE NOCASE
         `,
@@ -445,8 +598,8 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       const conditions = ["t.owner = ?"];
       const params: (string | number)[] = [owner];
       if (account) {
-        conditions.push("(p0.account_id = ? OR p1.account_id = ?)");
-        params.push(account, account);
+        conditions.push("(p0.account_id = ? OR p1.account_id = ? OR p3.account_id = ?)");
+        params.push(account, account, account);
       }
       if (q) {
         const like = `%${q.replace(/[\\%_]/g, "\\$&")}%`;
@@ -457,10 +610,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       const { n } = db
         .prepare(
           `
-          SELECT COUNT(*) AS n FROM transactions t
-          JOIN postings p0 ON p0.tx_id = t.id AND p0.seq = 0
-          JOIN postings p1 ON p1.tx_id = t.id AND p1.seq = 1
-          JOIN accounts a1 ON a1.id = p1.account_id
+          SELECT COUNT(*) AS n ${ENTRY_JOINS}
           WHERE ${where}
         `,
         )
@@ -482,10 +632,8 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
         roomForEntries(owner);
         const date = checkDate(input.date);
         const memo = checkText(input.memo, "The note", LIMITS.memo);
-        const { kind, account, other, amount } = everydayPostings(owner, input, []);
-        const currency = account.currency as Currency;
-        const { usd, rate } = dollars(currency, amount, date, input.usd);
-        writeTx(owner, id, kind, date, memo, rate, postingsOf(kind, account.id, other.id, currency, amount, usd), true);
+        const { kind, rate, paid, postings } = everydayTx(owner, input, date);
+        writeTx(owner, id, kind, date, memo, rate, postings, true, paid);
         return readEntry(owner, id)!;
       });
     },
@@ -501,35 +649,23 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
         const date = checkDate(input.date);
         const memo = checkText(input.memo, "The note", LIMITS.memo);
 
-        let kind: Entry["kind"];
-        let accountId: string;
-        let otherId: string;
-        let amount: number;
-        let currency: Currency;
         if (before.kind === "starting") {
-          kind = "starting";
-          accountId = before.account;
-          otherId = systemAccount(owner, "starting");
-          amount = checkCents(input.amount, "The amount", true);
+          const amount = checkCents(input.amount, "The amount", true);
           if (amount === 0) invalid("A starting balance can't be zero. Delete it instead.");
-          currency = before.currency;
-        } else {
-          const checked = everydayPostings(owner, input, [before.account, before.other]);
-          ({ kind, amount } = checked);
-          accountId = checked.account.id;
-          otherId = checked.other.id;
-          currency = checked.account.currency as Currency;
+          const same = date === before.date && amount === before.amount && input.usd === undefined;
+          const { usd, rate } = same
+            ? { usd: before.usd, rate: before.rate }
+            : dollars(before.currency, amount, date, input.usd);
+          const other = systemAccount(owner, "starting");
+          const postings = postingsOf("starting", before.account, other, before.currency, amount, usd);
+          remember(owner, before, "changed");
+          writeTx(owner, id, "starting", date, memo, rate, postings, false);
+          return readEntry(owner, id)!;
         }
 
-        // Dollars stay as they were saved unless what they depend on changed.
-        const same = date === before.date && amount === before.amount && currency === before.currency;
-        const kept = same && input.usd === undefined;
-        const { usd, rate } = kept
-          ? { usd: before.usd, rate: before.rate }
-          : dollars(currency, amount, date, input.usd);
-
+        const { kind, rate, paid, postings } = everydayTx(owner, input, date, before);
         remember(owner, before, "changed");
-        writeTx(owner, id, kind, date, memo, rate, postingsOf(kind, accountId, otherId, currency, amount, usd), false);
+        writeTx(owner, id, kind, date, memo, rate, postings, false, paid);
         return readEntry(owner, id)!;
       });
     },
@@ -595,7 +731,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
     changeAccount(owner, id, input) {
       transaction(db, () => {
         const row = accountRow(owner, id);
-        if (!row || row.kind === "starting" || row.kind === "adjustment") notFound("account");
+        if (!row || !(isMoneyKind(row.kind) || isCategoryKind(row.kind))) notFound("account");
         const money = isMoneyKind(row.kind);
         const name = input.name === undefined ? row.name : checkName(input.name);
         if (money) {
@@ -627,7 +763,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
     removeAccount(owner, id) {
       transaction(db, () => {
         const row = accountRow(owner, id);
-        if (!row || row.kind === "starting" || row.kind === "adjustment") notFound("account");
+        if (!row || !(isMoneyKind(row.kind) || isCategoryKind(row.kind))) notFound("account");
         if (db.prepare("SELECT 1 FROM postings WHERE account_id = ? LIMIT 1").get(id)) {
           conflict(`${row.name} has entries, so it can only be closed`);
         }

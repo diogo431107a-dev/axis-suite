@@ -1,8 +1,6 @@
-import { useEffect, useState } from "react";
-import type { Currency, IsoDate, Rate } from "../../shared/protocol.ts";
-import { api } from "../api.ts";
+import type { Currency, IsoDate } from "../../shared/protocol.ts";
 import { money, showDate } from "../format.ts";
-import type { TypedDollars } from "./typed.ts";
+import { useRate, type TypedDollars } from "./typed.ts";
 
 interface DollarsProps {
   currency: Currency | undefined;
@@ -16,24 +14,8 @@ interface DollarsProps {
 
 /** Under an amount in reais: what it is in dollars, the rate behind that, and a way to type it instead. */
 export function Dollars({ currency, cents, date, typed, saved }: DollarsProps) {
-  const [rate, setRate] = useState<{ date: IsoDate; rate: Rate | null } | null>(null);
   const brl = currency === "BRL";
-  const validDate = /^\d{4}-\d{2}-\d{2}$/.test(date);
-
-  useEffect(() => {
-    if (!brl || !validDate) return;
-    let cancelled = false;
-    void api<{ rate: Rate | null }>(`/api/rate?date=${date}`)
-      .then((answer) => {
-        if (!cancelled) setRate({ date, rate: answer.rate });
-      })
-      .catch(() => {
-        if (!cancelled) setRate({ date, rate: null });
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [brl, validDate, date]);
+  const { loading, rate } = useRate(date, brl);
 
   if (!brl) return null;
 
@@ -70,11 +52,11 @@ export function Dollars({ currency, cents, date, typed, saved }: DollarsProps) {
       </p>
     );
   }
-  if (!rate || rate.date !== date) return <p className="dollars muted">Finding the exchange rate…</p>;
-  if (!rate.rate) {
+  if (loading) return <p className="dollars muted">Finding the exchange rate…</p>;
+  if (!rate) {
     return <p className="dollars">No exchange rate is available for that day. {typeInstead}</p>;
   }
-  const { value, source } = rate.rate;
+  const { value, source } = rate;
   return (
     <p className="dollars">
       {cents !== null && cents !== 0 && (
@@ -83,7 +65,7 @@ export function Dollars({ currency, cents, date, typed, saved }: DollarsProps) {
         </>
       )}
       <span className="muted">
-        US$ 1 = R$ {value.toFixed(4)}, {source}, {showDate(rate.rate.date)}.
+        US$ 1 = R$ {value.toFixed(4)}, {source}, {showDate(rate.date)}.
       </span>{" "}
       {typeInstead}
     </p>
