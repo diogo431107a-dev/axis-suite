@@ -6,17 +6,17 @@ Items tagged #review or #approved in the owner's notes, and what the owner asked
 
 ## The order at a glance
 
-| Phase | Work                                  | Status       | Why it comes here                                        |
-| ----- | ------------------------------------- | ------------ | -------------------------------------------------------- |
-| 0     | The documents                         | Done         | Everything below refers to them                          |
-| 1     | Two small fixes                       | Done         | Independent of everything else                           |
-| 2     | Roster cards and notes                | Done         | One redesign of the card, one change to the saved game   |
-| 3     | In-game help, then strip explanations | Done         | Explanations need a new home before they leave           |
-| 4     | Lore in the labels                    | Done         | Only what survives phase 3 gets rewritten, and only once |
-| 5     | Roster simple/detailed mode           | Deliberation | May be unnecessary after phase 2                         |
-| 6     | Inn art and clerk                     | Deliberation | Speaks in the voice set by phase 4                       |
-| 7     | Damage formula and misses             | Deliberation | Angel mode's bonuses are tuned against these numbers     |
-| 8     | Angel mode                            | Deliberation | Needs the lore and the final combat numbers              |
+| Phase | Work                                  | Status    | Why it comes here                                        |
+| ----- | ------------------------------------- | --------- | -------------------------------------------------------- |
+| 0     | The documents                         | Done      | Everything below refers to them                          |
+| 1     | Two small fixes                       | Done      | Independent of everything else                           |
+| 2     | Roster cards and notes                | Done      | One redesign of the card, one change to the saved game   |
+| 3     | In-game help, then strip explanations | Done      | Explanations need a new home before they leave           |
+| 4     | Lore in the labels                    | Done      | Only what survives phase 3 gets rewritten, and only once |
+| 5     | Roster simple/detailed mode           | Rejected  | Phase 2's button already solved it                       |
+| 6     | Inn art and clerk                     | Postponed | Speaks in the voice set by phase 4                       |
+| 7     | Damage formula and misses             | Postponed | No solution yet for a miss on a real deed                |
+| 8     | Angel mode                            | Done      | Needs the lore; tuned against today's combat numbers     |
 
 ## Done
 
@@ -53,13 +53,31 @@ Items tagged #review or #approved in the owner's notes, and what the owner asked
 - Labels speak the lore's language: "Pay the tithe", "Run", "Call a companion", "The party falls". Attack, Spell, Item and Guard stay, as classic RPG words every player knows.
 - Attribute blurbs carry the new meaning of Resolve.
 
-## Under deliberation
+### Phase 8: Angel mode
 
-No promise on any of these. They are in the order they should happen if they happen.
+Like Trance in Final Fantasy IX: a bar fills slowly and, once full, gives benefits for a few turns before resetting to zero. It matches the Angel chosen at the start: Lunaria, whose rightful place it is, or Alecta, who usurps it and loves it. The game has no neutral word such as "patron". Whoever holds the place is the Angel.
+
+- **The choice:** right after the story, and on the next visit for heroes who started earlier. It lasts for the hero's whole road, and the dialog says so.
+- **Build-up:** about 33 turns with one or two companions acting, about 22 with a full party. Only a turn with a deed (an attack or a spell) fills the bar, so it can't be filled by pressing End turn.
+- **Duration:** 6 turns, which carry over between battles. If the party falls, she leaves.
+- **The Angel arrives and delivers the benefits, and doesn't attack.** The lore explains why: angels and devils may not strike a blow.
+- **Lunaria:** an extra attack at half power for each party member after using their action, less damage taken, and HP and MP back each turn.
+- **Alecta:** the foe takes more damage and deals less, and critical hits come far more often.
+- **The extra attack is not a check-in.** It adds damage only, and the foe doesn't counter it.
+- **Her place** is apart from the five, behind the party, and she shows only while present. The bar shows at camp and in battle.
+- **Art:** her painting when she arrives and in the choice, and a pixel sprite for the turns in battle. See the [credits](credits.md).
+
+The numbers are `TUNE.angel` in `web/data.js`, and the manual's spoiler part lists them. If Phase 7 ever changes the combat numbers, they need tuning again.
+
+## Rejected
 
 ### Phase 5: Roster simple/detailed mode
 
-Phase 2's button may already solve this. Decide after living with it.
+Phase 2's button already does this. The owner decided it stays as it is.
+
+## Postponed
+
+Not now, and no promise. They are in the order they should happen if they happen.
 
 ### Phase 6: Inn art and clerk
 
@@ -69,6 +87,8 @@ Phase 2's button may already solve this. Decide after living with it.
 This replaces the inn's panel on the camp page, which frees space there.
 
 ### Phase 7: Damage formula and misses
+
+**Why it is postponed.** When an activity is done, the reward it gives in the game is the damage done, so too many misses might be demotivating. In a regular game, a missed attack just means attacking again. Here, attacking again may mean doing the task again, which is a very different price. It waits until a solution is found.
 
 **"It seems the attacks never miss."** Correct: only Blind causes a miss, and it's a 50% chance. Foes never miss either. A base hit chance and evasive foes (bats, wisps) would add texture. One rule is fixed whatever is chosen: **a miss still records the habit**, as Blind already does, because the real repetition happened.
 
@@ -90,24 +110,6 @@ Nearly all of them add a small random spread, critical hits, and multipliers for
 **Recommendation:** a ratio formula, with a defence value for each foe family. Foes' HP grows by ×1.75 per tier, so a subtractive formula would swing between useless and overwhelming. Give the hero's sheet a small party-wide effect, so the attributes matter in battle.
 
 Any change here needs the balance simulated again. `TUNE` in `web/data.js` was tuned that way, and today's numbers assume a first knockout within about 5 fights.
-
-### Phase 8: Angel mode
-
-Like Trance in Final Fantasy IX: a bar fills slowly and, once full, gives benefits for a few turns before resetting to zero. It matches the Angel chosen at the start: Lunaria, whose rightful place it is, or Alecta, who usurps it and loves it. The game has no neutral word such as "patron". Whoever holds the place is the Angel.
-
-- **Build-up:** about 33 turns, faster with engagement and damage dealt.
-- **Duration:** about 6 turns. Short, but long enough to be missed.
-- **The Angel arrives and delivers the benefits, and doesn't attack.** The lore explains why: angels and devils may not strike a blow.
-- **Lunaria, the rightful Angel:** an extra attack for each party member after using their action, damage reduction, HP and MP regeneration each turn.
-- **Alecta, the usurper:** negative effects on the foe, and extra critical chance for the party.
-
-Things to settle:
-
-- **The extra attack must not count as a check-in**, or the game records a repetition that never happened. It should add damage only, not raise mastery.
-- **Existing players** need a way to choose their Angel, since it is otherwise chosen when starting. Suggested: the first time the bar would start to fill, or an event on the road.
-- **Saved game:** the choice of Angel and the bar need a new upgrade step.
-- **"The angel joins the party in a special place":** assumed to be a slot apart from the five, shown only while the Angel is present. **The owner should confirm.**
-- **Art:** `holy_angel.png` (Lunaria) and `succubus.png` (Alecta) are in `C:\Users\diogo\Claude\assets\angels`, but they are detailed paintings and the game is pixel art. Two options: show the painting as a full-screen moment when the Angel arrives, or draw pixel sprites from it. Suggested: both, the painting for the arrival and a sprite for the turns that follow. The succubus file is 2.4 MB and needs shrinking for the web. Neither goes into the repository before this phase, and the repository is public.
 
 ## Open questions from the documents
 

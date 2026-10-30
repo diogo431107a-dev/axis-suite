@@ -29,6 +29,8 @@ web/
   views.js           every screen, as HTML strings
   battle.js          the battle scene: the canvas loop and the turn's choreography
   sound.js           the sound effects, as note lists the browser plays, and the volume
+public/
+  angels/            the paintings of Lunaria and Alecta (see docs/credits.md)
   input.js           clicks, keys and forms
   net.js             the account, loading and saving the game, the ranking
   main.js            start-up

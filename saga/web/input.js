@@ -25,6 +25,7 @@ import {
   applyDamage,
   benchMember,
   buyItem,
+  chooseAngel,
   defeatEnemy,
   findVice,
   gameOver,
@@ -146,6 +147,23 @@ export const ACTIONS = {
   about: () => openPicker({ type: "about" }),
   help: () => openPicker({ type: "help" }),
   opening: () => openPicker({ type: "opening" }),
+  // A hero who hasn't chosen an Angel chooses straight after the story.
+  afterOpening: () => {
+    if (state.angel.who) closePicker();
+    else openPicker({ type: "angel" });
+  },
+  openAngel: () => {
+    if (!busyInBattle()) openPicker({ type: "angel" });
+  },
+  pickAngel: (d) => {
+    if (chooseAngel(state, d.who)) play("angel");
+    closePicker();
+    render();
+  },
+  fillAngel: () => {
+    state.angel.bar = TUNE.angel.bar - 0.5;
+    render();
+  },
   toggleSkills: (d) => {
     state.ui.skillsOpen[d.id] = !state.ui.skillsOpen[d.id];
     render();

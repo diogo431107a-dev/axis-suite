@@ -37,6 +37,14 @@ export const TUNE = {
     dropMin: 0.15,
     dropShare: [0.05, 0.15],
   }, // hidden from the player
+  angel: {
+    bar: 100, // a full bar brings her; it fills only on turns with a deed
+    fill: { turn: 2, perDeed: 0.5, damage: 1 }, // damage: up to this much, by the share of the foe's HP dealt
+    turns: 6, // how long she stays
+    lunaria: { echo: 0.5, shelter: 0.25, regen: 0.1 }, // extra attack's power, damage shaved, HP and MP back per turn
+    alecta: { exposed: 1.3, unnerved: 0.2, crit: 0.4 }, // foe's damage taken, foe's damage shaved, critical chance
+  },
+  crit: 0.1, // chance of a critical attack
   items: {
     potion: { price: 30, heal: 0.4 },
     ether: { price: 25, mp: 15 },
@@ -137,6 +145,51 @@ export const SCHOOLS = {
   ward: { name: "Ward", attr: "order", lore: "A house in order holds against the bad week." },
   finish: { name: "Finish", attr: "resolve", lore: "The last push is worth more than the first." },
   charm: { name: "Charm", attr: "charisma", lore: "Some fights are won by not having them." },
+};
+
+// Who may stand in the Angel's place. Lunaria by right, or Alecta usurping it.
+export const ANGELS = {
+  lunaria: {
+    name: "Lunaria",
+    claim: "The rightful Angel. She will tell you that you're worth saving, and she means it.",
+    gift: "Strength and shelter.",
+    arrives: "Lunaria takes her place. For a short time, she stands with you.",
+    leaves: "The law drags Lunaria back. The place stands empty.",
+    painting: "/angels/lunaria.webp",
+    color: "#ffd98a",
+    pal: {
+      o: "#3a3350",
+      e: "#2e6fb0",
+      w: "#f7f5ff",
+      c: "#c9cce6",
+      h: "#ecebf5",
+      s: "#f5d6c4",
+      a: "#fbf6e6",
+      y: "#f0c14a",
+    },
+  },
+  alecta: {
+    name: "Alecta",
+    claim:
+      "She wears the title with no right to it, and loves every moment. She will tell you that you're worth having.",
+    gift: "Her attention, on your enemy.",
+    arrives: "Alecta sits down in the Angel's place as if it had been built for her.",
+    leaves: "The law drags Alecta back. She blows you a kiss on the way.",
+    painting: "/angels/alecta.webp",
+    color: "#b58cff",
+    pal: {
+      o: "#120e1e",
+      e: "#6a3fd0",
+      g: "#2f2748",
+      t: "#c0392b",
+      h: "#ead9a0",
+      s: "#e8c8cf",
+      a: "#2c3f78",
+      c: "#6f8fe0",
+      b: "#1d2850",
+      y: "#c0392b",
+    },
+  },
 };
 
 export const CLASSES = {

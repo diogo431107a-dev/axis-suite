@@ -1,5 +1,5 @@
 import { BT, startScene, stopScene, updateBattleLog, updateCmd } from "./battle.js";
-import { ATTR, ATTRS, AVATARS, ENEMIES, ENEMY_BY_KEY, ITEMS, SCHOOLS, STATUSES, TIERS, TUNE } from "./data.js";
+import { ANGELS, ATTR, ATTRS, AVATARS, ENEMIES, ENEMY_BY_KEY, ITEMS, SCHOOLS, STATUSES, TIERS, TUNE } from "./data.js";
 import {
   actedThisTurn,
   atFront,
@@ -193,6 +193,17 @@ export function heroSheet(s) {
   </section>`;
 }
 
+// The Angel's place: a bar with no numbers, or who stands there now.
+export function angelPlace(s) {
+  const a = s.angel;
+  if (!a.who)
+    return `<div class="angel-place"><span>The Angel's place stands empty.</span><button class="btn small" data-action="openAngel">Choose</button></div>`;
+  const def = ANGELS[a.who];
+  if (a.left)
+    return `<div class="angel-place is-here" style="--c:${def.color}"><canvas class="px" data-sprite="angel:${a.who}" data-s="1"></canvas><span>${def.name} stands with you.</span></div>`;
+  return `<div class="angel-place" style="--c:${def.color}"><span>The Angel's place</span>${bar(pct(a.bar, TUNE.angel.bar), def.color, "thin")}</div>`;
+}
+
 export function campView() {
   const s = state,
     e = s.enemy,
@@ -253,6 +264,7 @@ export function campView() {
       <section class="win" aria-label="Party">
         <h2 class="sect">Party <span class="num">${s.party.length} / ${TUNE.partySize}</span></h2>
         <div class="party-slots">${slots.join("")}</div>
+        ${angelPlace(s)}
         <div class="party-foot">
           <span>Bag: ${bagCount(s)} item${bagCount(s) === 1 ? "" : "s"} · ${openTasks(s).length} open tasks</span>
           <span class="acts">
@@ -634,6 +646,7 @@ export function battleView() {
     <div class="cmd-wrap">
       <section class="win">
         <h2 class="sect">Party turn <span id="turn-label">Turn ${state.turn}</span></h2>
+        <div id="angel-place"></div>
         <div class="cmd-list" id="cmd-list"></div>
       </section>
       <section class="win blog-wrap">
@@ -929,6 +942,7 @@ export function debugStrip() {
     <button class="btn small" data-action="kill">Defeat current foe</button>
     <button class="btn small" data-action="skipTier">Skip to next tier</button>
     <button class="btn small" data-action="wipe">Wipe party</button>
+    <button class="btn small" data-action="fillAngel">Fill the Angel's bar</button>
   </footer>`;
 }
 
@@ -949,6 +963,19 @@ export function pickerHtml() {
   } else if (p.type === "opening") {
     title = "The Saga of the Turning";
     body = openingHtml();
+  } else if (p.type === "angel") {
+    title = "The Angel's place";
+    sub = "The law gives you the choosing, and only once. Whoever you choose stands there for this hero's whole road.";
+    body = `<div class="angel-choice">${Object.entries(ANGELS)
+      .map(
+        ([id, a]) => `<button class="pick angel-pick" style="--c:${a.color}" data-action="pickAngel" data-who="${id}">
+        <img src="${a.painting}" alt="${a.name}">
+        <span class="angel-name">${a.name}</span>
+        <span>${esc(a.claim)}</span>
+        <span class="angel-gift">${esc(a.gift)}</span>
+      </button>`,
+      )
+      .join("")}</div>`;
   } else if (p.type === "items") {
     const user = p.user && findHabit(s, p.user);
     title = inBattle() && user ? `${user.name}: use an item` : "Use an item";
@@ -1086,7 +1113,7 @@ function openingHtml() {
     <p>So Lunaria and Alecta, an angel and a devil, met on a bare hill under a full moon and made a wager. They would find one soul, so low and so unpromising that even the Dragon's children had stopped bothering with it. If that soul could turn, anyone could.</p>
     <p>They looked for a long time. In the end they found you.</p>
     <p>You wake in a cellar in the meadows. The villagers have a name for you, and it isn't kind. Something small rustles in the grass.</p>
-    <button class="btn primary" data-action="closePicker" style="align-self:flex-start">Get up</button>
+    <button class="btn primary" data-action="afterOpening" style="align-self:flex-start">Get up</button>
   </div>`;
 }
 export function renderModal() {

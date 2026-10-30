@@ -1,6 +1,7 @@
-import { ATTR, ENEMY_BY_KEY, SCHOOLS, STATUSES, TIERS } from "./data.js";
+import { ANGELS, ATTR, ENEMY_BY_KEY, SCHOOLS, STATUSES, TIERS } from "./data.js";
 import {
   actedThisTurn,
+  angelHere,
   attack,
   attackPower,
   attemptFlee,
@@ -27,9 +28,19 @@ import {
   turnDone,
 } from "./rules.js";
 import { play } from "./sound.js";
-import { ambient, companionSprite, enemySprite, hydrate, makeBg, paintAtFeet, tombSprite } from "./sprites.js";
+import {
+  ambient,
+  angelSprite,
+  companionSprite,
+  enemySprite,
+  hydrate,
+  makeBg,
+  paintAtFeet,
+  tombSprite,
+} from "./sprites.js";
 import {
   RM,
+  angelPlace,
   bagCount,
   closePicker,
   esc,
@@ -105,6 +116,8 @@ export const FORMATION = [
   [206, 168],
 ];
 export const ENEMY_FEET = [88, 158];
+// The Angel's place: behind the party, off the ground. She never strikes, so she never moves from it.
+export const ANGEL_FEET = [288, 92];
 export const slotPos = (id) => FORMATION[Math.max(0, state.party.indexOf(id))];
 export const foeTop = () => {
   const def = ENEMY_BY_KEY[BT.shown.key];
@@ -172,6 +185,15 @@ export function drawScene(now, dt) {
   g.globalAlpha = BT.fade;
   paintAtFeet(g, sp, efx + sx + BT.ex, efy + bob, es, { white: BT.flash > 0.45, dissolve: BT.dissolve });
   g.globalAlpha = 1;
+
+  // the Angel, while she stays, and a pip for each turn she has left
+  if (angelHere(state)) {
+    const [ax, ay] = ANGEL_FEET,
+      who = state.angel.who;
+    paintAtFeet(g, angelSprite(who), ax, ay + (RM ? 0 : Math.round(Math.sin(now / 600) * 2)), 2);
+    g.fillStyle = ANGELS[who].color;
+    for (let k = 0; k < state.angel.left; k++) g.fillRect(ax - 14 + k * 5, ay + 6, 3, 3);
+  }
 
   // party, back to front
   const units = state.party.map((id, i) => ({ u: findHabit(state, id), pos: FORMATION[i] })).filter((x) => x.u);
@@ -291,6 +313,11 @@ export function updateCmd() {
       })
       .join("") || '<p class="hint">No one is in the party. Add companions from the Roster.</p>';
   hydrate(list);
+  const place = document.getElementById("angel-place");
+  if (place) {
+    place.innerHTML = angelPlace(s);
+    hydrate(place);
+  }
   ["flee-btn", "endturn-btn", "vice-btn"].forEach((id) => {
     const b = document.getElementById(id);
     if (b) b.disabled = BT.busy;
@@ -340,6 +367,15 @@ export async function playFoeTurn(rep) {
       addFloater("-" + k.dmg, p[0], p[1] - 40, "#7ccf5a", false);
     });
   }
+  if (rep.regen.length) {
+    await wait(dur(300));
+    play("heal");
+    rep.regen.forEach((r) => {
+      const p = slotPos(r.id);
+      addFloater(r.hp ? "+" + r.hp : "+MP", p[0], p[1] - 40, "#7cf0a0", false);
+    });
+    updateCmd();
+  }
   if (rep.charmed) return;
   const moves =
     rep.events
@@ -380,6 +416,27 @@ const grewUp = (r) =>
   r.hero1 > r.hero0 ||
   r.title1 !== r.title0 ||
   r.members.some((c) => c.lv1 > c.lv0 || c.m1 > c.m0 || c.sp1 > c.sp0 || c.fl1 > c.fl0);
+// The Angel's arrival: her painting fills the screen, until a click or a short wait. The flag lives in
+// the saved game, so a reload or a victory on that turn only puts it off to the next chance.
+export async function angelArrives() {
+  const a = state.angel;
+  if (!a.arriving) return;
+  a.arriving = false;
+  const def = ANGELS[a.who];
+  updateBattleLog();
+  if (document.hidden) return;
+  play("angel");
+  const el = document.createElement("div");
+  el.className = "angel-arrival";
+  el.style.setProperty("--c", def.color);
+  el.innerHTML = `<img src="${def.painting}" alt="${def.name}"><p>${esc(def.arrives)}</p>`;
+  document.body.append(el);
+  await new Promise((done) => {
+    el.addEventListener("click", done, { once: true });
+    setTimeout(done, dur(3400));
+  });
+  el.remove();
+}
 // Runs the foe's turn (animated) and handles Game Over. Returns true if the battle ended.
 export async function runFoeTurn() {
   BT.busy = true;
@@ -391,6 +448,7 @@ export async function runFoeTurn() {
     await finishGameOver();
     return true;
   }
+  await angelArrives();
   BT.busy = false;
   updateCmd();
   updateBattleLog();
@@ -432,6 +490,16 @@ export async function resolveOutcome(id, res) {
       BT.ex = 24 * (1 - ease(t));
     });
     await wait(dur(380));
+  }
+  if (res.echo) {
+    await lunge(id);
+    play("hit");
+    BT.flash = 1;
+    addFloater(String(res.echo.dmg), ENEMY_FEET[0], foeTop(), ANGELS.lunaria.color, false);
+    setPlate(BT.shown, res.echo.hpAfter);
+    updateBattleLog();
+    await wait(dur(120));
+    await retreat(id);
   }
   if (res.kill) {
     if (res.gameOver) {
@@ -610,9 +678,9 @@ export function startBattle() {
   state.anthem = null;
   state.ward = null;
   go("battle");
-  if (turnDone(state)) {
+  if (state.angel.arriving || turnDone(state)) {
     BT.busy = true;
     updateCmd();
-    wait(dur(600)).then(afterAction);
+    wait(dur(600)).then(angelArrives).then(afterAction);
   }
 }

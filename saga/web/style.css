@@ -1780,3 +1780,93 @@ input[type="range"] {
 .pick + .swap.confirm {
   margin-top: -2px;
 }
+
+/* ---------- the Angel's place ---------- */
+.angel-place {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--muted);
+}
+.angel-place > span {
+  white-space: nowrap;
+}
+.angel-place .bar {
+  flex: 1;
+}
+.angel-place.is-here {
+  color: var(--fg);
+}
+#angel-place .angel-place {
+  margin: 0 0 10px;
+}
+.angel-choice {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.pick.angel-pick {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  height: auto;
+  text-align: left;
+  border-color: var(--c);
+}
+.angel-pick img {
+  width: 100%;
+  aspect-ratio: 2 / 3;
+  object-fit: cover;
+  display: block;
+}
+.angel-name {
+  font-family: var(--display);
+  font-size: 11px;
+}
+.angel-gift {
+  color: var(--muted);
+}
+.angel-arrival {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 16px;
+  background: rgba(8, 5, 14, 0.94);
+  cursor: pointer;
+  animation: angel-in 0.5s ease-out;
+}
+.angel-arrival img {
+  max-height: 76vh;
+  max-width: 100%;
+  border: 3px solid var(--c);
+}
+.angel-arrival p {
+  margin: 0;
+  max-width: 34em;
+  text-align: center;
+  font-size: 17px;
+  color: var(--c);
+}
+@keyframes angel-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .angel-arrival {
+    animation: none;
+  }
+}
+@media (max-width: 480px) {
+  .angel-place > span {
+    white-space: normal;
+  }
+}

@@ -130,7 +130,7 @@ The notes below are for us, not for the player. Phase 4 of the [roadmap](roadmap
 | Game Over         | Waking at camp. The word "over" never appears     |
 | Stars on the road | The road again, and the rats are bigger           |
 | Hall of Fame      | What the heralds sing                             |
-| The Angel (later) | Lunaria by right, or Alecta usurping her place    |
+| The Angel         | Lunaria by right, or Alecta usurping her place    |
 | The server owner  | The keeper of this realm (already in the game)    |
 
 ### Foe lines: samples of the rewrite

@@ -4,6 +4,7 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- **The Angel's place.** Every hero chooses, once and for their whole road, who stands there: Lunaria by right, or Alecta usurping her. New heroes choose after the story, and existing heroes on their next visit. A gold bar fills slowly on turns when you do a deed. When it is full she arrives, with her painting, and stays 6 turns. Beside Lunaria each companion strikes again after acting, takes less damage and recovers each turn. Beside Alecta the foe takes more and deals less, and critical hits come far more often. The extra attack is only damage: it records nothing and raises no mastery. Neither Angel strikes a blow.
 - The game now tells a story. A new hero sees its opening once, and existing heroes see it once on their next visit. Regions, foes, titles and buttons speak in its voice: "Pay the tithe" replaces "Log a vice", "Run" replaces "Flee", and the party falls and wakes at camp instead of "Game Over".
 - Screens are much emptier. Most explanations left the game for the manual, including what spells do and how foes attack. Damage, HP, MP, gold and levels stay, and so do the warnings before anything irreversible.
 - A **?** at the top of every screen, battle included, opens a short help with a link to the manual.
