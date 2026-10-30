@@ -143,6 +143,58 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@types/node@22.20.5)(happy-dom@20.14.6)(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
 
+  fafnir:
+    dependencies:
+      '@axis-suite/heimdall-client':
+        specifier: workspace:*
+        version: link:../packages/heimdall-client
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1(supports-color@8.1.1)
+    devDependencies:
+      '@fontsource/cinzel':
+        specifier: ^5.2.0
+        version: 5.3.0
+      '@fontsource/inter':
+        specifier: ^5.2.0
+        version: 5.3.0
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.2
+        version: 6.0.3(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
+      concurrently:
+        specifier: ^9.1.2
+        version: 9.2.3
+      lucide-react:
+        specifier: ^0.525.0
+        version: 0.525.0(react@19.2.7)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.0
+        version: 8.1.0(@types/node@22.20.5)(jiti@2.7.0)
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@types/node@22.20.5)(happy-dom@20.14.6)(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
+
   heimdall:
     devDependencies:
       '@types/node':
@@ -706,6 +758,9 @@ packages:
 
   '@fontsource/cinzel@5.3.0':
     resolution: {integrity: sha512-KEOYTsrRppW0uRIPWBDPrQgunCS6f8u4nzZxYRBfo9SCknKojLYjK7B0ZoVmJhyVLefz271ZQRF9EOpHZlfhRw==}
+
+  '@fontsource/inter@5.3.0':
+    resolution: {integrity: sha512-RofMylZmjlJEfELXeNHFWBRcSs75rGU/6bV2S2jfnvv/3rPXPGe0LgUJTklcHZ9lM4OZmAVFhcJPnACfb91A3g==}
 
   '@fontsource/jost@5.3.0':
     resolution: {integrity: sha512-lORv5y49hSoLVxjGb0qNuBzXvnaNYI3B94200uGPGJFei8fao6d6LLz2ziWbOZubGfZnibzuT6GVNX8fBw8WQQ==}
@@ -1893,6 +1948,8 @@ snapshots:
     optional: true
 
   '@fontsource/cinzel@5.3.0': {}
+
+  '@fontsource/inter@5.3.0': {}
 
   '@fontsource/jost@5.3.0': {}
 
