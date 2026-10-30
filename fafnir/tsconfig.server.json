@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    // server/ imports shared/, so both are compiled and the output keeps the folder names:
+    // dist/server/index.js, where the service unit expects it, and dist/shared/.
+    "rootDir": ".",
+    "outDir": "dist",
+    "tsBuildInfoFile": "dist/tsconfig.server.tsbuildinfo"
+  },
+  "include": ["server", "shared"],
+  // Tests are type-checked by tsconfig.vite.json and tsconfig.web.json, never built.
+  "exclude": ["**/*.test.ts"],
+  "references": [{ "path": "../packages/heimdall-client/tsconfig.server.json" }]
+}
