@@ -378,6 +378,11 @@ button {
   font-size: 16px;
   line-height: 1.2;
 }
+.hero-title .voice {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
 .hero-lv {
   display: flex;
   justify-content: space-between;
@@ -433,19 +438,8 @@ button {
 .attr .bar {
   grid-column: 2 / 4;
 }
-.attr .blurb {
-  grid-column: 2 / 4;
-  font-size: 14px;
-  color: var(--muted);
-  margin-top: 2px;
-}
 .attr .pen {
   color: var(--vice);
-}
-.sheet-note {
-  font-size: 14px;
-  color: var(--muted);
-  margin-bottom: 12px;
 }
 
 .report {
@@ -503,12 +497,6 @@ button {
 .lore {
   color: var(--muted);
   font-size: 15px;
-}
-.atk-note {
-  font-size: 14px;
-  color: var(--fg);
-  border-left: 3px solid var(--hp);
-  padding-left: 8px;
 }
 .front-note {
   font-size: 14px;
@@ -770,6 +758,21 @@ button {
   font-family: var(--display);
   font-size: 8px;
   color: var(--muted);
+}
+.comp-note {
+  font-size: 15px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  border-left: 3px solid var(--c, var(--edge-dim));
+  padding-left: 8px;
+}
+.note-form {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.note-form textarea {
+  resize: vertical;
 }
 .skills {
   display: grid;
@@ -1230,6 +1233,37 @@ input[type="range"] {
   font-size: 15px;
   color: var(--muted);
 }
+.help {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  font-size: 16px;
+}
+.help h3 {
+  font-family: var(--display);
+  font-size: 9px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 6px;
+}
+.help-attrs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+}
+.help-links {
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  align-items: baseline;
+}
+.help-links a {
+  color: var(--accent);
+}
 .about {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -1484,11 +1518,6 @@ input[type="range"] {
 .beast .b-lore {
   font-size: 12px;
   color: var(--muted);
-  line-height: 1.25;
-}
-.beast .b-atk {
-  font-size: 12px;
-  color: var(--fg);
   line-height: 1.25;
 }
 

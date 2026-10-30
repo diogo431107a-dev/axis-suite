@@ -8,76 +8,50 @@ Items tagged #review or #approved in the owner's notes, and what the owner asked
 
 | Phase | Work                                  | Status       | Why it comes here                                        |
 | ----- | ------------------------------------- | ------------ | -------------------------------------------------------- |
-| 0     | The documents                         | Guaranteed   | Everything below refers to them                          |
-| 1     | Two small fixes                       | Guaranteed   | Independent of everything else                           |
-| 2     | Roster cards and notes                | Guaranteed   | One redesign of the card, one change to the saved game   |
-| 3     | In-game help, then strip explanations | Guaranteed   | Explanations need a new home before they leave           |
-| 4     | Lore in the labels                    | Guaranteed   | Only what survives phase 3 gets rewritten, and only once |
+| 0     | The documents                         | Done         | Everything below refers to them                          |
+| 1     | Two small fixes                       | Done         | Independent of everything else                           |
+| 2     | Roster cards and notes                | Done         | One redesign of the card, one change to the saved game   |
+| 3     | In-game help, then strip explanations | Done         | Explanations need a new home before they leave           |
+| 4     | Lore in the labels                    | Done         | Only what survives phase 3 gets rewritten, and only once |
 | 5     | Roster simple/detailed mode           | Deliberation | May be unnecessary after phase 2                         |
 | 6     | Inn art and clerk                     | Deliberation | Speaks in the voice set by phase 4                       |
 | 7     | Damage formula and misses             | Deliberation | Angel mode's bonuses are tuned against these numbers     |
 | 8     | Angel mode                            | Deliberation | Needs the lore and the final combat numbers              |
 
-## Guaranteed
+## Done
 
 ### Phase 0: The documents
 
-- [Philosophy](philosophy.md), including the theory of why the attributes are as they are (#review).
-- [Manual](manual.md), [lore](lore.md), [in-game help text](help.md) and this roadmap.
-- Resolve is redefined as exceptional work and extra effort. The documents take this up now, and the game's own wording follows in phase 4.
+[Philosophy](philosophy.md) with the theory of the attributes, [manual](manual.md), [lore](lore.md), [in-game help text](help.md) and this roadmap.
 
 ### Phase 1: Two small fixes
 
-- **Remove the "who steps out?" screen after creating a habit** (#review #approved). A new habit waits on the bench when the party is full. The screen comes from `web/input.js:350`. The same screen stays for the Join button (`input.js:70`), where you are in fact asking someone to join.
-- **New companions default to the attribute you're viewing** (#review). Confirmed as a bug: `attrPicker` in `web/views.js:396` always selects Body, whichever filter is on. With a filter on Resolve, the new habit should default to Resolve. Creating a habit also resets the filter to All (`input.js:349`), and that should stop too, so the new companion shows up where you were looking.
-
-**Decision for the owner:** should the new-vice form follow the same rule? It shares the picker. Suggested: yes.
+- The "who steps out?" screen no longer appears after creating a habit. With the party full, a new companion waits on the bench. The same screen stays on the Join button, where you are in fact asking someone to join.
+- New companions and new vices start on the attribute being viewed. The filter stays on after creating one, unless the new one wouldn't show under it.
 
 ### Phase 2: Roster cards and notes
 
-These go together. The card is redesigned once, with the notes in mind, and both notes change the saved game, so they share one upgrade step (`GAME_VERSION` in `web/rules.js`, `MIGRATIONS` in `web/net.js`).
-
-- **Mastery, spell and flee levels behind a button** (#review), to save space.
-- **A note for each companion** on the Roster (#review). Why this habit, what counts as doing it, what the current goal is.
-- **An optional note when attacking** (#review). It must stay truly optional: keys 1 to 5 and the Attack button still strike at once, and the note is a separate small button.
-
-**Decision for the owner:** where do attack notes live? The chronicle keeps only the last 80 entries and shows 6, so it won't hold them for long. The whole saved game must also stay under the server's 512 KB limit (`server/index.ts:39`). Suggested: each companion keeps its most recent 50 notes, viewable from its card.
+- Mastery, spell and flee levels are behind a Skills button on each card.
+- Each companion has a note of up to 500 characters, behind a Note button. Older saves upgrade on load (`GAME_VERSION` 5).
+- **Rejected by the owner:** an optional note when attacking.
 
 ### Phase 3: In-game help, then strip the explanations
 
-The order inside this phase matters: the help has to exist before the explanations go.
+- The **?** at the top of every screen, battle included, opens [the help](help.md). It links to the manual on GitHub, the simplest way to reach it for now.
+- Stripped: the Attributes note and blurbs on the sheet, page introductions, the battle hint, "Victory pays…", the Inn's explanation, the Travel and tithe introductions, the note on heat, the tooltip on a companion's points, spell effects in the Spellbook and in battle.
+- Foes' attack descriptions and the rewards in the Bestiary are gone too. HP stays. The attack list moved to the manual.
+- The attribute descriptions moved into the help, and the attribute picker links there, so a new player can still classify a habit.
 
-1. **Online help in the game** (#review), using [the draft text](help.md), one click away from any screen. Battle included.
-2. **A way to reach the manual.** The manual is currently only a file in the repository. Suggested: a link from the help page. Serving a copy from `saga.<domain>` would be neater, but that is more work for little gain at the start.
-3. **Strip what the manual now covers.** The inventory, from `web/views.js`:
-   - The note under the hero's Attributes, and each attribute's blurb on the sheet.
-   - The intro paragraphs of the Roster, Vices, Spellbook, Shop, Bestiary and Hall of Fame.
-   - The Battle hint under the party's turn.
-   - "Victory pays…" on the foe's card, and the Inn's paragraph.
-   - The Travel and Log a vice introductions, and the vice card's notes on heat and gold.
-
-**What stays, in plain words:**
-
-- Warnings before irreversible actions: deleting a companion or a vice, logging a vice, starting over and deleting the account.
-- Damage, HP, MP, gold and levels.
-- Everything on the Account page and in sign-in forms. Those belong to the player's account, not to the game's mystery.
-
-**Watch out:** the attribute picker for a new habit shows only each attribute's name and class. Today the descriptions live on the hero's sheet, so once they are stripped, a new player has nothing to classify a habit with. Suggested: a link from the picker to the attributes in the help or manual.
-
-**Decision for the owner:** a foe's description of its attacks ("bites one member 1–3 times") and the HP and rewards listed in the Bestiary. Are those explanations or the numbers of a fight? Suggested: keep HP, remove the attack descriptions and rewards, so the Bestiary fills in by being fought.
+**Stayed, in plain words:** warnings before irreversible actions (deleting a companion or a vice, paying a tithe, starting over, deleting the account), damage, HP, MP, gold and levels, and the Account page and sign-in forms.
 
 ### Phase 4: Lore in the labels
 
-Needs [the lore](lore.md) approved first.
-
-- A short opening told at the start of a new game, and "A decent story" from the notes carried through in fragments.
-- All 48 foe lines rewritten in-world. Some samples are in the lore document.
-- Titles and the villagers' mockery, fading as the hero climbs.
-- Remaining labels in the lore's voice, and the Spellbook's "things that resist structure" dropped.
-- Attribute blurbs rewritten, including the new meaning of Resolve.
-- README intro and welcome screen brought in line.
-
-None of this changes the saved game: the labels are drawn from `web/data.js` and `web/views.js`, and old saves hold only the keys.
+- The story's opening appears once for each hero, and again from the help.
+- A line of story arrives in the chronicle when the party reaches each region, and those lines also head the Bestiary's regions.
+- Foe lines that named the real world are rewritten in-world.
+- Titles now say who is speaking: the villagers at first, the songs from 25 fame.
+- Labels speak the lore's language: "Pay the tithe", "Run", "Call a companion", "The party falls". Attack, Spell, Item and Guard stay, as classic RPG words every player knows.
+- Attribute blurbs carry the new meaning of Resolve.
 
 ## Under deliberation
 

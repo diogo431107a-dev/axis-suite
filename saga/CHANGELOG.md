@@ -4,6 +4,13 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- The game now tells a story. A new hero sees its opening once, and existing heroes see it once on their next visit. Regions, foes, titles and buttons speak in its voice: "Pay the tithe" replaces "Log a vice", "Run" replaces "Flee", and the party falls and wakes at camp instead of "Game Over".
+- Screens are much emptier. Most explanations left the game for the manual, including what spells do and how foes attack. Damage, HP, MP, gold and levels stay, and so do the warnings before anything irreversible.
+- A **?** at the top of every screen, battle included, opens a short help with a link to the manual.
+- Each companion's card has a **Note** for your own words on the habit, and its mastery, spell and flee levels are now behind a **Skills** button.
+- Creating a habit with a full party no longer asks who steps out: the new companion waits on the bench.
+- New companions and vices start on the attribute you are viewing, not always Body, and the Roster stays on that attribute afterwards.
+- Resolve now means exceptional work and extra effort, not only finished projects.
 - New documents in `saga/docs`, for you to review: the philosophy behind the game and its attributes, a player's manual, a draft of the lore, the text for an in-game help, and a roadmap of what changes next. Nothing in the game changes yet.
 
 ## 0.0.12 — 2026-10-25

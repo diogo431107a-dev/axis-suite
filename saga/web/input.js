@@ -36,6 +36,7 @@ import {
   removeTask,
   removeVice,
   restAtInn,
+  setHabitNote,
   skipTier,
   swapMember,
   turnDone,
@@ -142,6 +143,22 @@ export const ACTIONS = {
     render();
   },
   about: () => openPicker({ type: "about" }),
+  help: () => openPicker({ type: "help" }),
+  opening: () => openPicker({ type: "opening" }),
+  toggleSkills: (d) => {
+    state.ui.skillsOpen[d.id] = !state.ui.skillsOpen[d.id];
+    render();
+  },
+  editNote: (d) => {
+    state.ui.noteFor = d.id;
+    render();
+    const n = document.querySelector("#note-form textarea");
+    if (n) n.focus();
+  },
+  cancelNote: () => {
+    state.ui.noteFor = null;
+    render();
+  },
   openItems: (d) => {
     if (!busyInBattle()) openPicker({ type: "items", user: d.user });
   },
@@ -335,6 +352,12 @@ app.addEventListener("submit", (e) => {
     submitAccountForm(f);
     return;
   }
+  if (f.id === "note-form") {
+    setHabitNote(state, f.dataset.id, f.elements.note.value);
+    state.ui.noteFor = null;
+    render();
+    return;
+  }
   const name = f.elements.name.value.trim();
   if (!name) {
     state.ui.formErr = "Give it a name first.";
@@ -346,13 +369,13 @@ app.addEventListener("submit", (e) => {
     const attr = (f.querySelector('input[name="attr"]:checked') || {}).value || "body";
     const h = addHabit(state, { name, attr });
     state.ui.adding = false;
-    state.ui.filter = "all";
-    if (joinParty(state, h.id) === "full") state.ui.swapFor = h.id;
+    if (state.ui.filter !== attr) state.ui.filter = "all";
+    joinParty(state, h.id); // with the party full, the new companion waits on the bench
   } else if (f.id === "vice-form") {
     const attr = (f.querySelector('input[name="attr"]:checked') || {}).value || "body";
     addVice(state, { name, attr, drain: +f.elements.drain.value, cost: +f.elements.cost.value });
     state.ui.addingVice = false;
-    state.ui.filter = "all";
+    if (state.ui.filter !== attr) state.ui.filter = "all";
   } else if (f.id === "task-form") {
     const school = (f.querySelector('input[name="school"]:checked') || {}).value || "force";
     addTask(state, { name, school });

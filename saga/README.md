@@ -1,6 +1,6 @@
 # Saga
 
-**Habits Saga**: a habit tracker played as a pixel-art fantasy game. Your habits become companions, your one-off tasks become spells, and every real repetition is a blow against the beasts of procrastination. Players are ranked in a public Hall of Fame.
+**Habits Saga**: a habit tracker played as a pixel-art fantasy game. Your habits become companions, your one-off tasks become spells, and every real repetition is a blow against the Dragon's brood. Players are ranked in a public Hall of Fame.
 
 Saga is the one module that **doesn't use Heimdall**. It has its own players, who join with an invite code, and it is meant for people outside the suite. It only shares the server, the installer and Caddy with the other modules.
 

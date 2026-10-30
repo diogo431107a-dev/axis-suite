@@ -117,7 +117,7 @@ export function gameOver(s) {
   e.firstHit = null;
   e.insight = null;
   e.charmed = null;
-  addLog(s, `Game Over. The party wakes at camp with 1 HP each, and ${enemyName(e)} recovers fully.`);
+  addLog(s, `The party falls, and wakes at camp with 1 HP each. ${enemyName(e)} stands whole again.`);
   if (s.session) s.session.gameOver = true;
 }
 
@@ -497,6 +497,9 @@ export function defeatEnemy(s) {
     s.enemy = spawnEnemy(s.frontIndex);
     s.seen[s.enemy.key] = true;
     addLog(s, `${enemyName(s.enemy)} blocks the path.`);
+    if (enemyDef(s.enemy).idx === 0) addLog(s, TIERS[enemyDef(s.enemy).tier - 1].lore);
+    if (killed.index % ENEMIES.length === ENEMIES.length - 1)
+      addLog(s, "The road begins again in the meadows, and the rats are bigger.");
   }
   return { killed, pay };
 }
@@ -590,6 +593,8 @@ export function fameTitle({ fame, dragonKills, dragonKinds, loops, name }) {
   for (const [f, t] of TITLE_LADDER) if (fame >= f) title = t;
   return title;
 }
+// Who is saying it: the mockery of the first weeks gives way to the songs.
+export const titleVoice = (s) => (s.fame < 25 ? "The villagers call you" : "The songs call you");
 export function titleOf(s) {
   const dragonKinds = ENEMIES.filter((e) => e.tier === 8 && s.defeated[e.key]).length;
   return fameTitle({ fame: s.fame, dragonKills: s.dragonKills, dragonKinds, loops: s.loops, name: s.hero.name });
@@ -680,7 +685,7 @@ export function viceNow(v) {
 export function addVice(s, { name, attr, cost, drain }) {
   const v = { id: "v" + s.nextVid++, name, attr, cost, drain, heat: 0, count: 0 };
   s.vices.push(v);
-  addLog(s, `${name} is now tracked as a vice.`);
+  addLog(s, `${name} is named a vice.`);
   return v;
 }
 // Stops tracking a vice. The points it already took from the hero's sheet stay taken.
@@ -688,7 +693,7 @@ export function removeVice(s, id) {
   const v = findVice(s, id);
   if (!v) return null;
   s.vices = s.vices.filter((x) => x.id !== id);
-  addLog(s, `${v.name} is no longer tracked as a vice.`);
+  addLog(s, `${v.name} is no longer named a vice.`);
   return v;
 }
 // What logging a vice would do now, for asking before it is logged.
@@ -766,6 +771,7 @@ export function newHabit(id, name, attr, xp = 0, checkins = 0) {
     mp: 0,
     koCount: 0,
     statuses: [],
+    note: "",
   };
   h.hp = maxHpOf(h);
   h.mp = maxMpOf(h);
@@ -774,7 +780,13 @@ export function newHabit(id, name, attr, xp = 0, checkins = 0) {
 export function addHabit(s, { name, attr }) {
   const h = newHabit("h" + s.nextId++, name, attr);
   s.habits.push(h);
-  addLog(s, `${name} joins the roster as a ${ATTR[attr].cls}.`);
+  addLog(s, `${name} answers, and walks with you as a ${ATTR[attr].cls}.`);
+  return h;
+}
+// A companion's note: why this habit, what counts as doing it, what the current goal is.
+export function setHabitNote(s, id, text) {
+  const h = findHabit(s, id);
+  if (h) h.note = String(text).trim().slice(0, TUNE.noteMax);
   return h;
 }
 // Deletes a companion for good: it leaves the party and the roster, and the attribute points it
@@ -866,7 +878,7 @@ export function finishSession(s) {
 
 // The version of the state object. A change that reshapes it raises this and adds a step to
 // MIGRATIONS in web/net.js, which brings older saves up to date when they are loaded.
-export const GAME_VERSION = 4;
+export const GAME_VERSION = 5;
 
 // What only this page needs: the view, open forms and pickers. Never saved.
 export function freshUi(view = "camp") {
@@ -876,6 +888,8 @@ export function freshUi(view = "camp") {
     adding: false,
     addingVice: false,
     swapFor: null,
+    noteFor: null,
+    skillsOpen: {},
     confirmReset: false,
     confirmDelete: null,
     confirmVice: null,
@@ -913,6 +927,7 @@ export function seed(character = {}) {
     anthem: null,
     ward: null,
     log: [],
+    openingSeen: false,
     session: null,
     lastRewards: null,
     lastTurn: null,

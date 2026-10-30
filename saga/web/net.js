@@ -10,7 +10,15 @@ export const account = { player: null, rank: null, rankAt: 0, notice: "", saveFa
 
 // Steps that bring an older save up to date, by the version they upgrade from:
 // { 4: s => { … } } turns a version 4 state into version 5. Add one whenever GAME_VERSION goes up.
-const MIGRATIONS = {};
+const MIGRATIONS = {
+  // Companions get a note, and players who started before the story get to read it once.
+  4: (s) => {
+    s.habits.forEach((h) => {
+      h.note = "";
+    });
+    s.openingSeen = false;
+  },
+};
 
 /** Calls the API. Never throws: a network failure is { status: 0 } with an error to show. */
 export async function api(method, path, body) {
@@ -80,6 +88,13 @@ function newGame() {
   savedJson = null;
 }
 
+/** The story's opening, shown once to each hero. */
+function offerOpening() {
+  if (state.openingSeen || account.player.mustChangePassword) return;
+  state.openingSeen = true;
+  state.ui.picker = { type: "opening" };
+}
+
 function updateSaveChip() {
   const chip = document.getElementById("hud-save");
   if (chip) chip.hidden = !account.saveFailing;
@@ -141,6 +156,7 @@ async function loadGame() {
   else if (status === 404) newGame();
   else return showWelcome(data.error || "Couldn't load your game. Try again in a moment.");
   if (account.player.mustChangePassword) state.ui.view = "password";
+  offerOpening();
   render();
   refreshRank(true);
 }
@@ -202,6 +218,7 @@ export async function startOver(heroName, avatar) {
   if (cleared.status !== 204) return cleared.data.error || "Couldn't start over.";
   account.player = hero.data;
   newGame();
+  offerOpening();
   render();
   window.scrollTo(0, 0);
   refreshRank(true);

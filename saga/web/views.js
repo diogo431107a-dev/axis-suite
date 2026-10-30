@@ -1,5 +1,5 @@
 import { BT, startScene, stopScene, updateBattleLog, updateCmd } from "./battle.js";
-import { ATTR, ATTRS, AVATARS, ENEMIES, ENEMY_BY_KEY, ITEMS, MOVES, SCHOOLS, STATUSES, TIERS, TUNE } from "./data.js";
+import { ATTR, ATTRS, AVATARS, ENEMIES, ENEMY_BY_KEY, ITEMS, SCHOOLS, STATUSES, TIERS, TUNE } from "./data.js";
 import {
   actedThisTurn,
   atFront,
@@ -9,7 +9,6 @@ import {
   enemyName,
   findHabit,
   fleeLvOf,
-  foeReward,
   frontPreview,
   hasStatus,
   heroInfo,
@@ -31,6 +30,7 @@ import {
   spellCost,
   spellLvOf,
   titleOf,
+  titleVoice,
   travelOptions,
   viceNow,
   vicePreview,
@@ -69,12 +69,6 @@ export const statusChips = (u) =>
   u.statuses.length
     ? `<span class="sts">${u.statuses.map((x) => `<span class="st" style="--sc:${STATUSES[x.id].color}" title="${STATUSES[x.id].text}">${STATUSES[x.id].name.toUpperCase()}${x.left != null ? " " + x.left : ""}</span>`).join("")}</span>`
     : "";
-export function describeAtk(def) {
-  const moves = def.atk.turn.map((k) => MOVES[k].text);
-  let text = "On its turn it " + (def.atk.pick ? moves.join(" or ") : moves.join(", then "));
-  if (def.atk.counter) text += ". When hit, it " + MOVES[def.atk.counter].text;
-  return text + ".";
-}
 export const bagCount = (s) => Object.values(s.bag).reduce((a, b) => a + b, 0);
 
 export function header() {
@@ -100,6 +94,7 @@ export function header() {
             .join("")}</nav>`
     }
     <div class="hud">
+      <button class="btn small" data-action="help" title="Help" aria-label="Help">?</button>
       <span class="chip warn" id="hud-save" title="Your progress is kept on this page and sent again every second" ${account.saveFailing ? "" : "hidden"}>Not saved · retrying</span>
       <span class="chip">Turn <span class="num" id="hud-turn">${state.turn}</span></span>
       <span class="chip" title="Gold">${coin}<span class="num" id="hud-gold">${state.hero.gold}</span></span>
@@ -110,7 +105,7 @@ export function header() {
 export function guestHeader() {
   return `<header class="top">
     <button class="logo" data-action="about" title="About Habits Saga">HABITS<br>SAGA</button>
-    <div class="hud"><button class="btn small primary" data-action="nav" data-view="welcome">Sign in or join</button></div>
+    <div class="hud"><button class="btn small" data-action="help" title="Help" aria-label="Help">?</button><button class="btn small primary" data-action="nav" data-view="welcome">Sign in or join</button></div>
   </header>`;
 }
 // A message from the server side (another device saved, signed out…), dismissed with ×.
@@ -156,7 +151,8 @@ export function turnCard(s) {
   );
   if (t.charmed) rows.unshift("<li>The foe was charmed and lost its turn.</li>");
   if (!rows.length) rows.push("<li>No one in the party could be reached.</li>");
-  if (t.gameOver) rows.push("<li><b>Game Over.</b> The party woke at camp with 1 HP each, and the foe recovered.</li>");
+  if (t.gameOver)
+    rows.push("<li><b>The party fell.</b> It woke at camp with 1 HP each, and the foe stands whole.</li>");
   return `<section class="win report" aria-label="Last turn">
     <h2 class="sect">Last turn <span>Turn ${t.turn}</span></h2>
     <p>${esc(t.foe)} answered the party's turn.</p>
@@ -175,15 +171,14 @@ export function heroSheet(s) {
       <div class="hero-meta">
         <div class="eyebrow">The hero</div>
         <h1 class="hero-name">${esc(s.hero.name)}</h1>
-        <div class="hero-title">${esc(titleOf(s))}</div>
+        <div class="hero-title"><span class="voice">${titleVoice(s)}</span> ${esc(titleOf(s))}</div>
         <div class="hero-lv"><span>Level <b>${hi.level}</b></span><span class="num">${hi.into} / ${hi.need} pts</span></div>
         ${bar(pct(hi.into, hi.need), "var(--accent)")}
         <div class="hero-lv"><span>${hi.total} attribute points</span><span>Fame <b>${s.fame}</b></span></div>
         <div class="hero-lv"><span>Hall of Fame</span><button class="linkish" data-action="nav" data-view="fame">${account.rank ? `Rank #${account.rank} by fame` : s.habits.length ? "See the ranking" : "Add a habit to be ranked"}</button></div>
       </div>
     </div>
-    <h2 class="sect">Attributes <span>your companions, summed</span></h2>
-    <p class="sheet-note">Each attribute is the total of every companion's points in it. Companions gain 3 points per level. Vices take points away, and the hero's level follows the total.</p>
+    <h2 class="sect">Attributes</h2>
     <ul class="attrs">
       ${ATTRS.map((a, i) => {
         const pen = s.vicePenalty[a.id] || 0;
@@ -192,7 +187,6 @@ export function heroSheet(s) {
         <span class="nm" style="color:${a.color}">${a.name}</span>
         <span class="lv">${vals[i]}${pen ? ` <span class="pen">(−${pen})</span>` : ""}</span>
         ${bar(pct(vals[i], top), a.color, "thin")}
-        <span class="blurb">${esc(a.blurb)} · school: ${SCHOOLS[a.school].name}</span>
       </li>`;
       }).join("")}
     </ul>
@@ -213,17 +207,16 @@ export function campView() {
     slots.push(id ? memberSlot(s, id) : `<div class="slot empty">Empty slot</div>`);
   }
   const readyText = !s.habits.length
-    ? "Every habit you keep becomes a companion who fights for you. Add your first one to start."
+    ? "No one has answered yet. Keep a habit, and someone will."
     : !members.length
       ? "The party is empty. Add companions from the Roster."
       : allDown
-        ? "Everyone is knocked out. Revive someone with a Phoenix Feather."
+        ? "All have fallen. Only a Phoenix Feather raises them."
         : ready === members.length
-          ? `All ${members.length} companions are ready. Each acts once per turn.`
+          ? `All ${members.length} companions are ready.`
           : ready
             ? `${ready} of ${members.length} still to act this turn.`
             : "Everyone has acted. The foe answers when you return to battle.";
-  const reward = foeReward(e);
   const front = atFront(s)
     ? ""
     : (() => {
@@ -242,16 +235,14 @@ export function campView() {
           <div class="foe-info">
             <div class="foe-name">${esc(enemyName(e))}</div>
             <p class="lore">${esc(def.lore)}</p>
-            <p class="atk-note">${esc(describeAtk(def))}</p>
-            <p class="lore">Victory pays ${reward.xp} XP, shared by how much each companion did, and ${reward.gold} gold. Once the battle starts, the only ways out are winning or fleeing.</p>
             ${front}
             ${bar(pct(e.hp, e.maxHp), null, "hp")}
-            <div class="hp-row"><span>${e.hp < e.maxHp ? "Wounded. Damage carries over." : "Full health"}</span><span class="num" style="font-size:9px">${e.hp} / ${e.maxHp} HP</span></div>
+            <div class="hp-row"><span>${e.hp < e.maxHp ? "Wounded" : "Unhurt"}</span><span class="num" style="font-size:9px">${e.hp} / ${e.maxHp} HP</span></div>
             <div class="fight-row">
               ${
                 s.habits.length
                   ? `<button class="btn primary" data-action="fight" ${members.length && !allDown ? "" : "disabled"}>Fight</button>`
-                  : '<button class="btn primary" data-action="firstHabit">Add your first companion</button>'
+                  : '<button class="btn primary" data-action="firstHabit">Call your first companion</button>'
               }
               <button class="btn small" data-action="openTravel">Travel</button>
             </div>
@@ -265,7 +256,7 @@ export function campView() {
         <div class="party-foot">
           <span>Bag: ${bagCount(s)} item${bagCount(s) === 1 ? "" : "s"} · ${openTasks(s).length} open tasks</span>
           <span class="acts">
-            <button class="btn small vice" data-action="openVices">Log a vice</button>
+            <button class="btn small vice" data-action="openVices">Pay the tithe</button>
             <button class="btn small" data-action="openItems" ${bagCount(s) ? "" : "disabled"}>Use item</button>
             <button class="btn small" data-action="nav" data-view="roster">Roster</button>
           </span>
@@ -274,7 +265,7 @@ export function campView() {
       <section class="win" aria-label="Inn">
         <h2 class="sect">Inn <span>${coin} ${cost}</span></h2>
         <div class="inn-row">
-          <p class="inn-text">Rest to restore every standing companion's HP and MP and cure their ailments. The inn can't revive the fallen. Prices follow the region you're in.</p>
+          <p class="inn-text">A bed, a fire, no questions. The dead stay dead.</p>
           <button class="btn small primary" data-action="inn" ${s.hero.gold >= cost && innNeeded(s) ? "" : "disabled"}>Rest</button>
         </div>
       </section>
@@ -323,19 +314,25 @@ export function compCard(h) {
       <canvas class="px" data-sprite="comp:${h.id}" data-s="3"></canvas>
       <div class="comp-id">
         <h3 class="comp-name">${esc(h.name)}</h3>
-        <div class="comp-meta"><span class="attr-chip" title="What ${esc(h.name)} adds to the hero's ${a.name}: ${TUNE.pointsPerLevel} points for each of its levels">${a.icon} +${pointsOf(h)} ${a.name}</span><span>${a.cls}</span></div>
+        <div class="comp-meta"><span class="attr-chip">${a.icon} +${pointsOf(h)} ${a.name}</span><span>${a.cls}</span></div>
         <div class="lvline"><span>LV ${l.level}</span>${bar(pct(l.into, l.need), a.color, "thin")}<span>${l.into}/${l.need}</span></div>
         <div class="lvline"><span>HP</span>${hpBar(h)}<span>${h.hp}/${maxHpOf(h)}</span></div>
         <div class="lvline"><span>MP</span>${mpBar(h)}<span>${h.mp}/${maxMpOf(h)}</span></div>
         ${statusChips(h)}
       </div>
     </div>
-    <div class="skills">
+    ${h.note && s.ui.noteFor !== h.id ? `<p class="comp-note">${esc(h.note)}</p>` : ""}
+    ${s.ui.noteFor === h.id ? noteForm(h) : ""}
+    ${
+      s.ui.skillsOpen[h.id]
+        ? `<div class="skills">
       <div class="skill"><span class="k">Mastery</span><span class="v">LV ${m.level}</span><span class="n">${h.checkins} check-ins</span></div>
       <div class="skill"><span class="k">${SCHOOLS[a.school].name}</span><span class="v">LV ${sp.level}</span><span class="n">${h.casts} casts</span></div>
       <div class="skill"><span class="k">Flee</span><span class="v">LV ${fl.level}</span><span class="n">${h.escapes} escape${h.escapes === 1 ? "" : "s"} led</span></div>
-    </div>
-    <div class="comp-foot"><span class="foot-note">${statusNote(s, h)}</span>${
+    </div>`
+        : ""
+    }
+    <div class="comp-foot"><span class="foot-note">${statusNote(s, h)}</span><button class="btn small" data-action="editNote" data-id="${h.id}">Note</button><button class="btn small" data-action="toggleSkills" data-id="${h.id}" aria-expanded="${!!s.ui.skillsOpen[h.id]}">Skills</button>${
       inParty
         ? `<button class="btn small" data-action="bench" data-id="${h.id}">Bench</button>`
         : `<button class="btn small primary" data-action="join" data-id="${h.id}">Join party</button>`
@@ -349,18 +346,25 @@ export function compCard(h) {
     )}
   </article>`;
 }
+export function noteForm(h) {
+  return `<form id="note-form" class="note-form" data-id="${h.id}">
+    <textarea class="text-in" name="note" rows="3" maxlength="${TUNE.noteMax}" aria-label="Note on ${esc(h.name)}" placeholder="Why this habit? What counts as doing it? What is the goal now?">${esc(h.note)}</textarea>
+    <div class="swap-list"><button type="submit" class="btn small primary">Save</button>
+    <button type="button" class="btn small" data-action="cancelNote">Cancel</button></div>
+  </form>`;
+}
 export function viceCard(v) {
   const a = ATTR[v.attr],
     now = viceNow(v);
   return `<article class="win comp vice-card" style="--c:${a.color}">
     <div class="comp-id">
       <h3 class="comp-name">${esc(v.name)}</h3>
-      <div class="comp-meta"><span class="attr-chip">${a.icon} drains ${a.name}</span><span>logged ${v.count}× · heat ${v.heat}</span></div>
-      <p class="foot-note">Next log: −${now.drain} ${a.name} and −${now.cost} gold. Heat cools by 1 with every victory.</p>
+      <div class="comp-meta"><span class="attr-chip">${a.icon} drains ${a.name}</span><span>paid ${v.count}×</span></div>
+      <p class="foot-note">Next tithe: −${now.drain} ${a.name} and −${now.cost} gold.</p>
     </div>
-    ${rangeField(v, "drain", `${a.name} points taken (base)`, 1, 10, 1)}
-    ${rangeField(v, "cost", "Gold it costs (base)", 0, 50, 1)}
-    <div class="comp-foot"><span class="foot-note">No gold to pay means a random ailment.</span><span class="acts"><button class="btn small danger" data-action="askDelete" data-kind="vice" data-id="${v.id}">Delete</button><button class="btn small vice" data-action="logVice" data-id="${v.id}">Log it</button></span></div>
+    ${rangeField(v, "drain", `${a.name} points taken`, 1, 10, 1)}
+    ${rangeField(v, "cost", "Gold it costs", 0, 50, 1)}
+    <div class="comp-foot"><span class="acts"><button class="btn small danger" data-action="askDelete" data-kind="vice" data-id="${v.id}">Delete</button><button class="btn small vice" data-action="logVice" data-id="${v.id}">Pay the tithe</button></span></div>
     ${viceConfirm(state, v)}
     ${confirmBox(state, "vice", v.id, `Stop tracking ${esc(v.name)}? The points it already took stay taken.`)}
   </article>`;
@@ -386,14 +390,16 @@ export function viceConfirm(s, v) {
   const purse =
     p.cost && !p.canPay ? ` The purse can't pay its ${p.cost} gold, so an ailment will strike the party instead.` : "";
   return `<div class="swap confirm vice">
-    <p>Log ${esc(v.name)}? ${points}${purse}</p>
-    <div class="swap-list"><button class="btn small vice" data-action="confirmVice">Log it</button>
+    <p>Pay the tithe for ${esc(v.name)}? ${points}${purse}</p>
+    <div class="swap-list"><button class="btn small vice" data-action="confirmVice">Pay</button>
     <button class="btn small" data-action="cancelConfirm">Cancel</button></div>
   </div>`;
 }
 
+// Starts on the attribute the Roster is filtered to, or the first one.
 export function attrPicker(prefix, withClass) {
-  return `<div class="attr-pick">${ATTRS.map((a, i) => `<label style="--c:${a.color}"><input type="radio" name="attr" id="${prefix}-attr-${a.id}" value="${a.id}" ${i === 0 ? "checked" : ""}><span>${a.icon} ${a.name}${withClass ? " · " + a.cls : ""}</span></label>`).join("")}</div>`;
+  const pick = ATTR[state.ui.filter] ? state.ui.filter : ATTRS[0].id;
+  return `<div class="attr-pick">${ATTRS.map((a) => `<label style="--c:${a.color}"><input type="radio" name="attr" id="${prefix}-attr-${a.id}" value="${a.id}" ${a.id === pick ? "checked" : ""}><span>${a.icon} ${a.name}${withClass ? " · " + a.cls : ""}</span></label>`).join("")}</div>`;
 }
 export function formErr() {
   return state.ui.formErr ? `<span class="form-err">${esc(state.ui.formErr)}</span>` : "";
@@ -407,13 +413,13 @@ export function addForm() {
         <input class="text-in" id="f-name" name="name" maxlength="40" placeholder="e.g. Stretch before bed">
       </div>
       <fieldset class="field full" style="border:0;padding:0;margin:0">
-        <span>Attribute it trains (sets the companion's class and spell school)</span>
+        <span>What it trains <button type="button" class="linkish" data-action="help">What do these mean?</button></span>
         ${attrPicker("f", true)}
       </fieldset>
       <div class="form-actions full">
         ${formErr()}
         <button type="button" class="btn small" data-action="toggleAdd">Cancel</button>
-        <button type="submit" class="btn primary">Add to roster</button>
+        <button type="submit" class="btn primary">Call them</button>
       </div>
     </form>
   </section>`;
@@ -421,14 +427,14 @@ export function addForm() {
 export function addViceForm() {
   const D = TUNE.vice;
   return `<section class="win">
-    <h2 class="sect">New vice</h2>
+    <h2 class="sect">Name a vice</h2>
     <form id="vice-form" class="add-form" autocomplete="off">
       <div class="field">
         <label for="vf-name">Bad habit</label>
         <input class="text-in" id="vf-name" name="name" maxlength="40" placeholder="e.g. Late-night snacking">
       </div>
       <div class="field">
-        <span>Each time you log it (before heat)</span>
+        <span>Each time it is paid</span>
         <div class="slider"><label for="vf-drain">Points taken <output id="vf-drain-v">${D.drain}</output></label>
           <input type="range" id="vf-drain" name="drain" min="1" max="10" step="1" value="${D.drain}" data-out="vf-drain-v"></div>
         <div class="slider"><label for="vf-cost">Gold it costs <output id="vf-cost-v">${D.cost}</output></label>
@@ -441,7 +447,7 @@ export function addViceForm() {
       <div class="form-actions full">
         ${formErr()}
         <button type="button" class="btn small" data-action="toggleAddVice">Cancel</button>
-        <button type="submit" class="btn primary">Track this vice</button>
+        <button type="submit" class="btn primary">Name it</button>
       </div>
     </form>
   </section>`;
@@ -464,9 +470,9 @@ export function rosterView() {
     <div class="page-head">
       <div>
         <h1 class="page-title">Roster</h1>
-        <p class="page-sub">Every habit is a companion, and up to five fight in the party. Each turn a companion can Attack (you just did its habit), cast a Spell (you finished one of its school's tasks), use an Item, or Guard. XP and gold come only from victories. Skills grow with use.</p>
+        <p class="page-sub">Those who answered.</p>
       </div>
-      ${s.ui.adding ? "" : '<button class="btn primary" data-action="toggleAdd">Add habit</button>'}
+      ${s.ui.adding ? "" : '<button class="btn primary" data-action="toggleAdd">Call a companion</button>'}
     </div>
     ${s.ui.adding ? addForm() : ""}
     <div class="filters" role="group" aria-label="Filter by attribute">
@@ -477,12 +483,12 @@ export function rosterView() {
     <div class="page-head" style="margin-top:12px">
       <div>
         <h2 class="section-title">Vices</h2>
-        <p class="page-sub">Bad habits you log whenever they happen. Each one takes points from the hero's sheet and charges gold, and both grow with heat when you repeat it. If the purse is empty, an ailment strikes the party instead.</p>
+        <p class="page-sub">The Dragon keeps accounts.</p>
       </div>
-      ${s.ui.addingVice ? "" : '<button class="btn vice" data-action="toggleAddVice">Add vice</button>'}
+      ${s.ui.addingVice ? "" : '<button class="btn vice" data-action="toggleAddVice">Name a vice</button>'}
     </div>
     ${s.ui.addingVice ? addViceForm() : ""}
-    <div class="cards">${vices.map(viceCard).join("") || '<p class="page-sub">No vices tracked for this attribute.</p>'}</div>
+    <div class="cards">${vices.map(viceCard).join("") || '<p class="page-sub">No vice has been named here.</p>'}</div>
   </main>`;
 }
 
@@ -497,7 +503,7 @@ export function spellbookView() {
     <div class="page-head">
       <div>
         <h1 class="page-title">Spellbook</h1>
-        <p class="page-sub">One-off tasks, the things that resist structure. Each belongs to a school, and only a companion of that school can cast it in battle, using its turn and MP. Casting is how you log the task. It pays nothing, but each companion's spell level grows with every cast.</p>
+        <p class="page-sub">Deeds done once, burned up in the casting.</p>
       </div>
     </div>
     <section class="win">
@@ -508,7 +514,7 @@ export function spellbookView() {
           <input class="text-in" id="tf-name" name="name" maxlength="50" placeholder="e.g. Call the plumber">
         </div>
         <fieldset class="field full" style="border:0;padding:0;margin:0">
-          <span>School (who can cast it)</span>
+          <span>School</span>
           <div class="attr-pick">${ATTRS.map((a, i) => `<label style="--c:${a.color}"><input type="radio" name="school" id="tf-${a.school}" value="${a.school}" ${i === 0 ? "checked" : ""}><span>${a.icon} ${SCHOOLS[a.school].name} · ${a.cls}</span></label>`).join("")}</div>
         </fieldset>
         <div class="form-actions full">${formErr()}<button type="submit" class="btn primary">Add task</button></div>
@@ -519,7 +525,7 @@ export function spellbookView() {
       const who = casters(a.school);
       return `<section class="school-block" style="--c:${a.color}">
         <div class="school-head"><h2>${a.icon} ${SCHOOLS[a.school].name}</h2><span class="tier-tag">${a.cls}s · ${who.length ? who.map((h) => `${esc(h.name)} LV ${spellLvOf(h).level}`).join(", ") : "no companion of this class yet"}</span></div>
-        <p class="task-meta">${esc(SCHOOLS[a.school].text(1))} (level 1)</p>
+        <p class="task-meta">${esc(SCHOOLS[a.school].lore)}</p>
         <div class="tasks">${
           tasks
             .map(
@@ -545,7 +551,7 @@ export function shopView() {
     <div class="page-head">
       <div>
         <h1 class="page-title">Shop</h1>
-        <p class="page-sub">Spend the gold your victories earn. Only Phoenix Feathers bring a knocked-out companion back. In battle, using an item takes that companion's turn. At camp it's free.</p>
+        <p class="page-sub">Coin earned on the road, spent on staying on it.</p>
       </div>
       <span class="chip">${coin}<span class="num">${s.hero.gold}</span></span>
     </div>
@@ -580,24 +586,24 @@ export function bestiaryView() {
     <div class="page-head">
       <div>
         <h1 class="page-title">Bestiary</h1>
-        <p class="page-sub">Foes arrive in order, region by region, from the Cellar Meadows to the Ember Peaks. After the Elder Dragon the road starts again, one star stronger. ${slain} of ${ENEMIES.length} kinds slain.</p>
+        <p class="page-sub">The Dragon's brood, from the meadows to the peaks. ${slain} of ${ENEMIES.length} kinds slain.</p>
       </div>
     </div>
     ${TIERS.map((t, ti) => {
       const list = ENEMIES.filter((e) => e.tier === ti + 1);
       return `<section class="tier-block">
       <div class="tier-head"><h2>${esc(t.region)}</h2><span class="tier-tag">Tier ${t.roman} · ${t.name} · ${list[0].hp}–${list[5].hp} HP</span></div>
+      <p class="task-meta">${esc(t.lore)}</p>
       <div class="beasts">${list
         .map((e) => {
           const seen = s.seen[e.key],
             kills = s.defeated[e.key] || 0,
             cur = s.enemy.key === e.key;
-          const rw = foeReward(spawnEnemy(ENEMIES.indexOf(e)));
           return `<div class="beast ${seen ? "" : "unseen"} ${cur ? "current" : ""}">
           <div class="art"><canvas class="px" data-sprite="enemy:${e.key}" data-s="${e.base === "dragon" ? 2 : 3}"></canvas></div>
           <div class="b-name">${seen ? esc(e.name) : "???"}</div>
           <div class="b-meta">${cur ? "FIGHTING NOW" : kills ? `SLAIN ×${kills}` : seen ? "SEEN" : `${e.hp} HP`}</div>
-          ${seen ? `<div class="b-lore">${esc(e.lore)}</div><div class="b-atk">${esc(describeAtk(e))}</div><div class="b-meta">${rw.xp} XP · ${rw.gold} GOLD</div>` : ""}
+          ${seen ? `<div class="b-lore">${esc(e.lore)}</div>` : ""}
         </div>`;
         })
         .join("")}</div>
@@ -627,16 +633,15 @@ export function battleView() {
       <section class="win">
         <h2 class="sect">Party turn <span id="turn-label">Turn ${state.turn}</span></h2>
         <div class="cmd-list" id="cmd-list"></div>
-        <p class="hint">Each companion gets one action per turn. <b>Attack</b> when you've just done its habit, <b>Spell</b> when you've finished one of its school's tasks, or use an <b>Item</b> or <b>Guard</b>. When no one can act, the foe takes its turn. Keys 1 to 5 attack.</p>
       </section>
       <section class="win blog-wrap">
         <h2 class="sect">Battle log</h2>
         <ol class="log" id="blog"></ol>
         <div class="cmd-actions">
-          <button class="btn small vice" data-action="openVices" id="vice-btn">Log a vice</button>
+          <button class="btn small vice" data-action="openVices" id="vice-btn">Pay the tithe</button>
           <button class="btn small" data-action="endTurn" id="endturn-btn">End turn</button>
         </div>
-        <button class="btn" data-action="flee" id="flee-btn">Flee</button>
+        <button class="btn" data-action="flee" id="flee-btn">Run</button>
       </section>
     </div>
   </main>`;
@@ -646,12 +651,12 @@ export function rewardsView() {
   const r = state.lastRewards;
   if (!r) return campView();
   const e = r.enemy;
-  const title = r.gameOver ? "Game Over" : r.kills.length ? "Victory!" : r.fled ? "Escaped" : "Well fought";
+  const title = r.gameOver ? "Fallen" : r.kills.length ? "Victory!" : r.fled ? "Escaped" : "Well fought";
   const status = r.gameOver
-    ? `${enemyName(e)} recovered fully. Everything earned against it is lost.`
+    ? `${enemyName(e)} stands whole again. It is still there, and so are you.`
     : r.kills.length
       ? `${ENEMY_BY_KEY[r.kills[0]].name} defeated. Next foe: ${enemyName(e)}.`
-      : `${enemyName(e)} still stands at ${e.hp} / ${e.maxHp} HP. Its wounds and your party's credit against it carry over.`;
+      : `${enemyName(e)} still stands at ${e.hp} / ${e.maxHp} HP. Its wounds remain.`;
   const pay = r.payout;
   return `<main class="rewards">
     <section class="win r-card">
@@ -660,13 +665,13 @@ export function rewardsView() {
         <h1 class="r-title ${r.gameOver ? "over" : ""}">${title}</h1>
         <p class="r-sub">${esc(status)}</p>
       </div>
-      ${r.gameOver ? `<div class="r-banner bad"><b>The party fell</b>Everyone woke at camp with 1 HP. No gold was taken, but the foe's reward is gone with its wounds. Rest at the inn before the next fight.</div>` : ""}
+      ${r.gameOver ? `<div class="r-banner bad"><b>The party fell</b>You woke at camp with 1 HP each.</div>` : ""}
       ${r.dropped ? `<div class="r-banner bad"><b>Coins scattered</b>A failed escape dropped ${r.dropped} gold.</div>` : ""}
       ${r.title1 !== r.title0 ? `<div class="r-banner"><b>New title</b>${esc(state.hero.name)} is now known as “${esc(r.title1)}”.</div>` : ""}
       ${r.hero1 !== r.hero0 ? `<div class="r-banner ${r.hero1 < r.hero0 ? "bad" : ""}"><b>Hero level ${r.hero1 > r.hero0 ? "up" : "down"}</b>The hero is now level ${r.hero1}.</div>` : ""}
-      ${r.vices.length ? `<div class="r-banner bad"><b>Vices logged</b>${esc(r.vices.join(", "))}</div>` : ""}
+      ${r.vices.length ? `<div class="r-banner bad"><b>Tithes paid</b>${esc(r.vices.join(", "))}</div>` : ""}
       <div class="r-stats">
-        <div class="r-stat"><span class="r-label">XP shared</span><span class="r-num">${pay ? "+" + pay.xp : "0"}</span><span class="r-note">${pay ? "split by engagement" : "only victories pay"}</span></div>
+        <div class="r-stat"><span class="r-label">XP shared</span><span class="r-num">${pay ? "+" + pay.xp : "0"}</span><span class="r-note">${pay ? "shared" : "no spoils"}</span></div>
         <div class="r-stat"><span class="r-label">Gold</span><span class="r-num">${pay ? "+" + pay.gold : r.dropped ? signed(-r.dropped) : "0"}</span><span class="r-note">${pay ? "the foe's bounty" : "no bounty"}</span></div>
         <div class="r-stat"><span class="r-label">Damage dealt</span><span class="r-num">${r.dmg}</span><span class="r-note">${r.casts.length} task${r.casts.length === 1 ? "" : "s"} cast</span></div>
         <div class="r-stat"><span class="r-label">Damage taken</span><span class="r-num">${r.dmgTaken}</span><span class="r-note">${r.kos.length ? `${r.kos.length} knocked out` : "no one fell"}</span></div>
@@ -749,7 +754,7 @@ export function welcomeView() {
       </form>`;
   return `<main class="welcome">
     <h1 class="welcome-title">HABITS<br>SAGA</h1>
-    <p class="welcome-intro">Your habits become companions, your one-off tasks become spells, and every real repetition is a blow against the beasts of procrastination. Who will lead them?</p>
+    <p class="welcome-intro">Every habit you keep calls a companion out of the dark. Every deed done is a blow against the Dragon's brood. Who will lead them?</p>
     ${noticeBar()}
     <div class="filters" role="group" aria-label="Sign in or join">
       <button class="fchip" data-action="authMode" data-mode="signin" aria-pressed="${!join}">Sign in</button>
@@ -871,8 +876,7 @@ export function fameView() {
   let body;
   if (!r || r.loading) body = '<p class="page-sub">Gathering the heralds…</p>';
   else if (r.failed) body = '<p class="page-sub">The Hall of Fame couldn\'t be loaded. Try again in a moment.</p>';
-  else if (!r.rows.length)
-    body = '<p class="page-sub">No hero has been ranked yet. A hero needs at least one habit.</p>';
+  else if (!r.rows.length) body = '<p class="page-sub">The heralds have no one to sing of yet.</p>';
   else {
     const below = r.you && !r.rows.some((x) => x.you);
     body = `<table class="rank-table">
@@ -884,13 +888,13 @@ export function fameView() {
     signedIn && r && r.rows
       ? r.you
         ? ` You are rank #${r.you.rank} by ${by}.`
-        : " Add a habit to your roster to appear here."
+        : " Keep a habit, and they may sing of you."
       : "";
   return `<main style="display:flex;flex-direction:column;gap:16px">
     <div class="page-head">
       <div>
         <h1 class="page-title">Hall of Fame</h1>
-        <p class="page-sub">Fame comes from foes defeated, and bigger foes are worth far more. Level comes from the attribute sheet. A hero can be high level and still never venture past the meadows, so fame shows who actually goes out and fights.${yours}</p>
+        <p class="page-sub">What the heralds sing.${yours}</p>
       </div>
     </div>
     <div class="filters" role="group" aria-label="Rank by">
@@ -937,10 +941,15 @@ export function pickerHtml() {
   if (p.type === "about") {
     title = "About Habits Saga";
     body = aboutHtml();
+  } else if (p.type === "help") {
+    title = "How to play";
+    body = helpHtml();
+  } else if (p.type === "opening") {
+    title = "The Saga of the Turning";
+    body = openingHtml();
   } else if (p.type === "items") {
     const user = p.user && findHabit(s, p.user);
     title = inBattle() && user ? `${user.name}: use an item` : "Use an item";
-    if (inBattle() && user) sub = `Using an item takes ${user.name}'s action for this turn.`;
     const keys = Object.keys(ITEMS).filter((k) => s.bag[k]);
     body =
       keys
@@ -955,7 +964,7 @@ export function pickerHtml() {
   } else if (p.type === "target") {
     const key = p.item;
     title = ITEMS[key].name;
-    sub = `${ITEMS[key].desc} You have ${s.bag[key]}.${inBattle() ? " In battle, only party members can be targeted." : ""}`;
+    sub = `${ITEMS[key].desc} You have ${s.bag[key]}.`;
     const units = inBattle()
       ? partyUnits(s)
       : [...s.habits].sort((a, b) => s.party.includes(b.id) - s.party.includes(a.id));
@@ -975,7 +984,7 @@ export function pickerHtml() {
       L = spellLvOf(u).level,
       cost = spellCost(u);
     title = `${u.name}: ${SCHOOLS[sc].name} LV ${L}`;
-    sub = `${SCHOOLS[sc].text(L)} Costs ${cost} MP (${u.mp} left). Pick the task you just finished.`;
+    sub = `Costs ${cost} MP (${u.mp} left).`;
     const tasks = openTasks(s, sc);
     body =
       tasks
@@ -984,14 +993,12 @@ export function pickerHtml() {
             t,
           ) => `<button class="pick" style="--c:${ATTR[u.attr].color}" data-action="cast" data-task="${t.id}" ${u.mp < cost ? "disabled" : ""}>
         <span class="ico" aria-hidden="true">${ATTR[u.attr].icon}</span>
-        <span><span class="pk-name">${esc(t.name)}</span><span class="pk-meta">${u.mp < cost ? "Not enough MP. Rest at the inn or drink an Ether." : `Cast ${SCHOOLS[sc].name} · ${cost} MP`}</span></span>
+        <span><span class="pk-name">${esc(t.name)}</span><span class="pk-meta">${u.mp < cost ? "Not enough MP." : `Cast ${SCHOOLS[sc].name} · ${cost} MP`}</span></span>
         <span class="cmd-key">CAST</span></button>`,
         )
         .join("") || `<p class="modal-sub">No open ${SCHOOLS[sc].name} tasks. Add them in the Spellbook.</p>`;
   } else if (p.type === "vices") {
-    title = "Log a vice";
-    sub =
-      "Logging a vice never takes a turn. Log it each time it happens. Repeats cost more until victories cool them down.";
+    title = "Pay the tithe";
     body =
       (p.result ? `<p class="modal-result">${esc(p.result)}</p>` : "") +
       (s.vices
@@ -1000,17 +1007,16 @@ export function pickerHtml() {
             now = viceNow(v);
           return `<button class="pick" style="--c:var(--vice)" data-action="logVice" data-id="${v.id}">
         <span class="ico" aria-hidden="true">${a.icon}</span>
-        <span><span class="pk-name">${esc(v.name)}</span><span class="pk-meta">−${now.drain} ${a.name} · −${now.cost} gold · heat ${v.heat} · logged ${v.count}×</span></span>
-        <span class="cmd-key">LOG</span></button>${viceConfirm(s, v)}`;
+        <span><span class="pk-name">${esc(v.name)}</span><span class="pk-meta">−${now.drain} ${a.name} · −${now.cost} gold · paid ${v.count}×</span></span>
+        <span class="cmd-key">PAY</span></button>${viceConfirm(s, v)}`;
         })
-        .join("") || '<p class="modal-sub">No vices yet.</p>') +
+        .join("") || '<p class="modal-sub">No vice has been named yet.</p>') +
       (inBattle()
-        ? '<p class="modal-sub">New vices are added at camp, on the Roster.</p>'
-        : '<button class="btn small vice" data-action="newVice" style="align-self:flex-start">Track a new vice</button>');
+        ? '<p class="modal-sub">Vices are named at camp, on the Roster.</p>'
+        : '<button class="btn small vice" data-action="newVice" style="align-self:flex-start">Name a new vice</button>');
   } else {
     title = "Travel";
-    sub =
-      "Go back to any region you have passed and pick a foe there. It starts at full health, while the foe at the front keeps its wounds and your credit against it until you return.";
+    sub = "The road runs both ways.";
     const parts = [];
     if (!atFront(s)) {
       const f = frontPreview(s),
@@ -1030,7 +1036,7 @@ export function pickerHtml() {
       }
       parts.push(`<button class="pick" data-action="travel" data-to="${i}">
         <canvas class="px" data-sprite="enemy:${d.key}" data-s="${d.base === "dragon" ? 1 : 2}"></canvas>
-        <span><span class="pk-name">${esc(enemyName(e))}</span><span class="pk-meta">${e.maxHp} HP · ${esc(describeAtk(d))}</span></span>
+        <span><span class="pk-name">${esc(enemyName(e))}</span><span class="pk-meta">${e.maxHp} HP</span></span>
         <span class="cmd-key">GO</span></button>`);
     }
     body =
@@ -1054,6 +1060,32 @@ function aboutHtml() {
       <dt>Axis Suite</dt><dd>${esc(v.suite)}</dd>
     </dl>
     ${import.meta.env.DEV ? '<p class="modal-sub">Development: these are the numbers of the last release.</p>' : ""}`;
+}
+// Just enough to get the game rolling. The rest is for the player to find, or in the manual.
+function helpHtml() {
+  return `<div class="help">
+    <p><b>Your habits are your companions.</b> Call one from the Roster and choose what it trains.</p>
+    <p><b>Do it, then strike.</b> When you've done a habit in real life, go to battle and attack with its companion. Every blow is a real repetition, and only you know if it was honest.</p>
+    <p><b>Tasks are spells.</b> Write one-off tasks in the Spellbook. When you finish one, a companion of its school casts it in battle.</p>
+    <p><b>Pay your tithes.</b> Name your vices on the Roster. When one gets the better of you, pay the tithe. It will cost you.</p>
+    <p><b>Five walk with you.</b> Choose the five you're working on now. The rest wait on the bench.</p>
+    <p><b>Rest at the inn. Visit the shop.</b> Victories pay gold, so spend it.</p>
+    <h3>What a habit can train</h3>
+    <ul class="help-attrs">${ATTRS.map((a) => `<li><b style="color:${a.color}">${a.icon} ${a.name}</b> ${esc(a.blurb)}</li>`).join("")}</ul>
+    <p>The rest is for you to find out.</p>
+    <p class="help-links"><a href="https://github.com/diogo431107a-dev/axis-suite/blob/main/saga/docs/manual.md" target="_blank" rel="noopener">Read the manual</a><button type="button" class="linkish" data-action="opening">Hear the tale again</button></p>
+  </div>`;
+}
+// The story's opening: shown once to each hero, and again from the help.
+function openingHtml() {
+  return `<div class="help">
+    <p>Heaven and Hell have never agreed on anything but this: a soul must move to be worth having.</p>
+    <p>Then the Elder Dragon woke beneath the Ember Peaks. Where its breath settles, people go on doing today what they did yesterday, and they call this peace. The souls stopped moving.</p>
+    <p>So Lunaria and Alecta, an angel and a devil, met on a bare hill under a full moon and made a wager. They would find one soul, so low and so unpromising that even the Dragon's children had stopped bothering with it. If that soul could turn, anyone could.</p>
+    <p>They looked for a long time. In the end they found you.</p>
+    <p>You wake in a cellar in the meadows. The villagers have a name for you, and it isn't kind. Something small rustles in the grass.</p>
+    <button class="btn primary" data-action="closePicker" style="align-self:flex-start">Get up</button>
+  </div>`;
 }
 export function renderModal() {
   modal.innerHTML = pickerHtml();
@@ -1104,6 +1136,7 @@ export function render() {
 export function go(view) {
   state.ui.view = view;
   state.ui.swapFor = null;
+  state.ui.noteFor = null;
   state.ui.picker = null;
   state.ui.formErr = "";
   state.ui.confirmReset = false;

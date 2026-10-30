@@ -6,6 +6,7 @@ export const TUNE = {
   curveExp: 1.8,
   curve: { comp: 20, mastery: 2, spell: 3, flee: 4, hero: 10 }, // flee: successful escapes led
   partySize: 5,
+  noteMax: 500, // characters in a companion's note
   hp: [40, 10], // max HP = base + per level
   mp: [6, 2], // max MP = base + per level
   pointsPerLevel: 3, // attribute points a companion carries per level
@@ -57,7 +58,7 @@ export const ATTRS = [
     icon: "🏃",
     cls: "Brawler",
     school: "force",
-    blurb: "Things that move you: Pilates, walking, exercise of any kind",
+    blurb: "What moves you: walking, Pilates, any exercise.",
   },
   {
     id: "vitality",
@@ -66,7 +67,7 @@ export const ATTRS = [
     icon: "🔥",
     cls: "Herbalist",
     school: "mend",
-    blurb: "Things that maintain the body: sleep, meals, water, rest",
+    blurb: "What keeps the body going: sleep, meals, water, rest.",
   },
   {
     id: "mind",
@@ -75,7 +76,7 @@ export const ATTRS = [
     icon: "📚",
     cls: "Scholar",
     school: "insight",
-    blurb: "Things that add knowledge, like reading or audiobooks",
+    blurb: "What adds to what you know: books, courses, study.",
   },
   {
     id: "craft",
@@ -84,7 +85,7 @@ export const ATTRS = [
     icon: "🎸",
     cls: "Bard",
     school: "anthem",
-    blurb: "Things you make: guitar, art, music",
+    blurb: "What you make: music, art, writing.",
   },
   {
     id: "spirit",
@@ -93,7 +94,7 @@ export const ATTRS = [
     icon: "🕯️",
     cls: "Mystic",
     school: "purge",
-    blurb: "Things that deepen your practice",
+    blurb: "What deepens your practice: meditation, prayer, reflection.",
   },
   {
     id: "order",
@@ -102,7 +103,7 @@ export const ATTRS = [
     icon: "🧹",
     cls: "Warden",
     school: "ward",
-    blurb: "Things that keep the house and your affairs in hand",
+    blurb: "What keeps the house and your affairs in hand.",
   },
   {
     id: "resolve",
@@ -111,7 +112,7 @@ export const ATTRS = [
     icon: "⚓",
     cls: "Knight",
     school: "finish",
-    blurb: "Things you finish. Only completed projects count",
+    blurb: "What goes past your limit: exceptional work, the extra effort, the thing you dodged.",
   },
   {
     id: "charisma",
@@ -120,56 +121,22 @@ export const ATTRS = [
     icon: "🎭",
     cls: "Envoy",
     school: "charm",
-    blurb: "Likes and social things",
+    blurb: "What passes between people: calls, gatherings, sharing your work.",
   },
 ];
 export const ATTR = Object.fromEntries(ATTRS.map((a) => [a.id, a]));
 
 // Spell schools, one per class. f is the strength fraction for the caster's spell level (grows toward 1).
 export const sfrac = (L) => 1 - Math.pow(TUNE.spell.decay, L);
-export const pctS = (x) => Math.round(x * 100) + "%";
 export const SCHOOLS = {
-  force: {
-    name: "Force",
-    attr: "body",
-    text: (L) => `Strikes the foe for ${pctS(0.3 + 1.6 * sfrac(L))} of an attack.`,
-  },
-  mend: {
-    name: "Mend",
-    attr: "vitality",
-    text: (L) => `Heals every standing party member ${pctS(0.4 * sfrac(L))} of max HP.`,
-  },
-  insight: {
-    name: "Insight",
-    attr: "mind",
-    text: (L) => `The foe's next turn does ${pctS(0.7 * sfrac(L))} less damage.`,
-  },
-  anthem: {
-    name: "Anthem",
-    attr: "craft",
-    text: (L) => `Party attacks deal +${pctS(0.8 * sfrac(L))} for the rest of the turn.`,
-  },
-  purge: {
-    name: "Purge",
-    attr: "spirit",
-    text: (L) =>
-      `${L >= 3 ? "Cures every ailment" : L === 2 ? "Cures Poison, Burn, Shock and Blind" : "Cures Poison and Burn"} on the party and heals ${pctS(0.2 * sfrac(L))}.`,
-  },
-  ward: {
-    name: "Ward",
-    attr: "order",
-    text: (L) => `The party takes ${pctS(Math.min(0.75, 0.9 * sfrac(L)))} less damage until the turn ends.`,
-  },
-  finish: {
-    name: "Finish",
-    attr: "resolve",
-    text: (L) => `Strikes for ${pctS(0.2 + 1.2 * sfrac(L))} of an attack, up to 3× on a badly wounded foe.`,
-  },
-  charm: {
-    name: "Charm",
-    attr: "charisma",
-    text: (L) => `${pctS(0.7 * sfrac(L))} chance the foe loses its next turn.`,
-  },
+  force: { name: "Force", attr: "body", lore: "What strength says when words run out." },
+  mend: { name: "Mend", attr: "vitality", lore: "What rest gives back." },
+  insight: { name: "Insight", attr: "mind", lore: "Knowing what is coming takes the force out of it." },
+  anthem: { name: "Anthem", attr: "craft", lore: "A song for the ones beside you." },
+  purge: { name: "Purge", attr: "spirit", lore: "What the debt left behind, drawn out." },
+  ward: { name: "Ward", attr: "order", lore: "A house in order holds against the bad week." },
+  finish: { name: "Finish", attr: "resolve", lore: "The last push is worth more than the first." },
+  charm: { name: "Charm", attr: "charisma", lore: "Some fights are won by not having them." },
 };
 
 export const CLASSES = {
@@ -186,34 +153,70 @@ export const SKINS = ["#f1c7a0", "#c98e62", "#8d5a3b"];
 
 // Each tier is a region you can travel back to.
 export const TIERS = [
-  { roman: "I", name: "Crawlers", region: "Cellar Meadows", bg: "meadow" },
-  { roman: "II", name: "Beasts", region: "Greywood", bg: "forest" },
-  { roman: "III", name: "Tricksters", region: "Twilight Grove", bg: "grove" },
-  { roman: "IV", name: "Restless Dead", region: "Hollow Crypts", bg: "crypt" },
-  { roman: "V", name: "Elementals & Constructs", region: "Sunken Ruins", bg: "ruins" },
-  { roman: "VI", name: "Giants", region: "Highland Pass", bg: "highlands" },
-  { roman: "VII", name: "Drakes", region: "Ember Cliffs", bg: "cliffs" },
-  { roman: "VIII", name: "Dragons", region: "The Ember Peaks", bg: "lair" },
+  {
+    roman: "I",
+    name: "Crawlers",
+    region: "Cellar Meadows",
+    bg: "meadow",
+    lore: "Where the crawlers live, and where you learn that you can win.",
+  },
+  { roman: "II", name: "Beasts", region: "Greywood", bg: "forest", lore: "The beasts run you down in the dark here." },
+  {
+    roman: "III",
+    name: "Tricksters",
+    region: "Twilight Grove",
+    bg: "grove",
+    lore: "Nothing here is what it looks like.",
+  },
+  {
+    roman: "IV",
+    name: "Restless Dead",
+    region: "Hollow Crypts",
+    bg: "crypt",
+    lore: "What is left of everything you started and dropped. It knows your name.",
+  },
+  {
+    roman: "V",
+    name: "Elementals & Constructs",
+    region: "Sunken Ruins",
+    bg: "ruins",
+    lore: "Old machinery still ticks, keeping time for no one.",
+  },
+  {
+    roman: "VI",
+    name: "Giants",
+    region: "Highland Pass",
+    bg: "highlands",
+    lore: "The giants charge a toll for the first step.",
+  },
+  {
+    roman: "VII",
+    name: "Drakes",
+    region: "Ember Cliffs",
+    bg: "cliffs",
+    lore: "The drakes strike from high ledges. Only those who have climbed are worth striking.",
+  },
+  {
+    roman: "VIII",
+    name: "Dragons",
+    region: "The Ember Peaks",
+    bg: "lair",
+    lore: "The dragons. The oldest one is at the top, and it remembers you.",
+  },
 ];
 
 // Foe moves. Turn moves land when the party's turn ends; a counter lands right after the foe is hit.
 export const MOVES = {
-  bite: { name: "Bite", target: "one", hits: [1, 3], size: "small", text: "bites one member 1–3 times" },
-  savage: {
-    name: "Savage bite",
-    target: "one",
-    hits: [1, 2],
-    size: "medium",
-    text: "savages one member once or twice",
-  },
-  maul: { name: "Maul", target: "one", hits: [3, 5], size: "small", text: "mauls one member 3–5 times" },
-  swipe: { name: "Swipe", target: "all", hits: [1, 1], size: "small", text: "swipes the whole party (light)" },
-  sweep: { name: "Sweep", target: "all", hits: [1, 1], size: "medium", text: "sweeps the whole party" },
-  slam: { name: "Slam", target: "all", hits: [1, 1], size: "large", text: "slams the whole party (heavy)" },
-  breath: { name: "Breath", target: "all", hits: [1, 1], size: "heavy", text: "breathes on the whole party (massive)" },
-  snap: { name: "Bite back", target: "actor", hits: [1, 1], size: "small", text: "bites back whoever hits it" },
-  lash: { name: "Lash", target: "actor", hits: [1, 2], size: "medium", text: "lashes back hard at whoever hits it" },
-  storm: { name: "Backlash", target: "all", hits: [1, 1], size: "small", text: "strikes back at the whole party" },
+  bite: { name: "Bite", target: "one", hits: [1, 3], size: "small" },
+  savage: { name: "Savage bite", target: "one", hits: [1, 2], size: "medium" },
+  maul: { name: "Maul", target: "one", hits: [3, 5], size: "small" },
+  swipe: { name: "Swipe", target: "all", hits: [1, 1], size: "small" },
+  sweep: { name: "Sweep", target: "all", hits: [1, 1], size: "medium" },
+  slam: { name: "Slam", target: "all", hits: [1, 1], size: "large" },
+  breath: { name: "Breath", target: "all", hits: [1, 1], size: "heavy" },
+  snap: { name: "Bite back", target: "actor", hits: [1, 1], size: "small" },
+  lash: { name: "Lash", target: "actor", hits: [1, 2], size: "medium" },
+  storm: { name: "Backlash", target: "all", hits: [1, 1], size: "small" },
 };
 export const FAMILY_ATK = {
   rat: { turn: ["bite"] },
@@ -257,7 +260,7 @@ export const ENEMY_TIERS = [
       "Cellar Rat",
       "rat",
       P("#8a7f72", "#5e554c", "#b3a796", "#e8313a"),
-      "Lives on crumbs and skipped mornings.",
+      "Takes a crumb and a morning, and comes back for both.",
     ],
     [
       "dung-beetle",
@@ -280,13 +283,19 @@ export const ENEMY_TIERS = [
       P("#b5532e", "#7a3420", "#e0814f", "#ffe066"),
       "Every leg is a reason to wait.",
     ],
-    ["web-weaver", "Web Weaver", "spider", P("#3a3340", "#241f29", "#6d6378", "#ff3355"), 'Spins nets out of "later".'],
+    [
+      "web-weaver",
+      "Web Weaver",
+      "spider",
+      P("#3a3340", "#241f29", "#6d6378", "#ff3355"),
+      "Spins its web across the door you meant to open later.",
+    ],
     [
       "pale-grub",
       "Pale Grub",
       "slug",
       P("#e9dfc4", "#c2b48f", "#fff7e0", "#3b2a1a"),
-      "Grows fat on the snooze button.",
+      "Grows fat in the warm hour you meant to give away.",
     ],
   ],
   [
@@ -304,7 +313,13 @@ export const ENEMY_TIERS = [
       P("#7a4e33", "#52331f", "#a8714c", "#ff5a36", { t: "#f4ecd8" }),
       "Charges straight through good intentions.",
     ],
-    ["dusk-bat", "Dusk Bat", "bat", P("#4b3a5a", "#2f2340", "#7a6390", "#ff4060"), "Wakes when the screens glow late."],
+    [
+      "dusk-bat",
+      "Dusk Bat",
+      "bat",
+      P("#4b3a5a", "#2f2340", "#7a6390", "#ff4060"),
+      "Wakes when the lamps should have been put out.",
+    ],
     [
       "moss-viper",
       "Moss Viper",
@@ -317,7 +332,7 @@ export const ENEMY_TIERS = [
       "Storm Hawk",
       "bat",
       P("#7b6a52", "#54473a", "#c9b38f", "#ffcc00", { w: "#e8a33a" }),
-      "Circles high and dives at distraction.",
+      "Circles high. Dives the moment you look away from the road.",
     ],
     [
       "cave-bear",
@@ -347,7 +362,7 @@ export const ENEMY_TIERS = [
       "Kobold Digger",
       "imp",
       P("#b0743a", "#4a4a52", "#d69a5c", "#fff04a", { h: "#8a5a2a" }),
-      "Tunnels under the to-do list.",
+      "Tunnels under everything you had written down.",
     ],
     [
       "marsh-wisp",
@@ -384,14 +399,14 @@ export const ENEMY_TIERS = [
       "Grave Ghoul",
       "skeleton",
       P("#7f9a72", "#566b4c", "#a7c29a", "#ffef5a", { k: "#1c2418" }),
-      "Feeds on abandoned projects.",
+      "Feeds on work left half-done.",
     ],
     [
       "wraith",
       "Hollow Wraith",
       "ghost",
       P("#6a6a8a", "#44445e", "#9b9bc0", "#ffffff", { k: "#0a0a12" }),
-      "A shape left behind by habits you dropped.",
+      "A shape left behind by someone you stopped being.",
     ],
     ["bone-hound", "Bone Hound", "beast", P("#ddd2b8", "#a89d85", "#fffaf0", "#4bd1ff"), "Fetches old regrets."],
     [
@@ -487,14 +502,14 @@ export const ENEMY_TIERS = [
       "Frost Giant",
       "giant",
       P("#b9d9ea", "#4f7aa0", "#e6f5ff", "#2fe0ff", { h: "#f5f5f5", k: "#1a3550", d: "#2f4f70" }),
-      "Brings the long, cold slump.",
+      "Brings the long, cold stillness.",
     ],
     [
       "minotaur",
       "Labyrinth Minotaur",
       "giant",
       P("#6b3e26", "#8a2a1e", "#94593a", "#ff2a2a", { h: "#e8dcc0", k: "#2a160c", d: "#5a1a12" }),
-      "Guards a maze of open tabs.",
+      "Guards a maze of doors you opened and never went through.",
     ],
   ],
   [
@@ -510,14 +525,14 @@ export const ENEMY_TIERS = [
       "Lava Salamander",
       "dragon",
       P("#e05a1e", "#a3360f", "#ffb04a", "#fff07a"),
-      "Thrives where burnout runs hot.",
+      "Thrives where the fire has outrun the fuel.",
     ],
     [
       "sea-serpent",
       "Sea Serpent",
       "serpent",
       P("#2e7d9a", "#1d5468", "#7fd0d8", "#ffde3a", { r: "#ff6b8a" }),
-      "Drags you under the endless scroll.",
+      "Drags you under, and it's very pleasant on the way down.",
     ],
     [
       "rock-drake",
@@ -561,7 +576,7 @@ export const ENEMY_TIERS = [
       "Storm Dragon",
       "dragon",
       P("#4b5fa8", "#2d3a70", "#a8b8ff", "#fff35a", { g: "#7d6ad0" }),
-      "Roars with a hundred notifications.",
+      "Roars with a hundred voices, and none of them need you.",
     ],
     [
       "venom-dragon",
