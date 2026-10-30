@@ -4,6 +4,8 @@ What changed in Star, newest first. Each version is tagged in git as `star-v<ver
 
 ## Unreleased
 
+## 0.0.4 — 2026-10-30
+
 - Every Man is a Star: the people you know and their families, charted as a night sky at `star.<domain>`. Sign in with Heimdall; each user has their own private sky, saved in Star's own database.
 - Add someone you know as a bright star, and their relatives around them ("Bob's brother's wife"). Each star has a memo. Search finds people by name or memo.
 - Connect two stars from different families when you find out they are related, and make a relative a main star when you get to know them yourself.

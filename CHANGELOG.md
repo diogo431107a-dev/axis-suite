@@ -4,6 +4,28 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.127 — 2026-10-30
+
+A new module, Every Man is a Star (`star`): the people you know and their families, charted as a night sky, with its own database and sign-in through Heimdall. The other modules are unchanged.
+
+**By hand:** before the first install, make sure `star.<domain>` points at the server.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.21  |
+| Loggbok   | 0.0.16  |
+| Yggdrasil | 1.0.2   |
+| Janus     | 0.0.7   |
+| Papyrus   | 0.0.7   |
+| Vinr      | 0.0.6   |
+| Chronos   | 0.0.7   |
+| Valkyrie  | 0.0.6   |
+| Althing   | 0.0.4   |
+| Mimir     | 0.0.6   |
+| Urd       | 2.1.0   |
+| Saga      | 1.0.0   |
+| Star      | 0.0.4   |
+
 ## 0.0.122 — 2026-10-30
 
 Saga reaches 1.0.0, with the story in its labels, an in-game help and the Angel's place. The other modules are unchanged.
