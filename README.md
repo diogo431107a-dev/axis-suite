@@ -18,6 +18,7 @@ Small self-hosted web apps ("modules") that share one sign-in (all but Saga, whi
 | [Saga](saga/README.md)           | Habits Saga, a habit tracker played as a fantasy game, with its own players and a public ranking.        | 3011 | 8453       |
 | [Star](star/README.md)           | Every Man is a Star: the people you know and their families, charted as a night sky.                     | 3012 | 8454       |
 | [Fafnir](fafnir/README.md)       | Fafnir Personal Finances: what you have, what you owe and where your money goes, in US dollars.          | 3013 | 8455       |
+| [Tyr](tyr/README.md)             | A dossier of people: what was said, when and where, and how you came to know it.                         | 3014 | 8456       |
 
 Shared code lives in `packages/`:
 
@@ -43,7 +44,8 @@ browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   account
                         ├──▶ urd        127.0.0.1:3010   time-tracker API, live updates + static frontend
                         ├──▶ saga       127.0.0.1:3011   game API + static frontend (its own accounts)
                         ├──▶ star       127.0.0.1:3012   night-sky API + static frontend
-                        └──▶ fafnir     127.0.0.1:3013   finances API + static frontend
+                        ├──▶ fafnir     127.0.0.1:3013   finances API + static frontend
+                        └──▶ tyr        127.0.0.1:3014   dossier API + static frontend
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 althing's API     ── GET /online ──▶ heimdall (who has a live session, for the "online" list)
@@ -90,6 +92,7 @@ urd/                 time tracker
 saga/                Habits Saga, the game
 star/                Every Man is a Star, the night sky of people
 fafnir/              Fafnir Personal Finances
+tyr/                 Tyr, the dossier of people
 ```
 
 Every module has the same shape:
@@ -114,7 +117,7 @@ Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in 
 
 ```bash
 pnpm install
-pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga, :5184 for Star, :5185 for Fafnir
+pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga, :5184 for Star, :5185 for Fafnir, :5186 for Tyr
 ```
 
 Use `127.0.0.1`, not `localhost`: browsers send Heimdall's cookie (`127.0.0.1:3000`) to the other modules only on the same host. Demo accounts: `odin` / `allfather-demo`, `freya` / `folkvangr-demo`, `john` / `john-demo`. Local data goes in each module's `data/` folder, which git ignores.
@@ -171,6 +174,7 @@ sudo bash axis-suite/deploy/install.sh urd
 sudo bash axis-suite/deploy/install.sh saga
 sudo bash axis-suite/deploy/install.sh star
 sudo bash axis-suite/deploy/install.sh fafnir
+sudo bash axis-suite/deploy/install.sh tyr
 ```
 
 Janus's first install makes its encryption key, `/etc/axis-suite/janus.key`. Back it up right away, apart from the server: without it, nobody can read the vaults (see [Janus](janus/README.md#installing-and-data)).
@@ -198,14 +202,15 @@ sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh urd
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh saga
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh star
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh fafnir
+sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh tyr
 ```
 
-Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452, Saga at https://localhost:8453, Star at https://localhost:8454 and Fafnir at https://localhost:8455. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
+Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452, Saga at https://localhost:8453, Star at https://localhost:8454, Fafnir at https://localhost:8455 and Tyr at https://localhost:8456. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
 
 ## Operating it
 
 ```bash
-systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga star fafnir   # running?
+systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga star fafnir tyr   # running?
 journalctl -u loggbok -f                                                          # a module's log
 sudo systemctl restart loggbok                                                    # restart one module
 cat /etc/axis-suite/suite.env                                                     # the domain, URLs and usernames every module was given
@@ -230,6 +235,7 @@ Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<modul
 | Saga      | every player's account and game, and the invite codes                  | `/var/lib/saga/saga.db`         |
 | Star      | every user's sky: the people, their memos and how they connect         | `/var/lib/star/star.db`         |
 | Fafnir    | every user's accounts and entries, and the exchange rates              | `/var/lib/fafnir/fafnir.db`     |
+| Tyr       | every user's files on people: their entries, places and profiles       | `/var/lib/tyr/tyr.db`           |
 
 Back up a module's data with its service stopped, and keep the copies where only you can read them:
 
