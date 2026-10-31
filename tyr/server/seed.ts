@@ -2,7 +2,7 @@
 //   pnpm --filter tyr seed [username]
 // Only for the local data/ folder. It isn't built, so it never reaches a server.
 import { randomUUID } from "node:crypto";
-import type { Certainty, Question, Setting, Source, Stamp } from "../shared/protocol.ts";
+import type { CareLevel, Certainty, Outcome, Question, Setting, Source, Stamp } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { createStore } from "./dossier.ts";
 
@@ -557,6 +557,206 @@ const ANSWERS: [string, Question, string, string, string[]][] = [
 for (const [person, q, text, revised, ev] of ANSWERS) {
   store.addAnswer(owner, { id: randomUUID(), person: fileIds.get(person), q, text, ev, revised });
 }
+
+/* What the entries above left out: credit, care, word given, concerns, corrections, reports, incidents */
+const logged = () => store.load(owner).entries;
+const byBody = (text: string) => {
+  const found = logged().find((e) => e.body.startsWith(text));
+  if (!found) throw new Error(`No entry starting ${text}`);
+  return found.id;
+};
+const file = (key: string) => fileIds.get(key)!;
+for (const text of [
+  "Stayed after club",
+  "Keeps the last broas",
+  "Covered my 4th period",
+  "Gave her lunch",
+  "Feeds the courtyard cats",
+]) {
+  store.fileEntry(owner, byBody(text), { credit: true });
+}
+
+const CARE: [string, CareLevel, string, string, string | null, string, string?][] = [
+  ["fernanda", "never", "Don’t bring up hospitals.", "2026-05-14", f4, "2026-10-03"],
+  ["fernanda", "ifthey", "Her divorce. Only if she raises it.", "2026-06-10", null, "2026-09-01"],
+  [
+    "fernanda",
+    "watch",
+    "Money. She went quiet when it came up; an observation until it repeats.",
+    "2026-08-14",
+    f6,
+    "2026-08-14",
+  ],
+  ["fernanda", "practical", "Sit on her right in meetings.", "2026-03-26", f14, "2026-10-09"],
+  ["fernanda", "welcome", "Her garden, samba de roda, the anthology.", "2026-10-03", f10, "2026-10-22"],
+  [
+    "fernanda",
+    "careful",
+    "Mid-November is hard for her. Be gentle this week.",
+    "2026-10-03",
+    f9,
+    "2026-10-03",
+    "11-15",
+  ],
+  ["marcos", "ifthey", "His brother. Only if he raises it, and never in a group.", "2026-09-23", m1, "2026-10-20"],
+  [
+    "marcos",
+    "welcome",
+    "Botafogo; the chess problem he leaves on the staff-room board.",
+    "2026-07-08",
+    m0,
+    "2026-10-20",
+  ],
+  [
+    "lourdes",
+    "watch",
+    "My travel plans. She changes the subject.",
+    "2026-08-30",
+    byBody("Changed the subject"),
+    "2026-08-30",
+  ],
+  ["icaro", "practical", "Phone away before class starts.", "2026-09-17", null, "2026-09-17"],
+  ["alvaro", "welcome", "Running; anything about the Sunday 10 km.", "2026-02-09", a1, "2026-10-22"],
+];
+for (const [person, level, text, since, source, confirmed, date] of CARE) {
+  const id = randomUUID();
+  store.addCare(owner, { id, person: file(person), level, text, since, source, date: date ?? null });
+  store.changeCare(owner, id, { confirmed });
+}
+
+const WORDS: [string, "me" | "they", string, string, string | null, Outcome, string | null, string | null][] = [
+  [
+    "fernanda",
+    "they",
+    "I’ll bring you my copy of Vidas Secas next week.",
+    "2026-10-28",
+    "2026-11-06",
+    "pending",
+    null,
+    f12,
+  ],
+  [
+    "fernanda",
+    "me",
+    "I’ll help with the anthology budget spreadsheet.",
+    "2026-09-30",
+    "2026-10-20",
+    "kept",
+    "2026-10-15",
+    null,
+  ],
+  [
+    "alvaro",
+    "they",
+    "I’ll bring the projector cable back on Monday.",
+    "2026-09-12",
+    "2026-09-14",
+    "pending",
+    null,
+    byBody("Said he would bring back"),
+  ],
+  ["marcos", "me", "I’ll cover your 2nd period on the hearing day.", "2026-10-14", "2026-11-12", "pending", null, null],
+  ["marcos", "they", "I’ll tell you myself if I file for the transfer.", "2026-10-20", null, "pending", null, null],
+  ["debora", "me", "I’ll bring the endgame book to club.", "2026-10-13", "2026-10-20", "kept", "2026-10-20", null],
+  [
+    "sergio",
+    "me",
+    "I’ll send you scans of the 1932 yearbook.",
+    "2026-03-05",
+    "2026-03-31",
+    "released",
+    "2026-04-02",
+    null,
+  ],
+];
+for (const [person, dir, words, made, due, outcome, on, source] of WORDS) {
+  const id = randomUUID();
+  store.addWord(owner, { id, person: file(person), dir, words, made, due, source });
+  if (on) store.settleWord(owner, id, { outcome, on });
+}
+
+const addConcern = (person: string, text: string, opened: string, review: string, ev: string[]) => {
+  const id = randomUUID();
+  store.addConcern(owner, { id, person: file(person), text, opened, review, ev });
+  return id;
+};
+addConcern(
+  "alvaro",
+  "He may have presented my project draft as his own at the department meeting.",
+  "2026-10-10",
+  "2026-10-24",
+  [a4, byBody("I asked about the project outline")],
+);
+addConcern(
+  "marcos",
+  "He said he would tell me himself if he filed for the transfer. I found out from the tray.",
+  "2026-10-27",
+  "2026-11-27",
+  [byBody("Saw his transfer request")],
+);
+store.reviewConcern(
+  owner,
+  addConcern("sergio", "He seemed to leave without saying goodbye to the department.", "2026-03-20", "2026-04-20", []),
+  {
+    state: "dismissed",
+    on: "2026-04-20",
+    note: "He had a farewell lunch I wasn’t told about. Nothing to hold.",
+  },
+);
+store.addCorrection(owner, {
+  id: randomUUID(),
+  person: file("debora"),
+  on: "2026-08-03",
+  text: "I read her absence as avoidance. She had changed shifts.",
+  entry: d3,
+});
+store.addReport(owner, {
+  id: randomUUID(),
+  person: file("alvaro"),
+  text: "Told the coordinator I’m hard to work with on shared projects.",
+  by: "Jussara",
+  told: S("2026-10-20 10:15"),
+  hap: S("2026-10"),
+  place: PLACES.sec,
+});
+
+const arrest = randomUUID();
+store.addIncident(owner, {
+  id: arrest,
+  title: "Rodrigo’s arrest",
+  status: "one",
+  people: [file("marcos")],
+  mentions: ["Rodrigo, Marcos’s brother", "Their mother"],
+  opened: "2026-09-23",
+});
+for (const entry of [m1, m2]) store.fileEntry(owner, entry, { incident: arrest });
+store.addIncidentNote(owner, arrest, {
+  id: randomUUID(),
+  text: "The hearing is set for mid-November.",
+  by: "Jussara",
+  told: S("2026-10-14 10:20"),
+  hap: S("2026-10-14"),
+  place: PLACES.sec,
+});
+
+const house = randomUUID();
+store.addIncident(owner, {
+  id: house,
+  title: "Argument over the old house",
+  status: "confirmed",
+  people: [file("lourdes")],
+  mentions: ["Cousin Paulo"],
+  opened: "2026-07-05",
+});
+store.fileEntry(owner, byBody("Argued with cousin Paulo"), { incident: house });
+const made = E("lourdes", "2026-08-30 14:00", "O", "They sat together at the August lunch and joked about it.", {
+  place: "family",
+  setting: "group",
+});
+store.fileEntry(owner, made, { incident: house, credit: true });
+store.changeIncident(owner, house, {
+  closed: { on: "2026-08-30", note: "Settled between them. Nothing for me to carry." },
+});
 
 const loaded = store.load(owner);
 db.close();
