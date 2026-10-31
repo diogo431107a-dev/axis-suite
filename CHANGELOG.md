@@ -4,6 +4,28 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.138 — 2026-10-31
+
+A new module, Tyr (`tyr`): a dossier of people, saying what was said, when and where, and how you came to know it, with its own database and sign-in through Heimdall. The README now says that modules are independent and meant to differ. The other modules are unchanged.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.21  |
+| Loggbok   | 0.0.16  |
+| Yggdrasil | 1.0.2   |
+| Janus     | 0.0.7   |
+| Papyrus   | 0.0.7   |
+| Vinr      | 0.0.6   |
+| Chronos   | 0.0.7   |
+| Valkyrie  | 0.0.6   |
+| Althing   | 0.0.4   |
+| Mimir     | 0.0.6   |
+| Urd       | 2.1.0   |
+| Saga      | 1.0.0   |
+| Star      | 0.0.4   |
+| Fafnir    | 0.0.4   |
+| Tyr       | 0.0.4   |
+
 ## 0.0.133 — 2026-10-30
 
 Fafnir can now exchange between reais and dollars, take prices in the other currency, and show why what you're worth changed each month. The other modules are unchanged.
