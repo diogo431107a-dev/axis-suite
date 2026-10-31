@@ -1,0 +1,43 @@
+{
+  "name": "tyr",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Tyr — a dossier of people: what was said, when, and where",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc -b && vite build",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "start": "node dist/server/index.js",
+    "dev": "concurrently -k -n web,server -c blue,green \"pnpm dev:web\" \"pnpm dev:server\"",
+    "dev:web": "vite",
+    "dev:server": "node --conditions=development --watch server/index.ts",
+    "seed": "node --conditions=development server/seed.ts"
+  },
+  "dependencies": {
+    "@axis-suite/heimdall-client": "workspace:*",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@fontsource/courier-prime": "^5.2.0",
+    "@fontsource/public-sans": "^5.2.0",
+    "@fontsource/spectral": "^5.2.0",
+    "@types/express": "^5.0.6",
+    "@types/node": "catalog:",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.2",
+    "concurrently": "^9.1.2",
+    "react": "^19.2.7",
+    "react-dom": "^19.2.7",
+    "typescript": "catalog:",
+    "vite": "^8.1.0",
+    "vitest": "^4.1.11"
+  }
+}
