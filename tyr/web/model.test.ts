@@ -1,7 +1,8 @@
 import { describe, expect, it } from "vitest";
-import type { Entry, Person, Stamp } from "../shared/protocol.ts";
+import type { CareNote, Concern, Dossier, Entry, Incident, Person, Stamp, WordGiven } from "../shared/protocol.ts";
+import { evidenceCanProveBreach } from "../shared/rules.ts";
 import { fold, happenedAfterTold, letterOf, stampKey } from "../shared/time.ts";
-import { DORMANT_DAYS, Index, basisOf, drawerGroups, parseCapture } from "./model.ts";
+import { DORMANT_DAYS, Index, basisOf, drawerGroups, nextOccurrence, parseCapture } from "./model.ts";
 import { addDays, daysBetween, parseDateText, showStamp, withPrecision } from "./time.ts";
 
 const TODAY = "2026-10-31";
@@ -40,10 +41,23 @@ const entry = (over: Partial<Entry> = {}): Entry => ({
   amends: null,
   contra: null,
   incomplete: false,
+  credit: false,
+  incident: null,
   ...over,
 });
 
-const index = (people: Person[], entries: Entry[]) => new Index({ people, entries, places: [], answers: [] });
+const EMPTY = {
+  places: [],
+  answers: [],
+  care: [],
+  words: [],
+  concerns: [],
+  corrections: [],
+  reports: [],
+  incidents: [],
+};
+const index = (people: Person[], entries: Entry[], more: Partial<Dossier> = {}) =>
+  new Index({ ...EMPTY, people, entries, ...more });
 
 describe("the drawer", () => {
   it("files names under their letter with accents folded, and anything else under #", () => {
@@ -225,15 +239,183 @@ describe("Muninn", () => {
       body: "Exam on Friday, nervous",
       cat: "chapter",
       present: [],
+      care: false,
     });
     expect(parseCapture("Lunch with @fe and @Paulo #fear", nameOf)).toEqual({
       body: "Lunch with Fernanda and Paulo",
       cat: "fears",
       present: ["Fernanda", "Paulo"],
+      care: false,
+    });
+  });
+
+  it("takes !care from the line", () => {
+    expect(parseCapture("Don't mention the divorce !care #fear", nameOf)).toEqual({
+      body: "Don't mention the divorce",
+      cat: "fears",
+      present: [],
+      care: true,
     });
   });
 
   it("leaves an unknown tag in the text", () => {
-    expect(parseCapture("Loves #chess a lot", nameOf)).toEqual({ body: "Loves #chess a lot", cat: null, present: [] });
+    expect(parseCapture("Loves #chess a lot", nameOf)).toEqual({
+      body: "Loves #chess a lot",
+      cat: null,
+      present: [],
+      care: false,
+    });
+  });
+});
+
+const word = (over: Partial<WordGiven> = {}): WordGiven => ({
+  id: "w1",
+  person: "p1",
+  dir: "they",
+  words: "I'll bring the book.",
+  made: "2026-10-01",
+  due: null,
+  outcome: "pending",
+  outcomeOn: null,
+  source: null,
+  ...over,
+});
+
+const concern = (over: Partial<Concern> = {}): Concern => ({
+  id: "c1",
+  person: "p1",
+  text: "A worry.",
+  opened: "2026-10-01",
+  review: "2026-11-15",
+  state: "open",
+  ev: [],
+  reviewNote: "",
+  reviewed: null,
+  ...over,
+});
+
+const care = (over: Partial<CareNote> = {}): CareNote => ({
+  id: "n1",
+  person: "p1",
+  level: "careful",
+  text: "Be gentle.",
+  date: null,
+  since: "2026-01-01",
+  source: null,
+  confirmed: "2026-01-01",
+  retired: null,
+  ...over,
+});
+
+const incident = (over: Partial<Incident> = {}): Incident => ({
+  id: "i1",
+  title: "The arrest",
+  status: "one",
+  people: ["p1"],
+  mentions: [],
+  opened: "2026-09-01",
+  closed: null,
+  closeNote: "",
+  history: [],
+  notes: [],
+  ...over,
+});
+
+describe("what is left open", () => {
+  const kinds = (more: Partial<Dossier>) => index([person()], [], more).threads("p1", TODAY);
+
+  it("counts word given as overdue only with a date that has passed", () => {
+    const threads = kinds({
+      words: [
+        word({ id: "a", due: "2026-10-30" }),
+        word({ id: "b", due: TODAY }),
+        word({ id: "c" }),
+        word({ id: "d", due: "2026-01-01", outcome: "kept" }),
+      ],
+    });
+    expect(threads.map((t) => [t.key, t.over])).toEqual([
+      ["word-a", true],
+      ["word-b", false],
+      ["word-c", false],
+    ]);
+  });
+
+  it("puts a concern up for review on its exact day", () => {
+    const over = (review: string) => kinds({ concerns: [concern({ review })] })[0]?.over;
+    expect(over("2026-11-01")).toBe(false);
+    expect(over(TODAY)).toBe(true);
+    expect(over("2026-10-30")).toBe(true);
+    expect(kinds({ concerns: [concern({ state: "dismissed" })] })).toEqual([]);
+  });
+
+  it("shows a hard date from 30 days ahead, and retires with its note", () => {
+    const gentle = (date: string, over: Partial<CareNote> = {}) => kinds({ care: [care({ date, ...over })] });
+    expect(gentle("11-30")[0]).toMatchObject({ kind: "Gentle week", due: "2026-11-30" });
+    expect(gentle("12-01")).toEqual([]);
+    expect(gentle("11-15", { retired: "2026-10-01" })).toEqual([]);
+  });
+
+  it("lists an open incident undated and last, and not a closed one", () => {
+    const threads = kinds({ incidents: [incident()], words: [word({ due: "2026-12-01" })] });
+    expect(threads.map((t) => t.kind)).toEqual(["Word given", "Incident"]);
+    expect(kinds({ incidents: [incident({ closed: "2026-10-01" })] })).toEqual([]);
+  });
+
+  it("leaves a closed file's threads out of the overdue count", () => {
+    const words = [word({ due: "2026-01-01" })];
+    expect(index([person()], [], { words }).overdueCount(TODAY)).toBe(1);
+    expect(index([person({ closed: "2026-06-30" })], [], { words }).overdueCount(TODAY)).toBe(0);
+  });
+});
+
+describe("hard dates", () => {
+  it("come round each year, staying for six days after", () => {
+    expect(nextOccurrence("11-15", TODAY)).toBe("2026-11-15");
+    expect(nextOccurrence("10-25", TODAY)).toBe("2026-10-25");
+    expect(nextOccurrence("10-24", TODAY)).toBe("2027-10-24");
+    expect(nextOccurrence("01-05", "2026-12-30")).toBe("2027-01-05");
+  });
+
+  it("fall on 02-28 in a year with no 02-29", () => {
+    expect(nextOccurrence("02-29", "2027-01-10")).toBe("2027-02-28");
+    expect(nextOccurrence("02-29", "2028-01-10")).toBe("2028-02-29");
+  });
+});
+
+describe("an incident's steps", () => {
+  it("merges entries from any of its files with hearsay, in the order they happened", () => {
+    const note = {
+      id: "h1",
+      logged: "x",
+      told: day("2026-10-14"),
+      hap: day("2026-09-20"),
+      place: null,
+      text: "Heard it.",
+      by: "Jussara",
+    };
+    const inc = incident({ people: ["p1", "p2"], notes: [note] });
+    const ix = index(
+      [person(), person({ id: "p2", name: "Bia" })],
+      [
+        entry({ id: "late", incident: "i1", hap: day("2026-09-21") }),
+        entry({ id: "early", person: "p2", incident: "i1", hap: day("2026-09-19") }),
+        entry({ id: "other" }),
+      ],
+      { incidents: [inc] },
+    );
+    expect(ix.incidentSteps(inc).map((s) => (s.kind === "entry" ? s.entry.id : s.note.id))).toEqual([
+      "early",
+      "h1",
+      "late",
+    ]);
+  });
+});
+
+describe("a breach", () => {
+  it("needs evidence beyond my own conclusions", () => {
+    expect(evidenceCanProveBreach([])).toBe(false);
+    expect(evidenceCanProveBreach(["N", "N"])).toBe(false);
+    expect(evidenceCanProveBreach(["N", "O"])).toBe(true);
+    expect(evidenceCanProveBreach(["P"])).toBe(true);
   });
 });

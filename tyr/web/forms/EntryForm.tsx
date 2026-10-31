@@ -62,6 +62,8 @@ export function EntryForm({ sheet }: { sheet: Extract<Sheet, { what: "entry" }> 
   const [fuDate, setFuDate] = useState(completing?.fu?.date ?? "");
   const [fuNote, setFuNote] = useState(completing?.fu?.note ?? "");
   const [contra, setContra] = useState(completing?.contra ?? "");
+  const [credit, setCredit] = useState(completing?.credit ?? false);
+  const [incident, setIncident] = useState((sheet.mode === "new" ? sheet.incident : completing?.incident) ?? "");
   const [warned, setWarned] = useState(false);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -72,6 +74,7 @@ export function EntryForm({ sheet }: { sheet: Extract<Sheet, { what: "entry" }> 
     .entriesOf(sheet.pid)
     .filter((e) => e.id !== eid)
     .sort(byToldDesc);
+  const incidents = ix.incidentsOf(sheet.pid).filter((i) => !i.closed || i.id === incident);
   const needsWarning = src === "P" && !warned && completing?.src !== "P";
 
   const submit = async (ev: FormEvent) => {
@@ -113,6 +116,8 @@ export function EntryForm({ sheet }: { sheet: Extract<Sheet, { what: "entry" }> 
       conf,
       fu,
       contra: contra || null,
+      credit,
+      incident: incident || null,
     };
     setSaving(true);
     try {
@@ -296,6 +301,22 @@ export function EntryForm({ sheet }: { sheet: Extract<Sheet, { what: "entry" }> 
               />
             </div>
           </div>
+          <label className="check">
+            <input type="checkbox" checked={credit} onChange={(ev) => setCredit(ev.target.checked)} /> To their credit
+          </label>
+          {incidents.length > 0 && (
+            <div className="field">
+              <label htmlFor="ef-inc">Part of an incident</label>
+              <select id="ef-inc" value={incident} onChange={(ev) => setIncident(ev.target.value)}>
+                <option value="">None</option>
+                {incidents.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
           <div className="field">
             <label htmlFor="ef-contra">Contradicts an earlier entry</label>
             <select id="ef-contra" value={contra} onChange={(e) => setContra(e.target.value)}>

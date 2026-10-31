@@ -5,7 +5,6 @@ import type { DatabaseSync } from "node:sqlite";
 import {
   CERTAINTIES,
   LIMITS,
-  QUESTION_KEYS,
   SETTINGS,
   SOURCES,
   WORDINGS,
@@ -24,13 +23,28 @@ import {
   type Question,
   type Setting,
   type Source,
-  type Stamp,
   type Wording,
 } from "../shared/protocol.ts";
-import { fold, happenedAfterTold, isDate, isStamp } from "../shared/time.ts";
-import { StoreError, conflict, invalid, notFound, tooMany, transaction } from "./errors.ts";
+import { fold, happenedAfterTold, stampKey } from "../shared/time.ts";
+import {
+  createChecks,
+  day,
+  list,
+  newId,
+  object,
+  oneOf,
+  optionalId,
+  personField,
+  question,
+  required,
+  stamp,
+  text,
+} from "./check.ts";
+import { conflict, invalid, notFound, tooMany, transaction } from "./errors.ts";
+import { createIncidents, type Incidents } from "./incidents.ts";
+import { createTrust, type Trust } from "./trust.ts";
 
-export interface Store {
+export interface Store extends Trust, Incidents {
   load(owner: string): Dossier;
   openFile(owner: string, input: unknown): void;
   changeFile(owner: string, id: string, input: unknown): void;
@@ -45,49 +59,6 @@ export interface Store {
   removePlace(owner: string, id: string): void;
   removeUnknownOwners(known: ReadonlySet<string>): { owner: string; entries: number }[];
 }
-
-const object = (value: unknown): Record<string, unknown> =>
-  typeof value === "object" && value !== null && !Array.isArray(value)
-    ? (value as Record<string, unknown>)
-    : invalid("That request isn't valid");
-
-/** Text with its spaces trimmed, up to `max` characters. */
-function text(value: unknown, max: number, what: string): string {
-  if (typeof value !== "string") invalid(`${what} isn't valid`);
-  const trimmed = value.trim();
-  if (trimmed.length > max) invalid(`${what} is too long: ${max} characters at most`);
-  return trimmed;
-}
-
-function required(value: unknown, max: number, what: string): string {
-  return text(value, max, what) || invalid(`${what} can't be empty`);
-}
-
-function list(value: unknown, maxItems: number, maxLength: number, what: string): string[] {
-  if (!Array.isArray(value)) invalid(`${what} isn't valid`);
-  const items = value.map((item) => text(item, maxLength, what)).filter(Boolean);
-  if (items.length > maxItems) invalid(`${what}: ${maxItems} at most`);
-  return items;
-}
-
-function oneOf<T extends string>(value: unknown, options: readonly T[], what: string): T {
-  return options.includes(value as T) ? (value as T) : invalid(`${what} isn't valid`);
-}
-
-function newId(value: unknown): string {
-  if (typeof value !== "string" || !/^[A-Za-z0-9-]{8,64}$/.test(value)) invalid("That id isn't valid");
-  return value;
-}
-
-function day(value: unknown, what: string): string {
-  return isDate(value) ? value : invalid(`${what} needs a full date, like 2026-11-20`);
-}
-
-function stamp(value: unknown, what: string): Stamp {
-  return isStamp(value) ? { d: value.d, t: value.t, p: value.p } : invalid(`${what} isn't a valid date`);
-}
-
-const question = (value: unknown): Question => oneOf(value, QUESTION_KEYS, "That question") as Question;
 
 function checkedFields(input: Record<string, unknown>): EntryFields {
   const src = oneOf(input.src, SOURCES, "The source");
@@ -113,7 +84,9 @@ function checkedFields(input: Record<string, unknown>): EntryFields {
       date: day(fuInput.date, "A follow-up"),
       note: text(fuInput.note ?? "", LIMITS.note, "The follow-up note"),
     },
-    contra: input.contra === null || input.contra === undefined ? null : String(input.contra),
+    contra: optionalId(input.contra),
+    credit: input.credit === true,
+    incident: optionalId(input.incident),
   };
 }
 
@@ -155,6 +128,8 @@ interface EntryRow {
   amends_id: string | null;
   contra_id: string | null;
   incomplete: number;
+  credit: number;
+  incident_id: string | null;
 }
 
 const toPerson = (r: PersonRow): Person => ({
@@ -189,12 +164,16 @@ const toEntry = (r: EntryRow): Entry => ({
   amends: r.amends_id,
   contra: r.contra_id,
   incomplete: r.incomplete === 1,
+  credit: r.credit === 1,
+  incident: r.incident_id,
 });
 
 /** `now` is the clock behind logged-at; only the example data sets its own. */
 export function createStore(db: DatabaseSync, now: () => string = () => new Date().toISOString()): Store {
-  const count = (table: string, owner: string) =>
-    (db.prepare(`SELECT COUNT(*) AS n FROM ${table} WHERE owner = ?`).get(owner) as { n: number }).n;
+  const checks = createChecks(db);
+  const { alreadySaved, checkIncident, checkLinked, count, placeId } = checks;
+  const trust = createTrust(db, checks, now);
+  const incidents = createIncidents(db, checks, now);
 
   function personRow(owner: string, id: string): PersonRow {
     const row = db.prepare("SELECT * FROM people WHERE id = ? AND owner = ?").get(id, owner) as PersonRow | undefined;
@@ -226,27 +205,6 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
     }
   }
 
-  /** The id of the place with this label, added to the list if it is new. */
-  function placeId(owner: string, label: string | null): string | null {
-    if (!label) return null;
-    const key = fold(label);
-    const found = db.prepare("SELECT id FROM places WHERE owner = ? AND label_key = ?").get(owner, key) as
-      { id: string } | undefined;
-    if (found) return found.id;
-    if (count("places", owner) >= LIMITS.places) tooMany(`A drawer holds ${LIMITS.places} places at most`);
-    const id = randomUUID();
-    db.prepare("INSERT INTO places (id, owner, label, label_key) VALUES (?, ?, ?, ?)").run(id, owner, label, key);
-    return id;
-  }
-
-  /** An entry another one links to must be in the same file. */
-  function checkLinked(owner: string, person: string, linked: string | null, what: string): void {
-    if (linked === null) return;
-    const row = db.prepare("SELECT person_id FROM entries WHERE id = ? AND owner = ?").get(linked, owner) as
-      { person_id: string } | undefined;
-    if (row?.person_id !== person) invalid(`${what} has to be an entry in this file`);
-  }
-
   function insertEntry(
     owner: string,
     person: string,
@@ -258,11 +216,12 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
     if (count("entries", owner) >= LIMITS.entries) tooMany(`A drawer holds ${LIMITS.entries} entries at most`);
     checkLinked(owner, person, amends, "What it amends");
     checkLinked(owner, person, fields.contra, "What it contradicts");
+    checkIncident(owner, person, fields.incident);
     db.prepare(
       `INSERT INTO entries (id, owner, person_id, logged_at, told_date, told_time, told_prec, hap_date, hap_time, hap_prec,
          place_id, setting, source, wording, body, category, certainty, conf, present, context, fu_date, fu_note,
-         amends_id, contra_id, incomplete)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         amends_id, contra_id, incomplete, credit, incident_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
     ).run(
       id,
       owner,
@@ -289,18 +248,15 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
       amends,
       fields.contra,
       incomplete ? 1 : 0,
+      fields.credit ? 1 : 0,
+      fields.incident,
     );
   }
 
-  /** Whether a request with this id has already been saved: sending one twice saves it once. */
-  function alreadySaved(table: string, owner: string, id: string): boolean {
-    const row = db.prepare(`SELECT owner FROM ${table} WHERE id = ?`).get(id) as { owner: string } | undefined;
-    if (!row) return false;
-    if (row.owner !== owner) throw new StoreError(409, "That id isn't available", "conflict");
-    return true;
-  }
-
   return {
+    ...trust,
+    ...incidents,
+
     load(owner) {
       const people = (
         db.prepare("SELECT * FROM people WHERE owner = ? ORDER BY name_key").all(owner) as unknown as PersonRow[]
@@ -337,7 +293,7 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
         ev: evidenceOf.get(r.seq) ?? [],
         revised: r.revised_on,
       }));
-      return { people, places, entries, answers };
+      return { people, places, entries, answers, ...trust.loadTrust(owner), incidents: incidents.loadIncidents(owner) };
     },
 
     openFile(owner, input) {
@@ -363,7 +319,7 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
           `INSERT INTO people (id, owner, no, name, name_key, role, opened_on, created_at, updated_at)
            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         ).run(id, owner, no, name, fold(name), role, opened, at, at);
-        insertEntry(owner, id, entryId, { ...fields, contra: null }, null, first.incomplete === true);
+        insertEntry(owner, id, entryId, { ...fields, contra: null, incident: null }, null, first.incomplete === true);
       });
     },
 
@@ -415,19 +371,27 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
         personRow(owner, id);
         // Its entries, answers and evidence go with it. The file's number stays used.
         db.prepare("DELETE FROM people WHERE id = ? AND owner = ?").run(id, owner);
+        // An incident with nobody left in it goes too.
+        db.prepare("DELETE FROM incidents WHERE owner = ? AND id NOT IN (SELECT incident_id FROM incident_people)").run(
+          owner,
+        );
       });
     },
 
     addEntry(owner, input) {
       const body = object(input);
       const id = newId(body.id);
-      const person = typeof body.person === "string" ? body.person : invalid("Which file isn't valid");
+      const person = personField(body.person);
       const fields = checkedFields(body);
-      const amends = body.amends === null || body.amends === undefined ? null : String(body.amends);
+      const amends = optionalId(body.amends);
       transaction(db, () => {
         if (alreadySaved("entries", owner, id)) return;
         personRow(owner, person);
         insertEntry(owner, person, id, fields, amends, body.incomplete === true);
+        // Muninn's !care: the same words, as an instruction to look at later.
+        if (body.care === true) {
+          trust.addCareFromEntry(owner, person, id, fields.body, stampKey(fields.told).slice(0, 10));
+        }
       });
     },
 
@@ -438,11 +402,12 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
         if (row.incomplete !== 1) conflict("This entry is finished. Amend it with a new entry instead.");
         checkLinked(owner, row.person_id, fields.contra, "What it contradicts");
         if (fields.contra === id) invalid("An entry can't contradict itself");
+        checkIncident(owner, row.person_id, fields.incident);
         const place = placeId(owner, fields.place);
         db.prepare(
           `UPDATE entries SET told_date = ?, told_time = ?, told_prec = ?, hap_date = ?, hap_time = ?, hap_prec = ?,
              place_id = ?, setting = ?, source = ?, wording = ?, body = ?, category = ?, certainty = ?, conf = ?,
-             present = ?, context = ?, fu_date = ?, fu_note = ?, contra_id = ?, incomplete = ?
+             present = ?, context = ?, fu_date = ?, fu_note = ?, contra_id = ?, incomplete = ?, credit = ?, incident_id = ?
            WHERE id = ? AND owner = ?`,
         ).run(
           fields.told.d,
@@ -465,6 +430,8 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
           fields.fu?.note ?? "",
           fields.contra,
           place && fields.cat ? 0 : 1,
+          fields.credit ? 1 : 0,
+          fields.incident,
           id,
           owner,
         );
@@ -484,6 +451,15 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
           const done = body.fuDone === null ? null : day(body.fuDone, "The day it was done");
           db.prepare("UPDATE entries SET fu_done_on = ? WHERE id = ? AND owner = ?").run(done, id, owner);
         }
+        if (body.credit !== undefined) {
+          const credit = body.credit === true ? 1 : 0;
+          db.prepare("UPDATE entries SET credit = ? WHERE id = ? AND owner = ?").run(credit, id, owner);
+        }
+        if (body.incident !== undefined) {
+          const incident = optionalId(body.incident);
+          checkIncident(owner, row.person_id, incident);
+          db.prepare("UPDATE entries SET incident_id = ? WHERE id = ? AND owner = ?").run(incident, id, owner);
+        }
       });
     },
 
@@ -498,7 +474,7 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
     addAnswer(owner, input) {
       const body = object(input) as Partial<NewAnswer> & Record<string, unknown>;
       const id = newId(body.id);
-      const person = typeof body.person === "string" ? body.person : invalid("Which file isn't valid");
+      const person = personField(body.person);
       const q = question(body.q);
       const answer = required(body.text, LIMITS.answer, "The answer");
       const revised = day(body.revised, "The day it was revised");
@@ -555,8 +531,10 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
 
     removePlace(owner, id) {
       transaction(db, () => {
-        const used = db.prepare("SELECT 1 FROM entries WHERE owner = ? AND place_id = ? LIMIT 1").get(owner, id);
-        if (used) conflict("Entries were logged at this place, so it stays on the list.");
+        for (const table of ["entries", "incident_notes", "reports"]) {
+          const used = db.prepare(`SELECT 1 FROM ${table} WHERE owner = ? AND place_id = ? LIMIT 1`).get(owner, id);
+          if (used) conflict("Things were logged at this place, so it stays on the list.");
+        }
         const { changes } = db.prepare("DELETE FROM places WHERE id = ? AND owner = ?").run(id, owner);
         if (changes === 0) notFound("place");
       });
@@ -572,6 +550,7 @@ export function createStore(db: DatabaseSync, now: () => string = () => new Date
         transaction(db, () => {
           const entries = count("entries", owner);
           db.prepare("DELETE FROM people WHERE owner = ?").run(owner);
+          db.prepare("DELETE FROM incidents WHERE owner = ?").run(owner);
           db.prepare("DELETE FROM places WHERE owner = ?").run(owner);
           db.prepare("DELETE FROM drawers WHERE owner = ?").run(owner);
           removed.push({ owner, entries });

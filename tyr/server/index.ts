@@ -103,6 +103,55 @@ app.delete("/api/places/:id", (req, res) => {
   res.status(204).end();
 });
 
+app.post("/api/care", (req, res) => {
+  store.addCare(owner(req), req.body);
+  res.status(201).json(saved);
+});
+app.patch("/api/care/:id", (req, res) => {
+  store.changeCare(owner(req), req.params.id, req.body);
+  res.json(saved);
+});
+app.post("/api/words", (req, res) => {
+  store.addWord(owner(req), req.body);
+  res.status(201).json(saved);
+});
+app.patch("/api/words/:id", (req, res) => {
+  store.settleWord(owner(req), req.params.id, req.body);
+  res.json(saved);
+});
+app.post("/api/concerns", (req, res) => {
+  store.addConcern(owner(req), req.body);
+  res.status(201).json(saved);
+});
+app.patch("/api/concerns/:id", (req, res) => {
+  store.changeConcern(owner(req), req.params.id, req.body);
+  res.json(saved);
+});
+app.post("/api/concerns/:id/review", (req, res) => {
+  store.reviewConcern(owner(req), req.params.id, req.body);
+  res.json(saved);
+});
+app.post("/api/corrections", (req, res) => {
+  store.addCorrection(owner(req), req.body);
+  res.status(201).json(saved);
+});
+app.post("/api/said-about-me", (req, res) => {
+  store.addReport(owner(req), req.body);
+  res.status(201).json(saved);
+});
+app.post("/api/incidents", (req, res) => {
+  store.addIncident(owner(req), req.body);
+  res.status(201).json(saved);
+});
+app.patch("/api/incidents/:id", (req, res) => {
+  store.changeIncident(owner(req), req.params.id, req.body);
+  res.json(saved);
+});
+app.post("/api/incidents/:id/notes", (req, res) => {
+  store.addIncidentNote(owner(req), req.params.id, req.body);
+  res.status(201).json(saved);
+});
+
 app.use("/api", (_req, res) => {
   res.status(404).json({ error: "No such API" } satisfies ApiError);
 });

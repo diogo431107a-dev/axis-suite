@@ -174,8 +174,8 @@ function DossierPage({ me }: { me: Me }) {
           })
           .catch((err: unknown) => toast(describeError(err)));
       },
-      openFile: (pid) => {
-        setUi((u) => ({ ...u, view: "file", pid, tab: "profile", open: new Set() }));
+      openFile: (pid, tab = "profile") => {
+        setUi((u) => ({ ...u, view: "file", pid, tab, open: new Set() }));
         paneRef.current?.scrollTo(0, 0);
       },
       gotoEntry: (eid) => {
@@ -286,7 +286,7 @@ function DossierPage({ me }: { me: Me }) {
         </main>
       </div>
       {sheet?.what === "entry" && <EntryForm key={sheetKey(sheet)} sheet={sheet} />}
-      {sheet?.what === "muninn" && <Muninn tab={sheet.tab} />}
+      {sheet?.what === "muninn" && <Muninn tab={sheet.tab} name={sheet.name} />}
       {sheet?.what === "answer" && <AnswerForm pid={sheet.pid} q={sheet.q} />}
       {sheet?.what === "details" && <DetailsForm pid={sheet.pid} />}
       {toastText && (

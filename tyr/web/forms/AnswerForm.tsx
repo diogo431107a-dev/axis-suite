@@ -4,10 +4,9 @@ import type { Question } from "../../shared/protocol.ts";
 import { describeError } from "../api.ts";
 import { byToldDesc } from "../model.ts";
 import { newId, usePage } from "../page.ts";
-import { showStamp } from "../time.ts";
 import { SheetFrame } from "../ui/controls.tsx";
-import { Marker } from "../ui/Marker.tsx";
-import { SOURCE_LABEL, questionLabel } from "../vocab.ts";
+import { EntryPicklist } from "../ui/EntryPicklist.tsx";
+import { questionLabel } from "../vocab.ts";
 
 export function AnswerForm({ pid, q }: { pid: string; q: Question }) {
   const { ix, today, setSheet, send, toast } = usePage();
@@ -25,13 +24,6 @@ export function AnswerForm({ pid, q }: { pid: string; q: Question }) {
   const id = useRef(newId());
 
   if (!person) return null;
-
-  const toggle = (entry: string) => {
-    const next = new Set(picked);
-    if (next.has(entry)) next.delete(entry);
-    else next.add(entry);
-    setPicked(next);
-  };
 
   const submit = async (ev: FormEvent) => {
     ev.preventDefault();
@@ -64,23 +56,7 @@ export function AnswerForm({ pid, q }: { pid: string; q: Question }) {
         <div className="fs">
           <span className="flabel">What it rests on</span>
           {list.length === 0 && <p className="muted small">No entries in this file yet.</p>}
-          {list.length > 0 && (
-            <div className="picklist">
-              {list.map((e) => (
-                <label key={e.id}>
-                  <input type="checkbox" checked={picked.has(e.id)} onChange={() => toggle(e.id)} />
-                  <span>
-                    <span className="when">
-                      <Marker src={e.src} />
-                      {SOURCE_LABEL[e.src]} · {showStamp(e.told)}
-                      {e.src === "P" && <span className="note">left out of the profile</span>}
-                    </span>
-                    {e.body}
-                  </span>
-                </label>
-              ))}
-            </div>
-          )}
+          {list.length > 0 && <EntryPicklist entries={list} picked={picked} onChange={setPicked} />}
         </div>
         {error && (
           <span className="err" role="alert">

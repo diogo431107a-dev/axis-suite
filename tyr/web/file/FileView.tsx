@@ -1,11 +1,17 @@
 import type { Entry, Person } from "../../shared/protocol.ts";
-import { usePage } from "../page.ts";
+import type { Thread } from "../model.ts";
+import { threadDate } from "../model.ts";
+import { usePage, type Tab } from "../page.ts";
 import { showStamp } from "../time.ts";
 import { Marker } from "../ui/Marker.tsx";
 import { SOURCES } from "../../shared/protocol.ts";
 import { SOURCE_LABEL } from "../vocab.ts";
+import { Briefing } from "./Briefing.tsx";
+import { CareBox } from "./Care.tsx";
+import { Incidents } from "./Incidents.tsx";
 import { Profile } from "./Profile.tsx";
 import { Timeline } from "./Timeline.tsx";
+import { Word } from "./Word.tsx";
 
 /** The pane when no file is open. */
 export function NoFile() {
@@ -87,10 +93,12 @@ function Balance({ entries }: { entries: Entry[] }) {
 }
 
 function Pinned({ person }: { person: Person }) {
-  const { ix, today, setSheet, act, gotoEntry } = usePage();
+  const { ix, today, setSheet, patch, act, gotoEntry } = usePage();
   const threads = ix.threads(person.id, today);
+  const TAB: Partial<Record<Thread["kind"], Tab>> = { "Word given": "word", Concern: "word", Incident: "incidents" };
   return (
     <div className="pinned">
+      <CareBox person={person} />
       <fieldset>
         <legend>Matters most to them</legend>
         {person.matters.length > 0 ? (
@@ -113,15 +121,21 @@ function Pinned({ person }: { person: Person }) {
         {threads.length > 0 ? (
           <ul className="plain threads">
             {threads.map((t) => (
-              <li key={`${t.kind}-${t.entry}`}>
-                <span className={`tk ${t.over ? "overdue" : ""}`}>
-                  {t.due ? `${t.over ? "overdue " : ""}${t.due}` : t.kind}
-                </span>
+              <li key={t.key}>
+                <span className={`tk ${t.over ? "overdue" : ""}`}>{threadDate(t)}</span>
                 <span className="small">
                   <b>{t.kind}.</b>{" "}
-                  <button type="button" className="linkish" onClick={() => gotoEntry(t.entry)}>
-                    {t.text}
-                  </button>
+                  {t.entry ? (
+                    <button type="button" className="linkish" onClick={() => gotoEntry(t.entry!)}>
+                      {t.text}
+                    </button>
+                  ) : TAB[t.kind] ? (
+                    <button type="button" className="linkish" onClick={() => patch({ tab: TAB[t.kind]! })}>
+                      {t.text}
+                    </button>
+                  ) : (
+                    t.text
+                  )}
                   {t.kind === "Follow-up" && (
                     <>
                       {" "}
@@ -154,6 +168,13 @@ export function FileView({ person }: { person: Person }) {
   const last = ix.lastContact(person.id);
   const entries = ix.entriesOf(person.id);
   const prompted = entries.filter((e) => e.src === "P").length;
+  const tabs: [Tab, string, number | null][] = [
+    ["profile", "Profile", null],
+    ["timeline", "Timeline", entries.length],
+    ["incidents", "Incidents", ix.incidentsOf(person.id).length],
+    ["word", "Word given", ix.wordsOf(person.id).length + ix.concernsOf(person.id).length],
+    ["briefing", "Before I see them", null],
+  ];
 
   return (
     <div className="sheet anim">
@@ -208,19 +229,20 @@ export function FileView({ person }: { person: Person }) {
       <Pinned person={person} />
       <Balance entries={entries} />
       <div className="tabs" role="tablist">
-        <button type="button" role="tab" aria-selected={ui.tab === "profile"} onClick={() => patch({ tab: "profile" })}>
-          Profile
-        </button>
-        <button
-          type="button"
-          role="tab"
-          aria-selected={ui.tab === "timeline"}
-          onClick={() => patch({ tab: "timeline" })}
-        >
-          Timeline<span className="n">{entries.length}</span>
-        </button>
+        {tabs.map(([key, label, count]) => (
+          <button key={key} type="button" role="tab" aria-selected={ui.tab === key} onClick={() => patch({ tab: key })}>
+            {label}
+            {count !== null && <span className="n">{count}</span>}
+          </button>
+        ))}
       </div>
-      <div className="tabbody">{ui.tab === "profile" ? <Profile person={person} /> : <Timeline person={person} />}</div>
+      <div className="tabbody">
+        {ui.tab === "profile" && <Profile person={person} />}
+        {ui.tab === "timeline" && <Timeline person={person} />}
+        {ui.tab === "incidents" && <Incidents person={person} />}
+        {ui.tab === "word" && <Word person={person} />}
+        {ui.tab === "briefing" && <Briefing person={person} />}
+      </div>
       <p className="readmode">
         Read mode. Entries are appended; corrections are new entries that amend old ones.
         {prompted > 0 && ` ${prompted} prompted entr${prompted === 1 ? "y" : "ies"} kept in a separate ledger.`}

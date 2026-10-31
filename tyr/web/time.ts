@@ -87,3 +87,9 @@ export function withPrecision(raw: string, p: Precision, today: string): string 
   if (p === "month") return full.slice(0, 7);
   return p === "year" ? full.slice(0, 4) : `~${full.slice(0, 4)}`;
 }
+
+/** A full date from a date field, or null. */
+export function fullDate(raw: string, today: string): string | null {
+  const parsed = parseDateText(raw, today);
+  return parsed?.p === "date" ? parsed.d : null;
+}

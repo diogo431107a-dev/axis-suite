@@ -5,11 +5,13 @@ import type { Index } from "./model.ts";
 
 export type View = "file" | "threads" | "places" | "search";
 
+export type Tab = "profile" | "timeline" | "incidents" | "word" | "briefing";
+
 export interface Ui {
   view: View;
   /** The open file. */
   pid: string | null;
-  tab: "profile" | "timeline";
+  tab: Tab;
   ledger: "spont" | "prompt";
   life: "ours" | "past";
   order: "told" | "hap";
@@ -29,9 +31,9 @@ export interface Ui {
 }
 
 export type Sheet =
-  | { what: "entry"; pid: string; mode: "new" }
+  | { what: "entry"; pid: string; mode: "new"; incident?: string }
   | { what: "entry"; pid: string; mode: "amend" | "complete"; eid: string }
-  | { what: "muninn"; tab: "capture" | "met" }
+  | { what: "muninn"; tab: "capture" | "met"; name?: string }
   | { what: "answer"; pid: string; q: Question }
   | { what: "details"; pid: string }
   | null;
@@ -47,7 +49,7 @@ export interface Page {
   /** The same, from a button with no form to show an error in. */
   act: (path: string, method: string, body?: unknown, done?: string) => void;
   toast: (message: string) => void;
-  openFile: (pid: string) => void;
+  openFile: (pid: string, tab?: Tab) => void;
   /** Opens an entry where it lives: its file's timeline, in the right ledger. */
   gotoEntry: (eid: string) => void;
   /** Shows an entry just saved. */

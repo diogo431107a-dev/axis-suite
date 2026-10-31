@@ -512,7 +512,7 @@ fieldset.care legend {
 }
 .pinned {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr) minmax(0, 1fr);
   gap: 14px;
   align-items: start;
 }
@@ -1668,4 +1668,362 @@ dialog.about::backdrop {
     width: 100%;
     margin-left: 0;
   }
+}
+
+/* ---------- phase 3, from the pilot ---------- */
+.mk-H {
+  color: var(--warn);
+}
+.carelist {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 7px;
+}
+.carelist li {
+  display: grid;
+  grid-template-columns: 118px minmax(0, 1fr);
+  gap: 8px;
+  align-items: baseline;
+  font-size: 14px;
+}
+.lvl {
+  font: 700 10.5px/1.2 var(--f-mono);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 5px;
+  border: 1px solid currentColor;
+  border-radius: 2px;
+  justify-self: start;
+  white-space: nowrap;
+}
+.lvl.never {
+  color: var(--care);
+  background: var(--care-wash);
+}
+.lvl.careful {
+  color: var(--care);
+}
+.lvl.ifthey {
+  color: var(--warn);
+}
+.lvl.practical {
+  color: var(--ink-2);
+}
+.lvl.watch {
+  color: var(--warn);
+  border-style: dashed;
+}
+.lvl.welcome {
+  color: var(--ok);
+}
+.care-sub {
+  display: block;
+  font: 12px var(--f-mono);
+  color: var(--ink-3);
+  margin-top: 2px;
+}
+.card {
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  background: var(--sheet);
+  padding: 14px 16px;
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+}
+.card h3 {
+  font-family: var(--f-display);
+  font-weight: 500;
+  font-size: 20px;
+}
+.istat {
+  font: 700 11px/1.2 var(--f-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  border: 1.5px solid currentColor;
+  padding: 2px 6px;
+  border-radius: 2px;
+}
+.istat.rumour {
+  color: var(--ink-3);
+  border-style: dashed;
+}
+.istat.one {
+  color: var(--warn);
+}
+.istat.confirmed {
+  color: var(--ok);
+}
+.istat.disproved {
+  color: var(--care);
+  text-decoration: line-through;
+}
+.steps {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-left: 1px solid var(--rule);
+  display: grid;
+  gap: 12px;
+}
+.steps li {
+  position: relative;
+  padding-left: 16px;
+  display: grid;
+  gap: 3px;
+}
+.steps li::before {
+  content: "";
+  position: absolute;
+  left: -4px;
+  top: 7px;
+  width: 7px;
+  height: 7px;
+  background: var(--sheet);
+  border: 1.5px solid var(--ink-2);
+  border-radius: 50%;
+}
+.steps .sd {
+  font: 12.5px var(--f-mono);
+  color: var(--ink-2);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.mention {
+  display: inline-flex;
+  gap: 8px;
+  align-items: center;
+  border: 1px dashed var(--rule);
+  border-radius: 2px;
+  padding: 3px 8px;
+  font-size: 13px;
+}
+.two {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+}
+.prom {
+  display: grid;
+  gap: 4px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--rule-2);
+}
+.prom:last-child {
+  border-bottom: 0;
+}
+.prom .words {
+  font-family: var(--f-display);
+  font-style: italic;
+  font-size: 16.5px;
+  quotes: "“" "”";
+}
+.prom .pm {
+  font: 12.5px var(--f-mono);
+  color: var(--ink-2);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+  align-items: center;
+}
+.out {
+  font: 700 10.5px/1.2 var(--f-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+}
+.out.kept {
+  color: var(--ok);
+}
+.out.broken {
+  color: var(--care);
+  background: var(--care-wash);
+}
+.out.released {
+  color: var(--ink-3);
+}
+.out.pending {
+  color: var(--accent);
+}
+.out.overdue {
+  color: var(--care);
+}
+.cstate {
+  font: 700 10.5px/1.2 var(--f-mono);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 2px;
+  border: 1px solid currentColor;
+}
+.cstate.open {
+  color: var(--warn);
+}
+.cstate.dismissed {
+  color: var(--ink-3);
+}
+.cstate.breach {
+  color: var(--care);
+  background: var(--care-wash);
+}
+.fair {
+  border-top: 1px dashed var(--rule);
+  padding-top: 10px;
+  display: grid;
+  gap: 6px;
+}
+.fair h4,
+.sub-h {
+  margin: 0;
+  font: 700 11px var(--f-mono);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ink-2);
+}
+.brief {
+  background: var(--sheet);
+  border: 1px solid var(--rule);
+  border-radius: var(--r);
+  padding: 22px 24px;
+  display: grid;
+  gap: 18px;
+  max-width: 760px;
+}
+.brief-h {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: baseline;
+  border-bottom: 1.5px solid var(--ink);
+  padding-bottom: 10px;
+}
+.brief-h h2 {
+  font-family: var(--f-display);
+  font-weight: 500;
+  font-size: 26px;
+}
+.brief section {
+  display: grid;
+  gap: 8px;
+}
+.brief ol {
+  margin: 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+.flag.credit {
+  color: var(--ok);
+}
+.stamp.sm {
+  font: 700 11px var(--f-mono);
+  letter-spacing: 0.12em;
+}
+.care-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+.retired {
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.retired summary {
+  cursor: pointer;
+  font: 12px var(--f-mono);
+  color: var(--ink-3);
+}
+.retired ul {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.hearsay {
+  display: grid;
+  gap: 3px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--rule-2);
+}
+.hearsay:last-child {
+  border-bottom: 0;
+}
+.hearsay .sd {
+  font: 12.5px var(--f-mono);
+  color: var(--ink-2);
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.hearsay-note {
+  font: 700 10.5px/1.2 var(--f-mono);
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--warn);
+}
+.review-form {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 960px) {
+  .pinned {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  }
+  .pinned > :first-child {
+    grid-column: 1/-1;
+  }
+}
+@media (max-width: 620px) {
+  .two {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .pinned {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .carelist li {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.brief-quote {
+  font-size: 15.5px;
+}
+.care-editing {
+  display: block !important;
+}
+
+/* The strip follows the pane's width, which the drawer narrows, not the window's. */
+.sheet {
+  container-type: inline-size;
+}
+@container (max-width: 780px) {
+  .pinned {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.35fr);
+  }
+  .pinned > :first-child {
+    grid-column: 1/-1;
+  }
+}
+@container (max-width: 480px) {
+  .pinned {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.threads .linkish,
+td .linkish,
+.plain .linkish {
+  text-align: left;
 }
