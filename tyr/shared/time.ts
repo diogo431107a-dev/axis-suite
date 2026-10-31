@@ -27,6 +27,11 @@ export function isClock(text: string): boolean {
   return /^([01]\d|2[0-3]):[0-5]\d$/.test(text);
 }
 
+/** A day of the year, as MM-DD. 02-29 is allowed: other years it falls on 02-28. */
+export function isMonthDay(text: unknown): text is string {
+  return typeof text === "string" && /^\d{2}-\d{2}$/.test(text) && isDate(`2024-${text}`);
+}
+
 /** Whether a stamp is well made: its date has the shape of its precision, and only a day has a time. */
 export function isStamp(value: unknown): value is Stamp {
   if (typeof value !== "object" || value === null) return false;

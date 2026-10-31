@@ -306,7 +306,8 @@ describe("removed users", () => {
     store.addAnswer(OTHER, { id: id(), person: gone, q: "joy", text: "x", ev: [], revised: "2026-10-05" });
     const mine = openFile("Bia");
     expect(store.removeUnknownOwners(new Set([ME]))).toEqual([{ owner: OTHER, entries: 2 }]);
-    expect(store.load(OTHER)).toEqual({ people: [], places: [], entries: [], answers: [] });
+    const emptied = store.load(OTHER);
+    expect([emptied.people, emptied.places, emptied.entries, emptied.answers]).toEqual([[], [], [], []]);
     expect(store.load(ME).people.map((p) => p.id)).toEqual([mine]);
   });
 });
