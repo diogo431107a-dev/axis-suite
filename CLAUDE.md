@@ -10,6 +10,13 @@ Work happens on one module at a time, on its own branch (e.g. `odin`), merged in
 - Everything else needs the owner's explicit OK first: other modules (Heimdall, Loggbok, …), `packages/`, `deploy/`, and the shared root config (`package.json`, `tsconfig*.json`, `.oxlintrc.json`, `.prettierrc.json`, `.github/`).
 - If a module needs a change to a shared part, stop and propose it. It goes in its own commit and is checked against every module.
 
+## Modules are independent
+
+See "Modules are independent" in the README. When planning or building a module:
+
+- It talks only to Heimdall. Never propose links, shared IDs, imports or reminders between modules, or anything that keeps their data in agreement. Whether two modules' data matches is up to the user.
+- Design it for its own purpose, and don't reuse another module's look or way of working. Keep only generic choices that make things easier for the user, such as the version in the About box behind the logo at the top left.
+
 ## Environments
 
 | Where                      | What it is                            | Rules                                                                                                                                                                                                      |

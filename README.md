@@ -18,6 +18,7 @@ Small self-hosted web apps ("modules") that share one sign-in (all but Saga, whi
 | [Saga](saga/README.md)           | Habits Saga, a habit tracker played as a fantasy game, with its own players and a public ranking.        | 3011 | 8453       |
 | [Star](star/README.md)           | Every Man is a Star: the people you know and their families, charted as a night sky.                     | 3012 | 8454       |
 | [Fafnir](fafnir/README.md)       | Fafnir Personal Finances: what you have, what you owe and where your money goes, in US dollars.          | 3013 | 8455       |
+| [Tyr](tyr/README.md)             | A dossier of people: what was said, when and where, and how you came to know it.                         | 3014 | 8456       |
 
 Shared code lives in `packages/`:
 
@@ -43,7 +44,8 @@ browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   account
                         ├──▶ urd        127.0.0.1:3010   time-tracker API, live updates + static frontend
                         ├──▶ saga       127.0.0.1:3011   game API + static frontend (its own accounts)
                         ├──▶ star       127.0.0.1:3012   night-sky API + static frontend
-                        └──▶ fafnir     127.0.0.1:3013   finances API + static frontend
+                        ├──▶ fafnir     127.0.0.1:3013   finances API + static frontend
+                        └──▶ tyr        127.0.0.1:3014   dossier API + static frontend
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 althing's API     ── GET /online ──▶ heimdall (who has a live session, for the "online" list)
@@ -57,6 +59,14 @@ Saga is the exception: its players are its own, so it never asks Heimdall anythi
 - **Return after sign-in.** When nobody is signed in, the module's page sends the browser to Heimdall's `/?next=<page>`. Heimdall only sends users back to origins that were registered with it: the installer gives each module a systemd drop-in, `/etc/systemd/system/heimdall.service.d/origin-<module>.conf`, setting `RETURN_ORIGIN_<MODULE>`.
 - **Removed users leave nothing behind.** The installer writes Heimdall's usernames into `/etc/axis-suite/suite.env` as `AXIS_USERS`, and restarts every module when that list changes. When a module starts, it deletes the data of every owner not on the list (`knownUsers()` from `@axis-suite/heimdall-client/server`), logs what it deleted, and compacts its database. So removing or renaming a user in Heimdall deletes their data everywhere on the next deploy. Without the list (development, or Heimdall not installed yet), nothing is deleted.
 - **Keep them in step.** `/whoami`, the cookie and the `?next=` flow are the contract between Heimdall and `packages/heimdall-client`. Change both in the same commit.
+
+## Modules are independent
+
+Every module stands on its own. This is why each has its own SQLite file, and it holds for every module to come.
+
+- **A module talks only to Heimdall.** No module calls another, reads another's database or imports from another. Saga doesn't even talk to Heimdall, and the exchange-rate sources Fafnir calls are outside the suite, not modules.
+- **A module answers only for its own data.** There are no shared person IDs, no links or reminders between modules, and nothing that keeps two modules in agreement. Vinr, Star and Tyr can each know the same person; whether what they hold matches is up to the user, and the suite doesn't enforce it. The same goes for any other overlap.
+- **Modules are meant to differ.** Each covers a different need, so each is designed and built for that need, in how it looks and how it works. A resemblance between two modules would suggest a connection that doesn't exist. A design choice is shared only when it is generic and makes things easier for the user, such as finding the version in the About box behind the logo at the top left.
 
 ## Repository layout
 
@@ -82,6 +92,7 @@ urd/                 time tracker
 saga/                Habits Saga, the game
 star/                Every Man is a Star, the night sky of people
 fafnir/              Fafnir Personal Finances
+tyr/                 Tyr, the dossier of people
 ```
 
 Every module has the same shape:
@@ -106,7 +117,7 @@ Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in 
 
 ```bash
 pnpm install
-pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga, :5184 for Star, :5185 for Fafnir
+pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga, :5184 for Star, :5185 for Fafnir, :5186 for Tyr
 ```
 
 Use `127.0.0.1`, not `localhost`: browsers send Heimdall's cookie (`127.0.0.1:3000`) to the other modules only on the same host. Demo accounts: `odin` / `allfather-demo`, `freya` / `folkvangr-demo`, `john` / `john-demo`. Local data goes in each module's `data/` folder, which git ignores.
@@ -163,6 +174,7 @@ sudo bash axis-suite/deploy/install.sh urd
 sudo bash axis-suite/deploy/install.sh saga
 sudo bash axis-suite/deploy/install.sh star
 sudo bash axis-suite/deploy/install.sh fafnir
+sudo bash axis-suite/deploy/install.sh tyr
 ```
 
 Janus's first install makes its encryption key, `/etc/axis-suite/janus.key`. Back it up right away, apart from the server: without it, nobody can read the vaults (see [Janus](janus/README.md#installing-and-data)).
@@ -190,14 +202,15 @@ sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh urd
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh saga
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh star
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh fafnir
+sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh tyr
 ```
 
-Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452, Saga at https://localhost:8453, Star at https://localhost:8454 and Fafnir at https://localhost:8455. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
+Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452, Saga at https://localhost:8453, Star at https://localhost:8454, Fafnir at https://localhost:8455 and Tyr at https://localhost:8456. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
 
 ## Operating it
 
 ```bash
-systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga star fafnir   # running?
+systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga star fafnir tyr   # running?
 journalctl -u loggbok -f                                                          # a module's log
 sudo systemctl restart loggbok                                                    # restart one module
 cat /etc/axis-suite/suite.env                                                     # the domain, URLs and usernames every module was given
@@ -222,6 +235,7 @@ Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<modul
 | Saga      | every player's account and game, and the invite codes                  | `/var/lib/saga/saga.db`         |
 | Star      | every user's sky: the people, their memos and how they connect         | `/var/lib/star/star.db`         |
 | Fafnir    | every user's accounts and entries, and the exchange rates              | `/var/lib/fafnir/fafnir.db`     |
+| Tyr       | every user's files on people: their entries, places and profiles       | `/var/lib/tyr/tyr.db`           |
 
 Back up a module's data with its service stopped, and keep the copies where only you can read them:
 
@@ -279,12 +293,12 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
 ## Adding a module
 
 1. Pick the next free ports and add a line to `deploy/modules.conf`. Add the folder to `pnpm-workspace.yaml`.
-2. Create the folder with the layout above. Loggbok is the template for a module with an API and a frontend:
+2. Create the folder with the layout above. Loggbok is the template for the structure of a module with an API and a frontend, not for how it looks ([modules are meant to differ](#modules-are-independent)):
    - `package.json` with `dev`, `build`, `typecheck` and `start` scripts, `"files": ["dist"]`, and `"@axis-suite/heimdall-client": "workspace:*"` in `dependencies`. Shared tools (`typescript`, `@types/node`) use `"catalog:"`. Anything only the frontend uses goes in `devDependencies`, since the build bundles it.
    - `server/index.ts`: put `sameOriginWrites` and `requireUser` in front of `/api`, serve `GET /api/me` with `me`, answer `GET /healthz`, and keep data under `STATE_DIRECTORY`. Store users by `username`, and at startup delete the data of owners not in `knownUsers()` (see Loggbok's `removeUnknownOwners`).
    - `web/`: use `apiFetch`, `fetchMe` and `goToSignIn` from `@axis-suite/heimdall-client/browser`.
    - The About box: the module's logo and name at the top left are a button that opens it, with the module's version and the suite's it was built with. Copy `web/ui/About.tsx` from Papyrus (or `web/About.tsx` from Loggbok, for a module without a `Dialog`) and the `define` of `__AXIS_VERSIONS__` in its `vite.config.ts`.
-   - Narrow windows (below Tailwind's `md`, 768px, e.g. a window snapped to half the screen): the sidebar becomes a slide-in drawer over a dimmed backdrop. A menu button opens it; the backdrop, an X, or picking something closes it. Copy the drawer from Loggbok or Papyrus.
+   - Narrow windows (e.g. a window snapped to half the screen) must work. For a module with an ordinary sidebar, the default is a slide-in drawer over a dimmed backdrop below Tailwind's `md` (768px): a menu button opens it; the backdrop, an X, or picking something closes it. Copy it from Loggbok or Papyrus. A module whose design calls for something else does that instead.
    - `deploy/<module>.service` (copy Loggbok's, change the names) and `deploy/<module>.caddy`.
 3. For local development, add its dev-server origin to `heimdall/dev.env` as `RETURN_ORIGIN_<MODULE>`.
 4. Add it to the module table at the top of this file, start its `CHANGELOG.md` (copy Loggbok's header), then `pnpm install && pnpm check && pnpm build`.
