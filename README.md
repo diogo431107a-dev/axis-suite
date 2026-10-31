@@ -58,6 +58,14 @@ Saga is the exception: its players are its own, so it never asks Heimdall anythi
 - **Removed users leave nothing behind.** The installer writes Heimdall's usernames into `/etc/axis-suite/suite.env` as `AXIS_USERS`, and restarts every module when that list changes. When a module starts, it deletes the data of every owner not on the list (`knownUsers()` from `@axis-suite/heimdall-client/server`), logs what it deleted, and compacts its database. So removing or renaming a user in Heimdall deletes their data everywhere on the next deploy. Without the list (development, or Heimdall not installed yet), nothing is deleted.
 - **Keep them in step.** `/whoami`, the cookie and the `?next=` flow are the contract between Heimdall and `packages/heimdall-client`. Change both in the same commit.
 
+## Modules are independent
+
+Every module stands on its own. This is why each has its own SQLite file, and it holds for every module to come.
+
+- **A module talks only to Heimdall.** No module calls another, reads another's database or imports from another. Saga doesn't even talk to Heimdall, and the exchange-rate sources Fafnir calls are outside the suite, not modules.
+- **A module answers only for its own data.** There are no shared person IDs, no links or reminders between modules, and nothing that keeps two modules in agreement. Vinr, Star and Tyr can each know the same person; whether what they hold matches is up to the user, and the suite doesn't enforce it. The same goes for any other overlap.
+- **Modules are meant to differ.** Each covers a different need, so each is designed and built for that need, in how it looks and how it works. A resemblance between two modules would suggest a connection that doesn't exist. A design choice is shared only when it is generic and makes things easier for the user, such as finding the version in the About box behind the logo at the top left.
+
 ## Repository layout
 
 ```
@@ -279,12 +287,12 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
 ## Adding a module
 
 1. Pick the next free ports and add a line to `deploy/modules.conf`. Add the folder to `pnpm-workspace.yaml`.
-2. Create the folder with the layout above. Loggbok is the template for a module with an API and a frontend:
+2. Create the folder with the layout above. Loggbok is the template for the structure of a module with an API and a frontend, not for how it looks ([modules are meant to differ](#modules-are-independent)):
    - `package.json` with `dev`, `build`, `typecheck` and `start` scripts, `"files": ["dist"]`, and `"@axis-suite/heimdall-client": "workspace:*"` in `dependencies`. Shared tools (`typescript`, `@types/node`) use `"catalog:"`. Anything only the frontend uses goes in `devDependencies`, since the build bundles it.
    - `server/index.ts`: put `sameOriginWrites` and `requireUser` in front of `/api`, serve `GET /api/me` with `me`, answer `GET /healthz`, and keep data under `STATE_DIRECTORY`. Store users by `username`, and at startup delete the data of owners not in `knownUsers()` (see Loggbok's `removeUnknownOwners`).
    - `web/`: use `apiFetch`, `fetchMe` and `goToSignIn` from `@axis-suite/heimdall-client/browser`.
    - The About box: the module's logo and name at the top left are a button that opens it, with the module's version and the suite's it was built with. Copy `web/ui/About.tsx` from Papyrus (or `web/About.tsx` from Loggbok, for a module without a `Dialog`) and the `define` of `__AXIS_VERSIONS__` in its `vite.config.ts`.
-   - Narrow windows (below Tailwind's `md`, 768px, e.g. a window snapped to half the screen): the sidebar becomes a slide-in drawer over a dimmed backdrop. A menu button opens it; the backdrop, an X, or picking something closes it. Copy the drawer from Loggbok or Papyrus.
+   - Narrow windows (e.g. a window snapped to half the screen) must work. For a module with an ordinary sidebar, the default is a slide-in drawer over a dimmed backdrop below Tailwind's `md` (768px): a menu button opens it; the backdrop, an X, or picking something closes it. Copy it from Loggbok or Papyrus. A module whose design calls for something else does that instead.
    - `deploy/<module>.service` (copy Loggbok's, change the names) and `deploy/<module>.caddy`.
 3. For local development, add its dev-server origin to `heimdall/dev.env` as `RETURN_ORIGIN_<MODULE>`.
 4. Add it to the module table at the top of this file, start its `CHANGELOG.md` (copy Loggbok's header), then `pnpm install && pnpm check && pnpm build`.
