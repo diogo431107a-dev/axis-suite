@@ -5,6 +5,7 @@ import { describeError } from "../api.ts";
 import { EntryRow } from "../file/EntryRow.tsx";
 import { byToldDesc } from "../model.ts";
 import { usePage } from "../page.ts";
+import { Marker } from "../ui/Marker.tsx";
 
 function PlaceForm({ place, onDone }: { place: Place | null; onDone: () => void }) {
   const { send, toast } = usePage();
@@ -79,6 +80,14 @@ export function Places() {
     })
     .sort((a, b) => b.entries.length - a.entries.length);
   const selected = rows.find((r) => r.place.id === ui.place);
+  // Hearsay logged here: never shown among the entries, but it keeps the place on the list.
+  const hearsayAt = (place: string) => [
+    ...ix.dossier.reports.filter((r) => r.place === place).map((r) => ({ key: r.id, text: r.text })),
+    ...ix.dossier.incidents.flatMap((i) =>
+      i.notes.filter((n) => n.place === place).map((n) => ({ key: n.id, text: n.text })),
+    ),
+  ];
+  const hearsay = selected ? hearsayAt(selected.place.id) : [];
 
   return (
     <div className="sheet anim">
@@ -158,7 +167,7 @@ export function Places() {
               <button type="button" className="btn ghost sm" onClick={() => setRenaming(true)}>
                 Rename
               </button>
-              {selected.entries.length === 0 && (
+              {selected.entries.length === 0 && hearsay.length === 0 && (
                 <button
                   type="button"
                   className="btn ghost sm"
@@ -176,6 +185,15 @@ export function Places() {
             [...selected.entries].sort(byToldDesc).map((e) => <EntryRow key={e.id} entry={e} who plain />)
           ) : (
             <p className="muted small">Nothing logged here yet.</p>
+          )}
+          {hearsay.length > 0 && (
+            <ul className="plain">
+              {hearsay.map((h) => (
+                <li key={h.key} className="small">
+                  <Marker src="H" /> {h.text} <span className="muted">· hearsay</span>
+                </li>
+              ))}
+            </ul>
           )}
         </section>
       ) : (

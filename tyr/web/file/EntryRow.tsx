@@ -8,6 +8,7 @@ import { CERTAINTY_LABEL, SOURCE_LABEL, SOURCE_LONG, TOLD_LABEL, questionLabel }
 function EntryDetails({ entry }: { entry: Entry }) {
   const { ix, today, setSheet, send, act, toast, gotoEntry } = usePage();
   const [discarding, setDiscarding] = useState(false);
+  const incidents = ix.incidentsOf(entry.person).filter((i) => !i.closed || i.id === entry.incident);
   const amends = ix.entry(entry.amends);
   const contra = ix.entry(entry.contra);
   const amendedBy = ix.entriesOf(entry.person).filter((x) => x.amends === entry.id);
@@ -84,6 +85,39 @@ function EntryDetails({ entry }: { entry: Entry }) {
             ))}
           </select>
         </dd>
+        <dt>
+          <label htmlFor={`credit-${entry.id}`}>To their credit</label>
+        </dt>
+        <dd>
+          <input
+            id={`credit-${entry.id}`}
+            type="checkbox"
+            checked={entry.credit}
+            onChange={(e) => act(`/api/entries/${entry.id}`, "PATCH", { credit: e.target.checked })}
+          />
+        </dd>
+        {incidents.length > 0 && (
+          <>
+            <dt>
+              <label htmlFor={`inc-${entry.id}`}>Incident</label>
+            </dt>
+            <dd>
+              <select
+                id={`inc-${entry.id}`}
+                className="inline"
+                value={entry.incident ?? ""}
+                onChange={(e) => act(`/api/entries/${entry.id}`, "PATCH", { incident: e.target.value || null })}
+              >
+                <option value="">None</option>
+                {incidents.map((i) => (
+                  <option key={i.id} value={i.id}>
+                    {i.title}
+                  </option>
+                ))}
+              </select>
+            </dd>
+          </>
+        )}
         {entry.ctx && (
           <>
             <dt>Occasion</dt>
@@ -191,7 +225,8 @@ export function EntryRow({ entry, who, plain }: { entry: Entry; who?: boolean; p
     entry.cert !== "sure" && CERTAINTY_LABEL[entry.cert],
     entry.present.length > 0 && `with ${entry.present.join(", ")}`,
   ].filter(Boolean);
-  const hasFlags = entry.conf || entry.incomplete || !!amended || amendedLater;
+  const incidentTitle = ix.dossier.incidents.find((i) => i.id === entry.incident)?.title;
+  const hasFlags = entry.conf || entry.incomplete || !!amended || amendedLater || entry.credit || !!incidentTitle;
 
   const toggle = () => {
     const next = new Set(ui.open);
@@ -225,6 +260,8 @@ export function EntryRow({ entry, who, plain }: { entry: Entry; who?: boolean; p
             {entry.incomplete && <span className="flag inc">Incomplete</span>}
             {amended && <span className="flag">Amends {amended.told.d}</span>}
             {amendedLater && <span className="flag">Amended later</span>}
+            {entry.credit && <span className="flag credit">To their credit</span>}
+            {incidentTitle && <span className="flag">{incidentTitle}</span>}
           </div>
         )}
         {open && <EntryDetails entry={entry} />}

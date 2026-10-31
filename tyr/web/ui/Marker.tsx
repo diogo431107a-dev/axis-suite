@@ -3,7 +3,7 @@ import { SOURCE_LABEL } from "../vocab.ts";
 import { Seg } from "./controls.tsx";
 
 /** A source's mark. Shape carries the meaning; colour only groups "their words" and "mine". */
-export function Marker({ src }: { src: Source }) {
+export function Marker({ src }: { src: Source | "H" }) {
   return (
     <svg className={`mk mk-${src}`} viewBox="0 0 12 12" width="12" height="12" aria-hidden="true">
       {src === "U" && <circle cx="6" cy="6" r="4.6" fill="currentColor" />}
@@ -15,6 +15,7 @@ export function Marker({ src }: { src: Source }) {
       )}
       {src === "P" && <circle cx="6" cy="6" r="4.25" fill="none" stroke="currentColor" strokeWidth="1.5" />}
       {src === "O" && <rect x="1.6" y="1.6" width="8.8" height="8.8" fill="currentColor" />}
+      {src === "H" && <path d="M6 1.4 10.6 6 6 10.6 1.4 6z" fill="none" stroke="currentColor" strokeWidth="1.5" />}
       {src === "N" && <rect x="2" y="2" width="8" height="8" fill="none" stroke="currentColor" strokeWidth="1.5" />}
     </svg>
   );

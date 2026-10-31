@@ -25,9 +25,11 @@ const blankFields = (when: Stamp): Omit<EntryFields, "src" | "body"> => ({
   ctx: "",
   fu: null,
   contra: null,
+  credit: false,
+  incident: null,
 });
 
-export function Muninn({ tab }: { tab: "capture" | "met" }) {
+export function Muninn({ tab, name }: { tab: "capture" | "met"; name?: string | undefined }) {
   const { setSheet } = usePage();
   return (
     <SheetFrame
@@ -44,7 +46,7 @@ export function Muninn({ tab }: { tab: "capture" | "met" }) {
         value={tab}
         onChange={(next) => setSheet({ what: "muninn", tab: next })}
       />
-      {tab === "capture" ? <Capture /> : <JustMet />}
+      {tab === "capture" ? <Capture /> : <JustMet firstName={name ?? ""} />}
     </SheetFrame>
   );
 }
@@ -65,7 +67,7 @@ function Capture() {
     setError("");
     const person = ix.findPerson(who);
     if (!person) return setError("No file with that name. Use “Just met” to open one.");
-    const { body, cat, present } = parseCapture(line, (typed) => ix.findPerson(typed)?.name);
+    const { body, cat, present, care } = parseCapture(line, (typed) => ix.findPerson(typed)?.name);
     if (!body) return setError("Write one line first.");
     if (src === "P" && !warned) return setWarned(true);
     const now = new Date();
@@ -80,10 +82,11 @@ function Capture() {
         body,
         cat,
         present,
+        care,
         amends: null,
         incomplete: true,
       });
-      toast(`Captured for ${person.name}. Complete it later from Threads.`);
+      toast(`Captured for ${person.name}${care ? ", with a care note" : ""}. Complete it later from Threads.`);
       setSheet(null);
       showSaved(person.id, id.current, src, false);
     } catch (err) {
@@ -127,7 +130,8 @@ function Capture() {
         />
         <span className="help">
           Shortcuts: <span className="mono">@name</span> who else was there ·{" "}
-          <span className="mono">#fear #joy #want #value #like</span> sets the category.
+          <span className="mono">#fear #joy #want #value #like</span> sets the category ·{" "}
+          <span className="mono">!care</span> also files a care note.
         </span>
       </div>
       <p className="small">
@@ -154,9 +158,9 @@ function Capture() {
   );
 }
 
-function JustMet() {
+function JustMet({ firstName }: { firstName: string }) {
   const { today, setSheet, send, toast, openFile } = usePage();
-  const [name, setName] = useState("");
+  const [name, setName] = useState(firstName);
   const [role, setRole] = useState("");
   const [place, setPlace] = useState("");
   const [when, setWhen] = useState(() => dateTimeFrom(null));

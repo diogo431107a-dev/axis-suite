@@ -1,5 +1,5 @@
 // The words the page uses for an entry's source.
-import type { Certainty, Question, Source } from "../shared/protocol.ts";
+import type { CareLevel, Certainty, IncidentStatus, Question, Source } from "../shared/protocol.ts";
 import { QUESTIONS } from "../shared/protocol.ts";
 
 export const SOURCE_LABEL: Record<Source, string> = {
@@ -37,3 +37,19 @@ export const SOURCE_HINT: Record<Source, string> = {
 export const CERTAINTY_LABEL: Record<Certainty, string> = { sure: "Sure", fair: "Fairly sure", fuzzy: "Fuzzy memory" };
 
 export const questionLabel = (q: Question): string => QUESTIONS.find((x) => x[0] === q)?.[1] ?? q;
+
+export const CARE_LABEL: Record<CareLevel, string> = {
+  never: "Never raise",
+  careful: "Be careful",
+  ifthey: "Only if they do",
+  practical: "Practical",
+  watch: "Watching",
+  welcome: "Welcome",
+};
+
+export const STATUS_LABEL: Record<IncidentStatus, string> = {
+  rumour: "Rumour",
+  one: "Told by one party",
+  confirmed: "Confirmed",
+  disproved: "Disproved",
+};

@@ -7,9 +7,18 @@ import { Marker } from "../ui/Marker.tsx";
 export function Threads() {
   const { ix, today, setSheet, act, openFile, gotoEntry } = usePage();
   const live = ix.openFiles();
-  const followUps = live.flatMap((p) => ix.threads(p.id, today)).filter((t) => t.kind === "Follow-up");
-  const over = followUps.filter((t) => t.over);
-  const soon = followUps.filter((t) => !t.over);
+  // An incident with two files in it is one thing left open.
+  const open = [
+    ...new Map(
+      live
+        .flatMap((p) => ix.threads(p.id, today))
+        .filter((t) => t.kind !== "Incomplete")
+        .map((t) => [t.key, t]),
+    ).values(),
+  ].sort((a, b) => (a.due ?? "9").localeCompare(b.due ?? "9"));
+  const over = open.filter((t) => t.over);
+  const soon = open.filter((t) => !t.over && t.due);
+  const undated = open.filter((t) => !t.due);
   const closedIds = new Set(ix.dossier.people.filter((p) => p.closed).map((p) => p.id));
   const inbox = ix.dossier.entries.filter((e) => e.incomplete && !closedIds.has(e.person));
   const monthDay = today.slice(5);
@@ -17,6 +26,11 @@ export function Threads() {
     (e) => e.told.p === "date" && e.told.d.slice(5) === monthDay && e.told.d < today.slice(0, 4),
   );
   const dormant = live.filter((p) => ix.status(p, today) === "dormant");
+
+  const follow = (t: Thread) => {
+    if (t.entry) return gotoEntry(t.entry);
+    openFile(t.person, t.kind === "Incident" ? "incidents" : t.kind === "Gentle week" ? "profile" : "word");
+  };
 
   const table = (rows: Thread[]) =>
     rows.length > 0 ? (
@@ -26,34 +40,38 @@ export function Threads() {
             <tr>
               <th>Date</th>
               <th>File</th>
-              <th>Follow-up</th>
+              <th>Kind</th>
+              <th>Thread</th>
               <th />
             </tr>
           </thead>
           <tbody>
             {rows.map((t) => (
-              <tr key={t.entry}>
-                <td className="mono">{t.due}</td>
+              <tr key={t.key}>
+                <td className="mono">{t.due ?? "—"}</td>
                 <td>
                   <button type="button" className="linkish" onClick={() => openFile(t.person)}>
                     {ix.person(t.person)?.name}
                   </button>
                 </td>
+                <td>{t.kind}</td>
                 <td>
-                  <button type="button" className="linkish" onClick={() => gotoEntry(t.entry)}>
+                  <button type="button" className="linkish" onClick={() => follow(t)}>
                     {t.text}
                   </button>
                 </td>
                 <td>
-                  <button
-                    type="button"
-                    className="btn ghost sm"
-                    onClick={() =>
-                      act(`/api/entries/${t.entry}`, "PATCH", { fuDone: today }, `Follow-up done · ${today}`)
-                    }
-                  >
-                    Done
-                  </button>
+                  {t.kind === "Follow-up" && (
+                    <button
+                      type="button"
+                      className="btn ghost sm"
+                      onClick={() =>
+                        act(`/api/entries/${t.entry}`, "PATCH", { fuDone: today }, `Follow-up done · ${today}`)
+                      }
+                    >
+                      Done
+                    </button>
+                  )}
                 </td>
               </tr>
             ))}
@@ -69,17 +87,21 @@ export function Threads() {
       <div className="view-h">
         <h1>Threads</h1>
         <p>
-          Everything left open across the drawer: follow-ups and entries to complete. Tyr keeps its own list; it sends
-          nothing to other apps.
+          Everything left open across the drawer: words given, follow-ups, concerns up for review, gentle weeks ahead.
+          Tyr keeps its own list; it sends nothing to other apps.
         </p>
       </div>
       <section className="section">
-        <h4 className="sub-h over">Overdue · {over.length}</h4>
+        <h4 className="sub-h over">Overdue or up for review · {over.length}</h4>
         {table(over)}
       </section>
       <section className="section">
         <h4 className="sub-h">Coming up · {soon.length}</h4>
         {table(soon)}
+      </section>
+      <section className="section">
+        <h4 className="sub-h">Undated · {undated.length}</h4>
+        {table(undated)}
       </section>
       <section className="section">
         <h4 className="sub-h">Incomplete entries · {inbox.length}</h4>
