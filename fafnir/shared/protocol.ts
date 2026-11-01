@@ -1,4 +1,7 @@
 // The API's wire format, used by the server and the page.
+import type { Currency } from "./currencies.ts";
+
+export { CURRENCIES, type Currency } from "./currencies.ts";
 
 /** A page names the user whose money it shows, so its changes can't land on someone else's. */
 export const USER_HEADER = "X-Fafnir-User";
@@ -16,9 +19,6 @@ export const LIMITS = {
   amount: 50_000_000_000,
   entriesPerPage: 100,
 } as const;
-
-export const CURRENCIES = ["USD", "BRL"] as const;
-export type Currency = (typeof CURRENCIES)[number];
 
 /** Places the user's money is. A card's balance is normally below zero: what is owed on it. */
 export const MONEY_KINDS = ["cash", "bank", "savings", "card"] as const;
