@@ -6,7 +6,7 @@ import { StoreError } from "./errors.ts";
 import { today } from "./rates.ts";
 import type { Rate } from "../shared/protocol.ts";
 
-const RATE: Rate = { value: 5, date: "2026-10-01", source: "test" };
+const RATE: Rate = { currency: "BRL", value: 5, date: "2026-10-01", source: "test" };
 const ME = "odin";
 const DAY = "2026-10-05";
 
@@ -569,7 +569,12 @@ describe("in another currency", () => {
 
 describe("why what you're worth changed", () => {
   // The rate is 5 until the end of September, when it is 4.
-  const fiveThenFour = (date: string): Rate => ({ value: date >= "2026-09-30" ? 4 : 5, date, source: "test" });
+  const fiveThenFour = (date: string): Rate => ({
+    currency: "BRL",
+    value: date >= "2026-09-30" ? 4 : 5,
+    date,
+    source: "test",
+  });
 
   it("shows reais becoming worth more dollars as rate changes", () => {
     rateOn = fiveThenFour;

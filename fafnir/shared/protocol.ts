@@ -53,8 +53,15 @@ export interface MoneyAccount extends Account {
   usdNow: number | null;
 }
 
+/** The currencies with a rate: all but the US dollar, which everything is measured in. */
+export type RatedCurrency = Exclude<Currency, "USD">;
+
+/** The source of USDC's rate while it counts as exactly one dollar. */
+export const USDC_PEG = "Counted as $1";
+
 export interface Rate {
-  /** Reais for one US dollar. */
+  currency: RatedCurrency;
+  /** For BRL, reais for one US dollar. For a coin, US dollars for one coin. */
   value: number;
   /** The day it is the rate of. It can be earlier than the day asked for: weekends have none. */
   date: IsoDate;

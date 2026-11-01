@@ -214,7 +214,10 @@ export function createLedger(db: DatabaseSync, lookupRate: (date: IsoDate) => Ra
       currency: row.currency,
       amount: flip ? -row.amount : row.amount,
       usd: flip ? -row.usd : row.usd,
-      rate: row.rate === null ? null : { value: row.rate, date: row.rate_date!, source: row.rate_source! },
+      rate:
+        row.rate === null
+          ? null
+          : { currency: "BRL", value: row.rate, date: row.rate_date!, source: row.rate_source! },
       paid: row.paid_currency === null ? null : { currency: row.paid_currency, amount: row.paid_amount! },
       arrived: row.arrived_currency === null ? null : { currency: row.arrived_currency, amount: row.arrived_amount! },
     };

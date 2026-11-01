@@ -12,7 +12,7 @@ const PORT = Number(process.env.PORT ?? 3013);
 const db = openDatabase(DB_FILE);
 console.log(`Books database: ${DB_FILE}`);
 const rates = createRates(db);
-const ledger = createLedger(db, rates.lookup);
+const ledger = createLedger(db, (date) => rates.lookup("BRL", date));
 
 // The books of users removed from Heimdall go for good at start-up; the installer restarts this
 // service when Heimdall's list of users changes. VACUUM gives the space back to the disk.
@@ -77,7 +77,7 @@ app.get("/api/rate", async (req, res) => {
   const date = param(req.query.date) ?? today();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return void res.status(400).json({ error: "That date isn't valid" });
   await rates.ensure(date);
-  res.json({ rate: rates.lookup(date) });
+  res.json({ rate: rates.lookup("BRL", date) });
 });
 
 app.get("/api/entries", (req, res) => {
