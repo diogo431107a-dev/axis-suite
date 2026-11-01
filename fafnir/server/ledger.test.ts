@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import type { DatabaseSync } from "node:sqlite";
-import { openDatabase } from "./db.ts";
+import { DatabaseSync } from "node:sqlite";
+import { migrate, openDatabase } from "./db.ts";
 import { createLedger, assertBalanced, type Ledger } from "./ledger.ts";
 import { StoreError } from "./errors.ts";
 import { today } from "./rates.ts";
-import type { Rate } from "../shared/protocol.ts";
+import type { Currency, Rate } from "../shared/protocol.ts";
 
 const RATE: Rate = { currency: "BRL", value: 5, date: "2026-10-01", source: "test" };
 const ME = "odin";
@@ -14,6 +14,10 @@ let db: DatabaseSync;
 let rate: Rate | null;
 /** When set, the rate of each day instead of `rate`. */
 let rateOn: ((date: string) => Rate | null) | null;
+/** Dollars for one coin; a coin left out has no known price. */
+let prices: Partial<Record<Currency, number>>;
+/** When set, BTC's price on each day instead of the one in `prices`. */
+let btcOn: ((date: string) => number) | null;
 let ledger: Ledger;
 let nextId = 0;
 const id = () => `id-00000-${++nextId}`;
@@ -24,7 +28,12 @@ const category = (name: string, owner = ME) => {
   return found.id;
 };
 
-function addAccount(name: string, currency: "USD" | "BRL", kind: "bank" | "card" = "bank", starting = 0): string {
+function addAccount(
+  name: string,
+  currency: Currency,
+  kind: "bank" | "card" | "crypto" = currency === "USD" || currency === "BRL" ? "bank" : "crypto",
+  starting = 0,
+): string {
   const accountId = id();
   ledger.addAccount(ME, {
     id: accountId,
@@ -69,7 +78,13 @@ beforeEach(() => {
   db = openDatabase(":memory:");
   rate = RATE;
   rateOn = null;
-  ledger = createLedger(db, (date) => (rateOn ? rateOn(date) : rate));
+  prices = { BTC: 50_000, ICP: 10, USDC: 1 };
+  btcOn = null;
+  ledger = createLedger(db, (currency, date) => {
+    if (currency === "BRL") return rateOn ? rateOn(date) : rate;
+    const value = currency === "BTC" && btcOn ? btcOn(date) : prices[currency];
+    return value === undefined ? null : { currency: currency as "BTC", value, date, source: "test" };
+  });
 });
 
 describe("a new user", () => {
@@ -648,6 +663,492 @@ describe("why what you're worth changed", () => {
     });
     rate = null;
     expect(ledger.load(ME, "2026-09").month.change).toBeNull();
+  });
+});
+
+describe("coins", () => {
+  const BTC = 100_000_000;
+  const ICP = 100_000_000;
+  const USDC = 1_000_000;
+
+  it("keeps crypto accounts and coins together", () => {
+    expect(code(() => addAccount("Wrong", "BTC", "bank"))).toBe("invalid");
+    expect(code(() => addAccount("Wrong", "USD", "crypto"))).toBe("invalid");
+    const wallet = addAccount("Sparrow BTC", "BTC");
+    expect(code(() => ledger.changeAccount(ME, wallet, { kind: "savings" }))).toBe("invalid");
+    expect(account(wallet).kind).toBe("crypto");
+  });
+
+  it("values a coin at the day's price, and that value stays", () => {
+    const wallet = addAccount("Coinbase ICP", "ICP");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: DAY,
+      account: wallet,
+      other: category("Staking rewards"),
+      amount: 2 * ICP,
+    });
+    expect(entry.usd).toBe(2_000);
+    expect(entry.rate).toMatchObject({ currency: "ICP", value: 10 });
+    prices.ICP = 20;
+    expect(ledger.listEntries(ME, {}).entries[0]!.usd).toBe(2_000);
+    expect(account(wallet).usdNow).toBe(4_000);
+    expectEverythingBalances();
+  });
+
+  it("counts coins in what you have", () => {
+    addAccount("Coinbase BTC", "BTC", "crypto", BTC / 10);
+    addAccount("Coinbase USDC", "USDC", "crypto", 50 * USDC);
+    expect(ledger.load(ME, "2026-10").have).toBe(505_000);
+  });
+
+  it("asks for the dollars when a coin's price isn't known", () => {
+    delete prices.BTC;
+    const wallet = addAccount("Sparrow BTC", "BTC");
+    const input = {
+      id: id(),
+      kind: "received" as const,
+      date: DAY,
+      account: wallet,
+      other: category("Gifts"),
+      amount: BTC,
+    };
+    expect(code(() => ledger.addEntry(ME, input))).toBe("no-rate");
+    expect(ledger.addEntry(ME, { ...input, usd: 4_000_000 }).usd).toBe(4_000_000);
+    expect(ledger.load(ME, "2026-10").missingRate).toBe(true);
+  });
+
+  it("takes a typed cost for what you already held, even nothing", () => {
+    const wallet = id();
+    ledger.addAccount(ME, {
+      id: wallet,
+      name: "Sparrow BTC",
+      kind: "crypto",
+      currency: "BTC",
+      starting: BTC,
+      date: DAY,
+      usd: 1_000_000,
+    });
+    expect(ledger.listEntries(ME, {}).entries[0]!.usd).toBe(1_000_000);
+    expect(account(wallet).usdNow).toBe(5_000_000);
+    const gift = addAccount("Gifted ICP", "ICP");
+    const free = ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: DAY,
+      account: gift,
+      other: category("Gifts"),
+      amount: ICP,
+      usd: 0,
+    });
+    expect(free.usd).toBe(0);
+    expectEverythingBalances();
+  });
+
+  it("refuses a price in reais or dollars on a coin", () => {
+    const wallet = addAccount("Sparrow BTC", "BTC");
+    const paid = { currency: "USD" as const, amount: 100 };
+    const base = { kind: "spent" as const, date: DAY, account: wallet, other: category("Fun"), amount: 1_000 };
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), paid }))).toBe("invalid");
+  });
+
+  it("checks a coin's balance like any other", () => {
+    const wallet = addAccount("Sparrow BTC", "BTC", "crypto", BTC);
+    const { entry } = ledger.checkBalance(ME, wallet, { id: id(), date: DAY, actual: BTC + 1_000_000 });
+    expect(entry!.amount).toBe(1_000_000);
+    expect(entry!.usd).toBe(50_000);
+    expect(account(wallet).balance).toBe(BTC + 1_000_000);
+    expectEverythingBalances();
+  });
+
+  it("keeps large ICP amounts exact, and stops a balance before sums stop being safe", () => {
+    const wallet = addAccount("Coinbase ICP", "ICP");
+    const big = 9_000_000 * ICP + 1;
+    const add = (amount: number) =>
+      ledger.addEntry(ME, {
+        id: id(),
+        kind: "received",
+        date: DAY,
+        account: wallet,
+        other: category("Gifts"),
+        amount,
+        usd: 100,
+      });
+    add(big);
+    add(big);
+    expect(account(wallet).balance).toBe(2 * big);
+    expect(code(() => add(big + 1_000_000_000_000_000))).toBe("invalid");
+    add(big);
+    add(big);
+    expect(code(() => add(big))).toBe("invalid");
+    expect(account(wallet).balance).toBe(4 * big);
+  });
+
+  it("refuses a value too large to add up safely", () => {
+    const wallet = addAccount("Sparrow BTC", "BTC");
+    expect(
+      code(() =>
+        ledger.addEntry(ME, {
+          id: id(),
+          kind: "received",
+          date: DAY,
+          account: wallet,
+          other: category("Gifts"),
+          amount: 1_000_000 * BTC,
+        }),
+      ),
+    ).toBe("invalid");
+    expect(account(wallet).balance).toBe(0);
+  });
+});
+
+describe("which side values a trade", () => {
+  const BTC = 100_000_000;
+  const ICP = 100_000_000;
+  const USDC = 1_000_000;
+  const exchange = (from: Currency, amount: number, to: Currency, arrived: number) => {
+    const a = addAccount(`From ${from}`, from);
+    const b = addAccount(`To ${to}`, to);
+    return ledger.addEntry(ME, { id: id(), kind: "exchanged", date: DAY, account: a, other: b, amount, arrived });
+  };
+
+  it.each([
+    ["USD beats USDC", "USD", 5_000, "USDC", 51 * USDC, 5_000],
+    ["USD beats BRL", "BRL", 50_000, "USD", 9_000, 9_000],
+    ["USD beats BTC", "USD", 5_000, "BTC", BTC / 1_000, 5_000],
+    ["USDC beats BRL", "BRL", 50_000, "USDC", 90 * USDC, 9_000],
+    ["USDC beats BTC", "USDC", 40 * USDC, "BTC", BTC / 1_000, 4_000],
+    ["USDC beats ICP", "USDC", 50 * USDC, "ICP", 20 * ICP, 5_000],
+    ["BRL beats BTC", "BRL", 50_000, "BTC", BTC / 1_000, 10_000],
+    ["BRL beats ICP", "ICP", 2 * ICP, "BRL", 50_000, 10_000],
+    ["BTC beats ICP", "BTC", BTC / 1_000, "ICP", 20 * ICP, 5_000],
+    ["and the other way", "ICP", 20 * ICP, "BTC", BTC / 1_000, 5_000],
+  ] as const)("%s", (_name, from, amount, to, arrived, usd) => {
+    expect(exchange(from, amount, to, arrived).usd).toBe(usd);
+    expectEverythingBalances();
+  });
+
+  it("says which price it used", () => {
+    expect(exchange("BTC", BTC / 1_000, "ICP", 20 * ICP).rate).toMatchObject({ currency: "BTC", value: 50_000 });
+  });
+
+  it("takes typed dollars instead, and asks for them when the price isn't known", () => {
+    delete prices.BTC;
+    const a = addAccount("Coinbase BTC", "BTC");
+    const b = addAccount("Coinbase ICP", "ICP");
+    const input = {
+      id: id(),
+      kind: "exchanged" as const,
+      date: DAY,
+      account: a,
+      other: b,
+      amount: BTC / 1_000,
+      arrived: 20 * ICP,
+    };
+    expect(code(() => ledger.addEntry(ME, input))).toBe("no-rate");
+    expect(ledger.addEntry(ME, { ...input, usd: 4_900 }).usd).toBe(4_900);
+  });
+
+  it("keeps its dollars when only the note changes, even if the price has moved", () => {
+    const entry = exchange("BTC", BTC / 1_000, "ICP", 20 * ICP);
+    prices.BTC = 99_000;
+    const changed = ledger.changeEntry(ME, entry.id, {
+      kind: "exchanged",
+      date: DAY,
+      account: entry.account,
+      other: entry.other!,
+      amount: entry.amount,
+      arrived: 20 * ICP,
+      memo: "Note",
+    });
+    expect(changed.memo).toBe("Note");
+    expect(changed.usd).toBe(5_000);
+  });
+});
+
+describe("fees", () => {
+  const BTC = 100_000_000;
+
+  it("takes a trade's fee out of what left, as spending, and not out of what the coin cost", () => {
+    const bank = addAccount("Itaú", "BRL", "bank", 100_000);
+    const wallet = addAccount("Coinbase BTC", "BTC");
+    // R$ 425 left, R$ 5 of it the fee, and the rate is 5.
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: bank,
+      other: wallet,
+      amount: 42_500,
+      arrived: BTC / 1_000,
+      fee: 500,
+    });
+    expect(account(bank).balance).toBe(57_500);
+    expect(account(wallet).balance).toBe(BTC / 1_000);
+    expect(entry.fee).toEqual({ currency: "BRL", amount: 500, usd: 100 });
+    expect(entry.usd).toBe(8_500);
+    expect(entry.arrived).toEqual({ currency: "BTC", amount: BTC / 1_000 });
+    const { month } = ledger.load(ME, "2026-10");
+    expect(month.moneyOut).toBe(100);
+    expect(month.spending).toEqual([{ category: category("Fees"), usd: 100 }]);
+    const arrivedUsd = db.prepare("SELECT usd FROM postings WHERE tx_id = ? AND seq = 3").get(entry.id) as {
+      usd: number;
+    };
+    expect(arrivedUsd.usd).toBe(8_400);
+    expectEverythingBalances();
+  });
+
+  it("records a network fee on a move: less arrives, and the rest is spending", () => {
+    const from = addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    const to = addAccount("Sparrow BTC", "BTC");
+    const entry = ledger.addEntry(ME, {
+      id: id(),
+      kind: "moved",
+      date: DAY,
+      account: from,
+      other: to,
+      amount: BTC / 100,
+      fee: BTC / 10_000,
+    });
+    expect(account(from).balance).toBe(BTC - BTC / 100);
+    expect(account(to).balance).toBe(BTC / 100 - BTC / 10_000);
+    expect(entry.usd).toBe(50_000);
+    expect(entry.fee).toEqual({ currency: "BTC", amount: BTC / 10_000, usd: 500 });
+    expect(entry.other).toBe(to);
+    expect(ledger.load(ME, "2026-10").month.moneyOut).toBe(500);
+    expectEverythingBalances();
+  });
+
+  it("works on a move in reais or dollars too", () => {
+    const from = addAccount("Itaú", "BRL", "bank", 10_000);
+    const to = addAccount("Caixa", "BRL");
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: from, other: to, amount: 1_000, fee: 100 });
+    expect(account(to).balance).toBe(900);
+    expectEverythingBalances();
+  });
+
+  it("can be changed and removed, and an entry without one reads as before", () => {
+    const from = addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    const to = addAccount("Sparrow BTC", "BTC");
+    const base = { kind: "moved" as const, date: DAY, account: from, other: to, amount: BTC / 100 };
+    const entry = ledger.addEntry(ME, { ...base, id: id(), fee: 1_000 });
+    const removed = ledger.changeEntry(ME, entry.id, base);
+    expect(removed.fee).toBeNull();
+    expect(account(to).balance).toBe(BTC / 100);
+    expectEverythingBalances();
+  });
+
+  it("refuses a fee that isn't one", () => {
+    const from = addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    const to = addAccount("Sparrow BTC", "BTC");
+    const base = { kind: "moved" as const, date: DAY, account: from, other: to, amount: 1_000 };
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), fee: 1_000 }))).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), fee: -1 }))).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "spent", other: category("Fun"), fee: 10 }))).toBe(
+      "invalid",
+    );
+  });
+
+  it("makes the category again if it was deleted", () => {
+    ledger.load(ME, "2026-10");
+    ledger.removeAccount(ME, category("Fees"));
+    const from = addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    const to = addAccount("Sparrow BTC", "BTC");
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: from, other: to, amount: 1_000, fee: 10 });
+    expect(ledger.load(ME, "2026-10").categories.map((c) => c.name)).toContain("Fees");
+  });
+});
+
+describe("what you're worth, with coins", () => {
+  it("shows a coin's price moving as the same line as exchange rates", () => {
+    btcOn = (date) => (date >= "2026-09-30" ? 60_000 : 50_000);
+    const wallet = addAccount("Sparrow BTC", "BTC");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: "2026-08-15",
+      account: wallet,
+      other: category("Gifts"),
+      amount: 100_000_000,
+    });
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({
+      start: 5_000_000,
+      end: 6_000_000,
+      added: 0,
+      rates: 1_000_000,
+    });
+  });
+});
+
+describe("holdings", () => {
+  const BTC = 100_000_000;
+
+  it("lists nothing until there is a coin to list", () => {
+    addAccount("Itaú", "BRL");
+    expect(ledger.holdings(ME).holdings).toEqual([]);
+  });
+
+  it("lists a coin once it has an account, even an empty one", () => {
+    addAccount("Coinbase ICP", "ICP");
+    expect(ledger.holdings(ME).holdings).toMatchObject([{ coin: "ICP", quantity: 0, cost: 0, value: 0 }]);
+  });
+
+  it("follows a coin from buying it to moving it, with its cost unchanged by the move", () => {
+    const bank = addAccount("Itaú", "BRL", "bank", 10_000_000);
+    const coinbase = addAccount("Coinbase BTC", "BTC");
+    const sparrow = addAccount("Sparrow BTC", "BTC");
+    // 0.1 BTC for R$ 25,000 at a rate of 5: $5,000, plus a fee of R$ 50 that isn't part of its cost.
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: bank,
+      other: coinbase,
+      amount: 2_505_000,
+      arrived: BTC / 10,
+      fee: 5_000,
+    });
+    expect(ledger.holdings(ME).holdings[0]).toMatchObject({ quantity: BTC / 10, cost: 500_000, realized: 0 });
+
+    // All of it moves, with no fee.
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: coinbase, other: sparrow, amount: BTC / 10 });
+    const [moved] = ledger.holdings(ME).holdings;
+    expect(moved).toMatchObject({ quantity: BTC / 10, cost: 500_000, realized: 0, short: false });
+    expect(moved!.accounts).toEqual([
+      { id: coinbase, name: "Coinbase BTC", balance: 0 },
+      { id: sparrow, name: "Sparrow BTC", balance: BTC / 10 },
+    ]);
+
+    // The price has gone up, so half of it sells at a gain.
+    prices.BTC = 80_000;
+    expect(ledger.holdings(ME).holdings[0]).toMatchObject({ value: 800_000, price: { value: 80_000 } });
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "exchanged",
+      date: DAY,
+      account: sparrow,
+      other: bank,
+      amount: BTC / 20,
+      arrived: 2_000_000,
+    });
+    expect(ledger.holdings(ME).holdings[0]).toMatchObject({
+      quantity: BTC / 20,
+      cost: 250_000,
+      realized: 150_000,
+      value: 400_000,
+    });
+    expectEverythingBalances();
+  });
+
+  it("takes a network fee out as a small sale, leaving the average alone", () => {
+    const coinbase = addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    const sparrow = addAccount("Sparrow BTC", "BTC");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "moved",
+      date: DAY,
+      account: coinbase,
+      other: sparrow,
+      amount: BTC / 10,
+      fee: BTC / 1_000,
+    });
+    const [held] = ledger.holdings(ME).holdings;
+    expect(held!.quantity).toBe(BTC - BTC / 1_000);
+    expect(held!.cost).toBe(4_995_000);
+    expect(held!.realized).toBe(0);
+  });
+
+  it("adds a staking reward at the day's value", () => {
+    const wallet = addAccount("Coinbase ICP", "ICP");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: DAY,
+      account: wallet,
+      other: category("Staking rewards"),
+      amount: 5 * BTC,
+    });
+    expect(ledger.holdings(ME).holdings[0]).toMatchObject({ coin: "ICP", cost: 5_000, value: 5_000 });
+    expect(ledger.load(ME, "2026-10").month.moneyIn).toBe(5_000);
+  });
+
+  it("orders by date, so an entry typed late still counts in its place", () => {
+    const wallet = addAccount("Coinbase BTC", "BTC");
+    const bank = addAccount("Chase", "USD", "bank", 100_000_000);
+    const trade = (date: string, kind: "buy" | "sell", usd: number) =>
+      ledger.addEntry(ME, {
+        id: id(),
+        kind: "exchanged",
+        date,
+        account: kind === "buy" ? bank : wallet,
+        other: kind === "buy" ? wallet : bank,
+        amount: kind === "buy" ? usd : BTC,
+        arrived: kind === "buy" ? BTC : usd,
+      });
+    trade("2026-09-20", "sell", 6_000_000);
+    trade("2026-09-10", "buy", 5_000_000);
+    expect(ledger.holdings(ME).holdings[0]).toMatchObject({ quantity: 0, realized: 1_000_000, short: false });
+  });
+
+  it("shows no value while the price isn't known, but still what it cost", () => {
+    addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    delete prices.BTC;
+    expect(ledger.holdings(ME).holdings[0]).toMatchObject({ value: null, cost: 5_000_000, price: null });
+  });
+
+  it("keeps each user's coins apart", () => {
+    addAccount("Coinbase BTC", "BTC", "crypto", BTC);
+    expect(ledger.holdings("freya").holdings).toEqual([]);
+  });
+});
+
+describe("the upgrade to coins", () => {
+  it("adds the two categories and leaves what was there alone", () => {
+    const old = new DatabaseSync(":memory:");
+    old.exec("PRAGMA foreign_keys = ON");
+    migrate(old, 2);
+    const at = "2026-10-01T00:00:00Z";
+    const add = old.prepare(
+      "INSERT INTO accounts (id, owner, name, kind, currency, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    );
+    old.prepare("INSERT INTO books (owner, created_at) VALUES ('odin', ?), ('freya', ?)").run(at, at);
+    for (const owner of ["odin", "freya"]) {
+      add.run(`starting-${owner}`, owner, "Starting balance", "starting", null, at, at);
+      add.run(`adjust-${owner}`, owner, "Balance check", "adjustment", null, at, at);
+      add.run(`exchange-${owner}`, owner, "Currency exchange", "exchange", null, at, at);
+      add.run(`food-${owner}`, owner, "Food", "expense", null, at, at);
+    }
+    // Freya already has a category called that.
+    add.run("fees-freya", "freya", "FEES", "expense", null, at, at);
+    add.run("bank-odin", "odin", "Itaú", "bank", "BRL", at, at);
+    old
+      .prepare(
+        `
+      INSERT INTO transactions (id, owner, kind, date, rate, rate_date, rate_source, created_at, updated_at)
+      VALUES ('old-entry-1', 'odin', 'spent', '2026-10-05', 5, '2026-10-05', 'Banco Central (PTAX)', ?, ?)
+    `,
+      )
+      .run(at, at);
+    const post = old.prepare(
+      "INSERT INTO postings (tx_id, seq, account_id, currency, amount, usd) VALUES (?, ?, ?, ?, ?, ?)",
+    );
+    post.run("old-entry-1", 0, "bank-odin", "BRL", -10_000, -2_000);
+    post.run("old-entry-1", 1, "food-odin", "BRL", 10_000, 2_000);
+
+    migrate(old);
+
+    const ledgerNow = createLedger(old, () => null);
+    const names = (owner: string) => ledgerNow.load(owner, "2026-10").categories.map((c) => c.name);
+    expect(names("odin")).toEqual(expect.arrayContaining(["Fees", "Food", "Staking rewards"]));
+    expect(names("freya").filter((n) => n.toLowerCase() === "fees")).toEqual(["FEES"]);
+    const [entry] = ledgerNow.listEntries("odin", {}).entries;
+    expect(entry).toMatchObject({
+      amount: 10_000,
+      usd: 2_000,
+      fee: null,
+      rate: { currency: "BRL", value: 5, source: "Banco Central (PTAX)" },
+    });
   });
 });
 

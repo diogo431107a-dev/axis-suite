@@ -36,9 +36,9 @@ export function useRate(date: IsoDate, enabled: boolean): { loading: boolean; ra
   useEffect(() => {
     if (!enabled || !validDate) return;
     let cancelled = false;
-    void api<{ rate: Rate | null }>(`/api/rate?date=${date}`)
-      .then(({ rate }) => {
-        if (!cancelled) setAnswer({ date, rate });
+    void api<Record<string, Rate | null>>(`/api/rates?date=${date}`)
+      .then((rates) => {
+        if (!cancelled) setAnswer({ date, rate: rates.BRL ?? null });
       })
       .catch(() => {
         if (!cancelled) setAnswer({ date, rate: null });

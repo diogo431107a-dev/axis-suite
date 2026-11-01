@@ -66,7 +66,8 @@ export function Home({
   const { moneyIn, moneyOut, spending, change } = book.month;
   const biggest = spending[0]?.usd ?? 1;
   const thisMonth = localDate().slice(0, 7);
-  const rateAge = book.rate ? (Date.parse(localDate()) - Date.parse(book.rate.date)) / DAY_MS : 0;
+  const rate = book.rates.BRL;
+  const rateAge = rate ? (Date.parse(localDate()) - Date.parse(rate.date)) / DAY_MS : 0;
 
   if (book.accounts.length === 0) {
     return (
@@ -104,9 +105,9 @@ export function Home({
             <CircleAlert aria-hidden /> No exchange rate is available yet, so your reais aren't counted in these totals.
           </p>
         )}
-        {book.rate && rateAge > STALE_DAYS && (
+        {rate && rateAge > STALE_DAYS && (
           <p className="notice" role="status">
-            <CircleAlert aria-hidden /> The latest exchange rate is from {showDate(book.rate.date)}. Fafnir couldn't get
+            <CircleAlert aria-hidden /> The latest exchange rate is from {showDate(rate.date)}. Fafnir couldn't get
             a newer one.
           </p>
         )}
@@ -206,9 +207,9 @@ export function Home({
           <h2>Accounts</h2>
         </div>
         <AccountRows accounts={accounts} onOpen={onOpenAccount} />
-        {book.rate && (
+        {rate && (
           <p className="footnote">
-            US$ 1 = R$ {book.rate.value.toFixed(4)} ({book.rate.source}, {showDate(book.rate.date)}). This is a
+            US$ 1 = R$ {rate.value.toFixed(4)} ({rate.source}, {showDate(rate.date)}). This is a
             reference rate: your bank or card may charge a little more.
           </p>
         )}
