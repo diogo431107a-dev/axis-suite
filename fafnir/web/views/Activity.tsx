@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { ArrowRight, Search } from "lucide-react";
+import { isCoin } from "../../shared/currencies.ts";
 import type { Book, Entry, EntryPage } from "../../shared/protocol.ts";
 import { api, describeError } from "../api.ts";
 import { money, showDate } from "../format.ts";
@@ -8,6 +9,13 @@ import { money, showDate } from "../format.ts";
 function title(entry: Entry, names: Map<string, string>) {
   const account = names.get(entry.account) ?? "";
   const other = entry.other ? (names.get(entry.other) ?? "") : "";
+  if (entry.kind === "exchanged" && entry.arrived) {
+    const left = entry.currency;
+    const got = entry.arrived.currency;
+    if (isCoin(got) && !isCoin(left)) return `Bought ${got}`;
+    if (isCoin(left) && !isCoin(got)) return `Sold ${left}`;
+    if (isCoin(left) && isCoin(got)) return `${left} for ${got}`;
+  }
   switch (entry.kind) {
     case "moved":
     case "exchanged":
@@ -136,7 +144,11 @@ export function Activity({
                   <small className="muted">
                     {showDate(e.date)}
                     {e.kind === "spent" || e.kind === "received" ? ` · ${names.get(e.account) ?? ""}` : ""}
+                    {e.kind === "exchanged" && (isCoin(e.currency) || isCoin(e.arrived?.currency))
+                      ? ` · ${names.get(e.account) ?? ""} to ${e.other ? (names.get(e.other) ?? "") : ""}`
+                      : ""}
                     {e.paid ? ` · ${money(e.paid.amount, e.paid.currency)}` : ""}
+                    {e.fee ? ` · fee ${money(e.fee.amount, e.fee.currency)}` : ""}
                     {e.memo ? ` · ${e.memo}` : ""}
                   </small>
                 </span>

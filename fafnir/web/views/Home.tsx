@@ -102,13 +102,14 @@ export function Home({
         </dl>
         {book.missingRate && (
           <p className="notice" role="status">
-            <CircleAlert aria-hidden /> No exchange rate is available yet, so your reais aren't counted in these totals.
+            <CircleAlert aria-hidden /> Some rates or prices aren't available yet, so those balances aren't counted in
+            these totals.
           </p>
         )}
         {rate && rateAge > STALE_DAYS && (
           <p className="notice" role="status">
-            <CircleAlert aria-hidden /> The latest exchange rate is from {showDate(rate.date)}. Fafnir couldn't get
-            a newer one.
+            <CircleAlert aria-hidden /> The latest exchange rate is from {showDate(rate.date)}. Fafnir couldn't get a
+            newer one.
           </p>
         )}
       </section>
@@ -171,8 +172,8 @@ export function Home({
               {change.rates !== 0 && (
                 <div>
                   <dt>
-                    Exchange rate changes
-                    <small>Your reais worth more or fewer dollars, and what exchanging cost.</small>
+                    Price and exchange rate changes
+                    <small>Your reais and coins worth more or fewer dollars, and what exchanging cost.</small>
                   </dt>
                   <dd>{signedMoney(change.rates)}</dd>
                 </div>
@@ -209,8 +210,8 @@ export function Home({
         <AccountRows accounts={accounts} onOpen={onOpenAccount} />
         {rate && (
           <p className="footnote">
-            US$ 1 = R$ {rate.value.toFixed(4)} ({rate.source}, {showDate(rate.date)}). This is a
-            reference rate: your bank or card may charge a little more.
+            US$ 1 = R$ {rate.value.toFixed(4)} ({rate.source}, {showDate(rate.date)}). This is a reference rate: your
+            bank or card may charge a little more.
           </p>
         )}
       </section>

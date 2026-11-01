@@ -3,7 +3,7 @@ import type { BalanceCheck, BalanceCheckResult, MoneyAccount } from "../../share
 import { ApiFailure, api, describeError } from "../api.ts";
 import { localDate, money, parseAmount } from "../format.ts";
 import { Dialog } from "../ui/Dialog.tsx";
-import { Dollars } from "./Dollars.tsx";
+import { Dollars, ReadAs } from "./Dollars.tsx";
 import { typedUsd, useTypedDollars } from "./typed.ts";
 
 /** Check balance: compares what the bank shows with what is recorded, and adds any difference. */
@@ -25,7 +25,7 @@ export function CheckDialog({
   const [result, setResult] = useState<BalanceCheckResult | null>(null);
 
   const card = account.kind === "card";
-  const parsed = parseAmount(text);
+  const parsed = parseAmount(text, account.currency);
   const actual = parsed !== null && card ? -parsed : parsed;
 
   async function save(e: FormEvent) {
@@ -81,6 +81,7 @@ export function CheckDialog({
               onChange={(e) => setText(e.target.value)}
               placeholder="0.00"
             />
+            <ReadAs text={text} currency={account.currency} />
           </label>
           <label className="field">
             <span>On what day?</span>
@@ -90,7 +91,7 @@ export function CheckDialog({
         {typed.typing && (
           <Dollars
             currency={account.currency}
-            cents={actual === null ? null : actual - account.balance}
+            amount={actual === null ? null : actual - account.balance}
             date={date}
             typed={typed}
           />
