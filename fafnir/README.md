@@ -1,6 +1,6 @@
 # Fafnir Personal Finances
 
-What you have, what you owe and where your money goes, crypto included, added up in US dollars. Fafnir (FPF for short) is double-entry bookkeeping for people who have never heard of it: you say you spent, received or moved money, and the books are kept for you. It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own money and nobody else's.
+What you have, what you owe and where your money goes, crypto and loans included, added up in US dollars. Fafnir (FPF for short) is double-entry bookkeeping for people who have never heard of it: you say you spent, received or moved money, and the books are kept for you. It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own money and nobody else's.
 
 | Layer    | Technology                                                                        |
 | -------- | --------------------------------------------------------------------------------- |
@@ -24,8 +24,8 @@ web/
   App.tsx            signing in, the sidebar, and which page and dialog are open
   api.ts             fetch for the API
   format.ts          reading and showing amounts and dates
-  forms/             the dialogs: an entry, an account, Check balance, and the dollars line
-  views/             the pages: Home, Activity, Accounts, Crypto, Categories
+  forms/             the dialogs: an entry, an account, a loan and its payments, Check balance, and the dollars line
+  views/             the pages: Home, Activity, Accounts, Loans, Crypto, Categories
   ui/                the dialog and the About box
 deploy/
   fafnir.service     systemd unit (sandboxed)
@@ -66,6 +66,8 @@ deploy/
 
 **Fees.** Moved and Exchanged can have a fee, as part of what left. It's recorded as spending under Fees and isn't part of what a coin cost: its value is its share of the trade, so it needs no second rate. A move sends the amount and delivers it less the fee, which is how a network fee is recorded.
 
+**Loans.** A loan is an account in USD or BRL: money borrowed sits below zero, money lent above it, so What I owe and What I have count them with no special rule. Taking one out is a move between it and one of the user's accounts, which is why it doesn't change what they're worth; a fee taken out of it does, as spending under Fees. An older loan is added with only what's left, as a starting balance. A payment is a total and how much of it was interest, always in the loan's own currency: interest goes to Interest paid or to Interest, and the rest comes off the loan. Add interest makes a balance grow with no money moving, so it can match a lender's statement. Check balance covers a loan that's forgiven or wrong. Fafnir doesn't work interest out or keep a schedule: the user types what happened. Paying more than what's left isn't refused, since entries are often typed out of order; the loan shows as overpaid. What was borrowed, what's come off and the interest so far are read from the entries each time, never stored.
+
 **Accounts.** Cash, bank account, savings or credit card, each in USD or BRL, or a crypto account holding one coin (BTC, ICP or USDC). Any of them can be in a group, which is how Coinbase's balances stay together. A card's balance is normally below zero: what is owed. An account with nothing in it can be closed, and one with no entries deleted.
 
 **Check balance.** The user types what the bank shows; if it differs from what is recorded on that day, the difference is added as a balance check. It can be deleted, not changed.
@@ -78,9 +80,8 @@ deploy/
 
 ## Not yet
 
-Phases 1, 2 and 3 of the plan are done. Still to come, in order:
+Phases 1 to 4 of the plan are done. Still to come, in order:
 
-4. **Loans:** money owed and owed to you, payments split into principal and interest.
 5. **Assets and savings:** a house or car with a value updated by hand; savings goals.
 6. **Understanding your money:** net worth over time, budgets, recurring entries.
 

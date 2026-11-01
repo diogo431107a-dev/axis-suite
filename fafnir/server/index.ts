@@ -86,6 +86,11 @@ app.get("/api/holdings", async (req, res) => {
   res.json(ledger.holdings(owner(req)));
 });
 
+app.get("/api/loans", async (req, res) => {
+  await rates.ensure(today());
+  res.json(ledger.loans(owner(req)));
+});
+
 app.get("/api/entries", (req, res) => {
   const offset = Number(param(req.query.offset) ?? 0);
   res.json(
@@ -160,10 +165,11 @@ app.get("/api/export.csv", (req, res) => {
       e.rate ? e.rate.value : "",
       ...foreign(e.paid ?? e.arrived),
       ...foreign(e.fee),
+      e.interest ? decimal(e.interest.amount, e.interest.currency) : "",
       csvText(e.memo),
     ].join(",");
   const header =
-    "date,kind,account,category or destination,currency,amount,usd,rate,other currency,other amount,fee currency,fee,note";
+    "date,kind,account,category or destination,currency,amount,usd,rate,other currency,other amount,fee currency,fee,interest,note";
   res.type("text/csv");
   res.set("Content-Disposition", `attachment; filename="fafnir-${today()}.csv"`);
   res.send([header, ...ledger.allEntries(me).map(row)].join("\r\n") + "\r\n");

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Bitcoin,
   CircleUser,
+  HandCoins,
   Landmark,
   LayoutDashboard,
   ListTree,
@@ -19,25 +20,37 @@ import {
   watchForSignIn,
   type Me,
 } from "@axis-suite/heimdall-client/browser";
-import type { Book, Entry, MoneyAccount, MoneyKind } from "../shared/protocol.ts";
+import {
+  isLoan,
+  type Book,
+  type Entry,
+  type LoanSummary,
+  type MoneyAccount,
+  type MoneyKind,
+} from "../shared/protocol.ts";
 import { api, describeError, setPageUser, setSignedOutHandler } from "./api.ts";
 import { localDate } from "./format.ts";
 import { AccountDialog } from "./forms/AccountDialog.tsx";
 import { CheckDialog } from "./forms/CheckDialog.tsx";
 import { EntryDialog } from "./forms/EntryDialog.tsx";
+import { InterestDialog } from "./forms/InterestDialog.tsx";
+import { LoanDialog } from "./forms/LoanDialog.tsx";
+import { PaymentDialog } from "./forms/PaymentDialog.tsx";
 import { AboutButton } from "./ui/About.tsx";
 import { Accounts } from "./views/Accounts.tsx";
 import { Activity } from "./views/Activity.tsx";
 import { Categories } from "./views/Categories.tsx";
 import { Crypto } from "./views/Crypto.tsx";
 import { Home } from "./views/Home.tsx";
+import { Loans } from "./views/Loans.tsx";
 
-type View = "home" | "activity" | "accounts" | "crypto" | "categories";
+type View = "home" | "activity" | "accounts" | "loans" | "crypto" | "categories";
 
 const NAV: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "home", label: "Home", icon: LayoutDashboard },
   { view: "activity", label: "Activity", icon: Receipt },
   { view: "accounts", label: "Accounts", icon: Landmark },
+  { view: "loans", label: "Loans", icon: HandCoins },
   { view: "crypto", label: "Crypto", icon: Bitcoin },
   { view: "categories", label: "Categories", icon: ListTree },
 ];
@@ -51,6 +64,9 @@ type Open =
   | { what: "entry"; entry?: Entry }
   | { what: "account"; account?: MoneyAccount; startAs?: MoneyKind }
   | { what: "check"; account: MoneyAccount }
+  | { what: "loan" }
+  | { what: "payment"; loan: MoneyAccount; lastTotal?: number | null; entry?: Entry }
+  | { what: "interest"; loan: MoneyAccount; entry?: Entry }
   | null;
 
 /** Signs in and loads the books; everything after that is BookPage's. */
@@ -146,7 +162,22 @@ function BookPage({ me }: { me: Me }) {
   };
 
   const addEntry = () =>
-    setOpen(book && book.accounts.some((a) => !a.closed) ? { what: "entry" } : { what: "account" });
+    setOpen(book && book.accounts.some((a) => !a.closed && !isLoan(a.kind)) ? { what: "entry" } : { what: "account" });
+
+  /** An entry opens in the form that made it. */
+  const openEntry = (entry: Entry) => {
+    const find = (id: string | null) => book?.accounts.find((a) => a.id === id);
+    const loan = find(entry.kind === "interest" ? entry.account : entry.other);
+    if (loan && (entry.kind === "repaid" || entry.kind === "collected")) setOpen({ what: "payment", loan, entry });
+    else if (loan && entry.kind === "interest") setOpen({ what: "interest", loan, entry });
+    else setOpen({ what: "entry", entry });
+  };
+
+  /** The account behind a line on the Loans page, then what to do with it. */
+  const withLoan = (summary: LoanSummary, then: (loan: MoneyAccount) => void) => {
+    const loan = book?.accounts.find((a) => a.id === summary.id);
+    if (loan) then(loan);
+  };
 
   if (!book) {
     return (
@@ -251,7 +282,7 @@ function BookPage({ me }: { me: Me }) {
               version={version}
               account={activityAccount}
               onAccount={setActivityAccount}
-              onOpen={(entry) => setOpen({ what: "entry", entry })}
+              onOpen={openEntry}
             />
           )}
           {view === "accounts" && (
@@ -263,6 +294,22 @@ function BookPage({ me }: { me: Me }) {
               onActivity={(a) => {
                 setActivityAccount(a.id);
                 go("activity");
+              }}
+            />
+          )}
+          {view === "loans" && (
+            <Loans
+              version={version}
+              onAdd={() => setOpen({ what: "loan" })}
+              actions={{
+                onPayment: (s) => withLoan(s, (loan) => setOpen({ what: "payment", loan, lastTotal: s.lastTotal })),
+                onInterest: (s) => withLoan(s, (loan) => setOpen({ what: "interest", loan })),
+                onCheck: (s) => withLoan(s, (account) => setOpen({ what: "check", account })),
+                onEdit: (s) => withLoan(s, (account) => setOpen({ what: "account", account })),
+                onActivity: (s) => {
+                  setActivityAccount(s.id);
+                  go("activity");
+                },
               }}
             />
           )}
@@ -298,6 +345,20 @@ function BookPage({ me }: { me: Me }) {
           onClose={() => setOpen(null)}
           onSaved={saved}
         />
+      )}
+      {open?.what === "loan" && <LoanDialog book={book} onClose={() => setOpen(null)} onSaved={saved} />}
+      {open?.what === "payment" && (
+        <PaymentDialog
+          book={book}
+          loan={open.loan}
+          lastTotal={open.lastTotal}
+          entry={open.entry}
+          onClose={() => setOpen(null)}
+          onSaved={saved}
+        />
+      )}
+      {open?.what === "interest" && (
+        <InterestDialog loan={open.loan} entry={open.entry} onClose={() => setOpen(null)} onSaved={saved} />
       )}
       {open?.what === "check" && (
         <CheckDialog

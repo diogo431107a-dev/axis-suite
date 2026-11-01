@@ -4,6 +4,12 @@ What changed in Fafnir, newest first. Each version is tagged in git as `fafnir-v
 
 ## Unreleased
 
+- Loans: a new page for money you've borrowed and money you've lent, with what's left, what you've paid off and what the interest has come to.
+- Taking out a loan doesn't change what you're worth, since you have the money and you owe it. A fee taken out of it does, and shows in your spending.
+- Record a payment as a total and how much of it was interest. The interest counts as spending or income, the rest comes off the loan, and the form starts from your last payment. You type the interest: Fafnir doesn't work it out.
+- Add interest makes a loan's balance grow with no payment made, so it can match your statement.
+- There's a new Interest paid category, and the spreadsheet download has a new interest column.
+
 - Crypto: keep track of Bitcoin, ICP and USDC. Set up Coinbase and Sparrow with one button, or add your own crypto accounts. What I'm worth now includes your coins at the latest price.
 - The new Crypto page shows how much of each coin you have, where it sits, what it cost you on average and what it's worth, all in US dollars. Moving a coin between your accounts doesn't change what it cost.
 - Exchanged works between any two currencies, reading as Bought BTC or Sold BTC. A trade takes its US dollar value from the USDC, reais or BTC side, and you can always type it yourself.
