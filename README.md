@@ -49,7 +49,7 @@ browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   account
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 althing's API     ── GET /online ──▶ heimdall (who has a live session, for the "online" list)
-fafnir's API      ── HTTPS ──▶ Banco Central, Frankfurter (USD/BRL exchange rates; the only module that calls outside)
+fafnir's API      ── HTTPS ──▶ Banco Central, Frankfurter, Coinbase, Kraken (exchange rates and coin prices; the only module that calls outside)
 ```
 
 Saga is the exception: its players are its own, so it never asks Heimdall anything. What follows is about every other module.
