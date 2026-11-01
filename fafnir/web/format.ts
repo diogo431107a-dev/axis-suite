@@ -3,6 +3,9 @@
 import { CURRENCY_INFO, amountDigits, isCoin, unitOf } from "../shared/currencies.ts";
 import type { Currency, IsoDate, MoneyKind } from "../shared/protocol.ts";
 
+/** Whether an account's balance below zero is what the user owes on it, rather than an overdraft. */
+export const holdsDebt = (account: { kind: MoneyKind }) => account.kind === "card" || account.kind === "borrowed";
+
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const LONG_MONTHS = [
   "January",

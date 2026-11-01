@@ -464,6 +464,32 @@ dd {
   margin-top: 14px;
 }
 
+/* Loans */
+.loan-section {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  margin: 14px 0 8px;
+}
+.loan-section .amount {
+  font-weight: 600;
+}
+.loan-bar {
+  display: block;
+  margin-top: 10px;
+}
+.loan .row-end {
+  white-space: normal;
+  text-align: right;
+}
+.segmented.two-up {
+  grid-template-columns: 1fr 1fr;
+}
+.loan-how {
+  margin-top: 14px;
+}
+
 /* Crypto */
 .heading-icon {
   width: 24px;

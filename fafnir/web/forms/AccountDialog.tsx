@@ -2,6 +2,7 @@ import { useState, type FormEvent } from "react";
 import { COINS, CURRENCY_INFO, FIAT, isCoin } from "../../shared/currencies.ts";
 import {
   MONEY_KINDS,
+  isLoan,
   type AccountChange,
   type Book,
   type Currency,
@@ -57,7 +58,8 @@ export function AccountDialog({
   const starting = parsed !== null && kind === "card" ? -parsed : parsed;
   const holdsCoin = kind === "crypto";
   // A coin's account can't turn into a bank account, or the other way round: what it holds would stop fitting.
-  const kinds = account ? MONEY_KINDS.filter((k) => (k === "crypto") === isCoin(account.currency)) : MONEY_KINDS;
+  const kinds = MONEY_KINDS.filter((k) => !isLoan(k) && (!account || (k === "crypto") === isCoin(account.currency)));
+  const loan = isLoan(kind);
 
   const changeKind = (next: MoneyKind) => {
     setKind(next);
@@ -99,7 +101,7 @@ export function AccountDialog({
   }
 
   return (
-    <Dialog title={account ? "Change account" : "Add an account"} onClose={onClose}>
+    <Dialog title={loan ? "Change loan" : account ? "Change account" : "Add an account"} onClose={onClose}>
       <form onSubmit={save} noValidate>
         <label className="field">
           <span>Name</span>
@@ -111,17 +113,19 @@ export function AccountDialog({
           />
         </label>
 
-        <label className="field">
-          <span>What is it?</span>
-          <select value={kind} onChange={(e) => changeKind(e.target.value as MoneyKind)}>
-            {kinds.map((k) => (
-              <option key={k} value={k}>
-                {KIND_NAMES[k]}
-              </option>
-            ))}
-          </select>
-          <small>{KIND_HINTS[kind]}</small>
-        </label>
+        {!loan && (
+          <label className="field">
+            <span>What is it?</span>
+            <select value={kind} onChange={(e) => changeKind(e.target.value as MoneyKind)}>
+              {kinds.map((k) => (
+                <option key={k} value={k}>
+                  {KIND_NAMES[k]}
+                </option>
+              ))}
+            </select>
+            <small>{KIND_HINTS[kind]}</small>
+          </label>
+        )}
 
         {!account && (
           <label className="field">
@@ -198,7 +202,7 @@ export function AccountDialog({
                   disabled={saving}
                   onClick={() => void run(() => api(`/api/accounts/${account.id}`, { method: "DELETE" }))}
                 >
-                  Delete account
+                  Delete {loan ? "loan" : "account"}
                 </button>
               ) : (
                 <button
@@ -215,7 +219,7 @@ export function AccountDialog({
                     )
                   }
                 >
-                  {account.closed ? "Reopen account" : "Close account"}
+                  {account.closed ? "Reopen" : "Close"} {loan ? "loan" : "account"}
                 </button>
               )}
             </div>

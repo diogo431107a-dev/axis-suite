@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { BalanceCheck, BalanceCheckResult, MoneyAccount } from "../../shared/protocol.ts";
+import { isLoan, type BalanceCheck, type BalanceCheckResult, type MoneyAccount } from "../../shared/protocol.ts";
 import { ApiFailure, api, describeError } from "../api.ts";
 import { localDate, money, parseAmount } from "../format.ts";
 import { Dialog } from "../ui/Dialog.tsx";
@@ -24,7 +24,9 @@ export function CheckDialog({
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<BalanceCheckResult | null>(null);
 
-  const card = account.kind === "card";
+  // On a card or a debt the question is what is owed, so the number typed is below zero in the books.
+  const card = account.kind === "card" || account.kind === "borrowed";
+  const loan = isLoan(account.kind);
   const parsed = parseAmount(text, account.currency);
   const actual = parsed !== null && card ? -parsed : parsed;
 
@@ -68,12 +70,14 @@ export function CheckDialog({
     <Dialog title={`Check ${account.name}`} onClose={onClose}>
       <form onSubmit={(e) => void save(e)} noValidate>
         <p className="lead">
-          Look at the balance your {card ? "card" : "bank or wallet"} shows. If it differs from what Fafnir has, the
-          difference is recorded for you.
+          {loan
+            ? "Look at what your statement says is left, or what the two of you agree."
+            : `Look at the balance your ${card ? "card" : "bank or wallet"} shows.`}{" "}
+          If it differs from what Fafnir has, the difference is recorded for you.
         </p>
         <div className="two">
           <label className="field">
-            <span>{card ? "How much do you owe?" : "How much does it show?"}</span>
+            <span>{loan ? "How much is left?" : card ? "How much do you owe?" : "How much does it show?"}</span>
             <input
               inputMode="decimal"
               autoComplete="off"

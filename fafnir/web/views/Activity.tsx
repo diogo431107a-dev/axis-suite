@@ -6,9 +6,20 @@ import { api, describeError } from "../api.ts";
 import { money, showDate } from "../format.ts";
 
 /** What an entry is called in the list. */
-function title(entry: Entry, names: Map<string, string>) {
+function title(entry: Entry, names: Map<string, string>, kinds: Map<string, string>) {
   const account = names.get(entry.account) ?? "";
   const other = entry.other ? (names.get(entry.other) ?? "") : "";
+  if (entry.kind === "repaid") return `Paid ${other}`;
+  if (entry.kind === "collected") return `${other} paid`;
+  if (entry.kind === "interest") return `Interest on ${account}`;
+  if (entry.kind === "moved") {
+    const to = entry.other ? kinds.get(entry.other) : undefined;
+    const from = kinds.get(entry.account);
+    if (from === "borrowed") return `Borrowed from ${account}`;
+    if (to === "lent") return `Lent to ${other}`;
+    if (to === "borrowed") return `Paid ${other}`;
+    if (from === "lent") return `${account} paid`;
+  }
   if (entry.kind === "exchanged" && entry.arrived) {
     const left = entry.currency;
     const got = entry.arrived.currency;
@@ -34,8 +45,12 @@ function title(entry: Entry, names: Map<string, string>) {
 }
 
 /** Money coming in shows as positive, going out as negative, and a move or exchange as neither. */
-function signed(entry: Entry): number {
-  return entry.kind === "spent" ? -entry.amount : entry.amount;
+function signed(entry: Entry, kinds: Map<string, string>): number {
+  const out =
+    entry.kind === "spent" ||
+    entry.kind === "repaid" ||
+    (entry.kind === "interest" && kinds.get(entry.account) === "borrowed");
+  return out ? -entry.amount : entry.amount;
 }
 
 export function Activity({
@@ -58,6 +73,7 @@ export function Activity({
   const [error, setError] = useState("");
 
   const names = new Map([...book.accounts, ...book.categories].map((a) => [a.id, a.name]));
+  const kinds = new Map(book.accounts.map((a) => [a.id, a.kind as string]));
 
   // Searching waits for a pause in the typing.
   useEffect(() => {
@@ -134,21 +150,24 @@ export function Activity({
       )}
       <ul className="rows">
         {page?.entries.map((e) => {
-          const amount = signed(e);
+          const amount = signed(e, kinds);
           const neutral = e.kind === "moved" || e.kind === "exchanged";
           return (
             <li key={e.id}>
               <button type="button" className="row" onClick={() => onOpen(e)}>
                 <span className="row-main">
-                  <span>{title(e, names)}</span>
+                  <span>{title(e, names, kinds)}</span>
                   <small className="muted">
                     {showDate(e.date)}
-                    {e.kind === "spent" || e.kind === "received" ? ` · ${names.get(e.account) ?? ""}` : ""}
+                    {e.kind === "spent" || e.kind === "received" || e.kind === "repaid" || e.kind === "collected"
+                      ? ` · ${names.get(e.account) ?? ""}`
+                      : ""}
                     {e.kind === "exchanged" && (isCoin(e.currency) || isCoin(e.arrived?.currency))
                       ? ` · ${names.get(e.account) ?? ""} to ${e.other ? (names.get(e.other) ?? "") : ""}`
                       : ""}
                     {e.paid ? ` · ${money(e.paid.amount, e.paid.currency)}` : ""}
                     {e.fee ? ` · fee ${money(e.fee.amount, e.fee.currency)}` : ""}
+                    {e.interest ? ` · interest ${money(e.interest.amount, e.interest.currency)}` : ""}
                     {e.memo ? ` · ${e.memo}` : ""}
                   </small>
                 </span>
@@ -160,9 +179,7 @@ export function Activity({
                   {e.arrived ? (
                     <small className="muted">became {money(e.arrived.amount, e.arrived.currency)}</small>
                   ) : (
-                    e.currency !== "USD" && (
-                      <small className="muted">{money(e.kind === "spent" ? -e.usd : e.usd)}</small>
-                    )
+                    e.currency !== "USD" && <small className="muted">{money(amount < 0 ? -e.usd : e.usd)}</small>
                   )}
                 </span>
               </button>

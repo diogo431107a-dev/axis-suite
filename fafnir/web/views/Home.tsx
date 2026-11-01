@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, CircleAlert } from "lucide-react";
-import type { Book, MoneyAccount } from "../../shared/protocol.ts";
-import { addMonths, localDate, money, showDate, showMonth } from "../format.ts";
+import { isLoan, type Book, type MoneyAccount } from "../../shared/protocol.ts";
+import { addMonths, holdsDebt, localDate, money, showDate, showMonth } from "../format.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 /** A rate this old means the sources have been failing, not just a weekend or a holiday. */
@@ -8,12 +8,14 @@ const STALE_DAYS = 5;
 
 const signedMoney = (cents: number) => `${cents > 0 ? "+" : ""}${money(cents)}`;
 
-/** A card's negative balance reads as what is owed; everything else as a plain balance. */
+/** What is owed reads as that, either way round; everything else as a plain balance. */
 export function BalanceText({ account }: { account: MoneyAccount }) {
-  const owed = account.kind === "card" && account.balance < 0;
+  const owed = holdsDebt(account) && account.balance < 0;
+  const owedToYou = account.kind === "lent" && account.balance > 0;
   return (
     <span className="amount">
       {owed && <small>you owe </small>}
+      {owedToYou && <small>owed to you </small>}
       {money(owed ? -account.balance : account.balance, account.currency)}
     </span>
   );
@@ -34,9 +36,7 @@ export function AccountRows({ accounts, onOpen }: { accounts: MoneyAccount[]; on
                 <BalanceText account={a} />
                 {a.currency !== "USD" && (
                   <small className="muted">
-                    {a.usdNow === null
-                      ? "no rate yet"
-                      : `≈ ${money(a.kind === "card" ? Math.abs(a.usdNow) : a.usdNow)}`}
+                    {a.usdNow === null ? "no rate yet" : `≈ ${money(holdsDebt(a) ? Math.abs(a.usdNow) : a.usdNow)}`}
                   </small>
                 )}
               </span>
@@ -61,7 +61,8 @@ export function Home({
   onAddAccount: () => void;
   onOpenAccount: (account: MoneyAccount) => void;
 }) {
-  const accounts = book.accounts.filter((a) => !a.closed);
+  const accounts = book.accounts.filter((a) => !a.closed && !isLoan(a.kind));
+  const loans = book.accounts.filter((a) => !a.closed && isLoan(a.kind));
   const names = new Map(book.categories.map((c) => [c.id, c.name]));
   const { moneyIn, moneyOut, spending, change } = book.month;
   const biggest = spending[0]?.usd ?? 1;
@@ -215,6 +216,15 @@ export function Home({
           </p>
         )}
       </section>
+
+      {loans.length > 0 && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Loans</h2>
+          </div>
+          <AccountRows accounts={loans} onOpen={onOpenAccount} />
+        </section>
+      )}
     </>
   );
 }

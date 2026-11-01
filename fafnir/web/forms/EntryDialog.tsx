@@ -1,8 +1,8 @@
 import { useState, type FormEvent } from "react";
-import { Trash2 } from "lucide-react";
 import { isCoin, unitOf } from "../../shared/currencies.ts";
 import {
   ENTRY_KINDS,
+  isLoan,
   type Account,
   type Book,
   type Currency,
@@ -14,8 +14,10 @@ import {
   type NewEntry,
 } from "../../shared/protocol.ts";
 import { ApiFailure, api, describeError } from "../api.ts";
-import { localDate, money, parseAmount, plainAmount, showDate, symbolOf } from "../format.ts";
+import { localDate, money, parseAmount, plainAmount, showDate } from "../format.ts";
 import { Dialog } from "../ui/Dialog.tsx";
+import { AmountInput } from "./AmountInput.tsx";
+import { DeleteEntry } from "./DeleteEntry.tsx";
 import { Dollars, ReadAs } from "./Dollars.tsx";
 import { convert, typedUsd, useRates, useTypedDollars, type DayRates } from "./typed.ts";
 
@@ -53,30 +55,6 @@ function AccountOptions({ accounts }: { accounts: MoneyAccount[] }) {
       {a.name.includes(a.currency) ? "" : ` (${a.currency})`}
     </option>
   ));
-}
-
-function AmountInput({
-  currency,
-  value,
-  onChange,
-}: {
-  currency: Currency | undefined;
-  value: string;
-  onChange: (text: string) => void;
-}) {
-  return (
-    <div className="amount-input">
-      <span aria-hidden>{symbolOf(currency)}</span>
-      <input
-        inputMode="decimal"
-        autoComplete="off"
-        required
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        placeholder="0.00"
-      />
-    </div>
-  );
 }
 
 /** Which of two currencies a rate is the price of: the one worth more. */
@@ -142,7 +120,10 @@ export function EntryDialog({
 }) {
   const everyday = entry === undefined || (entry.kind !== "starting" && entry.kind !== "adjustment");
   const [id] = useState(() => crypto.randomUUID());
-  const open = book.accounts.filter((a) => !a.closed || a.id === entry?.account || a.id === entry?.other);
+  // A loan's payments have their own form, so a loan is only here if this entry already uses one.
+  const open = book.accounts.filter(
+    (a) => (!a.closed && !isLoan(a.kind)) || a.id === entry?.account || a.id === entry?.other,
+  );
 
   const [kind, setKind] = useState<EntryKind>(entry && everyday ? (entry.kind as EntryKind) : "spent");
   const [amountText, setAmountText] = useState(() => {
@@ -171,7 +152,6 @@ export function EntryDialog({
   const typed = useTypedDollars();
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const from = book.accounts.find((a) => a.id === account);
   const to = book.accounts.find((a) => a.id === other);
@@ -292,25 +272,7 @@ export function EntryDialog({
     }
   }
 
-  const deleteControls = entry && (
-    <div className="delete-row">
-      {confirmDelete ? (
-        <>
-          <span>Delete this entry?</span>
-          <button type="button" className="btn danger" disabled={saving} onClick={() => void remove()}>
-            Delete
-          </button>
-          <button type="button" className="btn" onClick={() => setConfirmDelete(false)}>
-            Keep it
-          </button>
-        </>
-      ) : (
-        <button type="button" className="btn quiet" onClick={() => setConfirmDelete(true)}>
-          <Trash2 aria-hidden /> Delete
-        </button>
-      )}
-    </div>
-  );
+  const deleteControls = entry && <DeleteEntry disabled={saving} onDelete={() => void remove()} />;
 
   // A balance check only says what the bank showed on a day: to redo one, delete it and check again.
   if (entry?.kind === "adjustment") {
@@ -333,8 +295,9 @@ export function EntryDialog({
 
   const title = entry ? (everyday ? "Change entry" : "Change starting balance") : "Add an entry";
   let amountLabel = "How much?";
-  if (!everyday) amountLabel = `Balance${from?.kind === "card" ? " (below zero for what you owe)" : ""}`;
-  else if (kind === "moved" || exchanging) amountLabel = fee ? "How much left, with the fee?" : "How much left?";
+  if (!everyday) {
+    amountLabel = `Balance${from?.kind === "card" || from?.kind === "borrowed" ? " (below zero for what you owe)" : ""}`;
+  } else if (kind === "moved" || exchanging) amountLabel = fee ? "How much left, with the fee?" : "How much left?";
   else if (inForeign) amountLabel = kind === "spent" ? `Charged to ${from?.name}` : `Reached ${from?.name}`;
 
   return (

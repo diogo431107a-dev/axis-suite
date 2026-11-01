@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
-import type { Book, MoneyAccount } from "../../shared/protocol.ts";
-import { KIND_NAMES, money } from "../format.ts";
+import { isLoan, type Book, type MoneyAccount } from "../../shared/protocol.ts";
+import { KIND_NAMES, holdsDebt, money } from "../format.ts";
 import { BalanceText } from "./Home.tsx";
 
 function AccountCard({
@@ -27,9 +27,7 @@ function AccountCard({
         <div className="row-end">
           <BalanceText account={account} />
           {account.currency !== "USD" && account.usdNow !== null && (
-            <small className="muted">
-              ≈ {money(account.kind === "card" ? Math.abs(account.usdNow) : account.usdNow)}
-            </small>
+            <small className="muted">≈ {money(holdsDebt(account) ? Math.abs(account.usdNow) : account.usdNow)}</small>
           )}
         </div>
       </div>
@@ -64,8 +62,10 @@ export function Accounts({
   onActivity: (account: MoneyAccount) => void;
 }) {
   const [showClosed, setShowClosed] = useState(false);
-  const open = book.accounts.filter((a) => !a.closed);
-  const closed = book.accounts.filter((a) => a.closed);
+  // Loans have their own page.
+  const accounts = book.accounts.filter((a) => !isLoan(a.kind));
+  const open = accounts.filter((a) => !a.closed);
+  const closed = accounts.filter((a) => a.closed);
   const groups = new Map<string, MoneyAccount[]>();
   for (const a of open) groups.set(a.group, [...(groups.get(a.group) ?? []), a]);
 
@@ -87,7 +87,7 @@ export function Accounts({
           <Plus aria-hidden /> Add account
         </button>
       </div>
-      {book.accounts.length === 0 && <p className="empty">No accounts yet.</p>}
+      {accounts.length === 0 && <p className="empty">No accounts yet.</p>}
       {[...groups].map(([group, rows]) => (
         <section key={group} className="account-group">
           {group && <h3>{group}</h3>}
