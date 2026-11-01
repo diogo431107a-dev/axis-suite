@@ -9,6 +9,7 @@ import {
   ENTRY_KINDS,
   LIMITS,
   MONEY_KINDS,
+  isLoan,
   type Account,
   type AccountChange,
   type BalanceCheck,
@@ -37,10 +38,12 @@ import { coinCosts, type CoinChange } from "./holdings.ts";
 import { addDays, monthSpan, today } from "./rates.ts";
 
 const FEES = "Fees";
+const INTEREST_PAID = "Interest paid";
+const INTEREST_EARNED = "Interest";
 
 const STARTING_CATEGORIES: Record<CategoryKind, string[]> = {
-  expense: ["Food", "Home", "Transport", "Health", "Fun", "Shopping", "Bills", FEES, "Other"],
-  income: ["Salary", "Gifts", "Interest", "Staking rewards", "Other"],
+  expense: ["Food", "Home", "Transport", "Health", "Fun", "Shopping", "Bills", FEES, INTEREST_PAID, "Other"],
+  income: ["Salary", "Gifts", INTEREST_EARNED, "Staking rewards", "Other"],
 };
 
 /** Which side of an exchange says what it was worth: the first of these it involves. */
@@ -379,11 +382,15 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     if (!isMoneyKind(account.kind)) invalid("Pick an account");
     const amount = checkAmount(input.amount, "The amount", account.currency as Currency);
     const other = usable(owner, input.other, previous);
+    if (kind !== "moved" && (isLoan(account.kind) || isLoan(other.kind))) {
+      invalid("A loan only takes moves and payments. Record a payment on the Loans page.");
+    }
     if (kind === "spent" && other.kind !== "expense") invalid("Pick a spending category");
     if (kind === "received" && other.kind !== "income") invalid("Pick an income category");
     if (kind === "moved") {
       if (!isMoneyKind(other.kind)) invalid("Pick the account the money went to");
       if (other.id === account.id) invalid("Pick two different accounts");
+      if (isLoan(account.kind) && isLoan(other.kind)) invalid("Money can't move straight from one loan to another");
       if (other.currency !== account.currency) {
         invalid("A move stays in one currency. Use Exchanged to change money into another currency.");
       }
@@ -416,17 +423,25 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     return checked;
   }
 
-  /** Where fees are recorded. If the user has renamed or deleted the category, a new one is made. */
-  function feesAccount(owner: string): string {
+  /**
+   * A category Fafnir itself records to, such as fees or interest. If the user has renamed or deleted
+   * it, a new one is made.
+   */
+  function ownCategory(owner: string, kind: CategoryKind, name: string): string {
     const row = db
-      .prepare("SELECT id FROM accounts WHERE owner = ? AND kind = 'expense' AND name = ? COLLATE NOCASE")
-      .get(owner, FEES) as { id: string } | undefined;
+      .prepare("SELECT id FROM accounts WHERE owner = ? AND kind = ? AND name = ? COLLATE NOCASE")
+      .get(owner, kind, name) as { id: string } | undefined;
     if (row) return row.id;
     const id = randomUUID();
     const at = now();
-    db.prepare(
-      "INSERT INTO accounts (id, owner, name, kind, created_at, updated_at) VALUES (?, ?, ?, 'expense', ?, ?)",
-    ).run(id, owner, FEES, at, at);
+    db.prepare("INSERT INTO accounts (id, owner, name, kind, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)").run(
+      id,
+      owner,
+      name,
+      kind,
+      at,
+      at,
+    );
     return id;
   }
 
@@ -450,7 +465,12 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       { account: to.id, currency: to.currency, amount: to.amount, usd },
     ];
     if (fee.amount > 0) {
-      postings.push({ account: feesAccount(owner), currency: from.currency, amount: fee.amount, usd: fee.usd });
+      postings.push({
+        account: ownCategory(owner, "expense", FEES),
+        currency: from.currency,
+        amount: fee.amount,
+        usd: fee.usd,
+      });
     }
     return postings;
   }
@@ -522,7 +542,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       // What was sent is worth all of `usd`. Less of it arrives, and the rest went on the fee.
       const feeUsd = Math.round((usd * fee) / amount);
       postings[1] = { account: other.id, currency, amount: amount - fee, usd: usd - feeUsd };
-      postings.push({ account: feesAccount(owner), currency, amount: fee, usd: feeUsd });
+      postings.push({ account: ownCategory(owner, "expense", FEES), currency, amount: fee, usd: feeUsd });
     }
     return { kind, rate, paid, postings };
   }
@@ -866,6 +886,9 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         const group = checkText(input.group, "The group", LIMITS.group);
         const starting =
           input.starting === undefined ? 0 : checkAmount(input.starting, "The balance", input.currency, true);
+        if ((input.kind === "borrowed" && starting > 0) || (input.kind === "lent" && starting < 0)) {
+          invalid("A loan you took starts at what you owe, and one you gave at what you're owed");
+        }
         const at = now();
         db.prepare(
           `
@@ -922,6 +945,9 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
           if (!money || !isMoneyKind(input.kind)) invalid("That kind of account doesn't exist");
           if ((input.kind === "crypto") !== isCoin(row.currency)) {
             invalid("A crypto account holds a coin, and only a crypto account can");
+          }
+          if ((isLoan(row.kind) || isLoan(input.kind)) && input.kind !== row.kind) {
+            invalid("A loan stays a loan, and which way it goes can't change");
           }
           kind = input.kind;
         }

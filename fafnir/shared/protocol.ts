@@ -27,9 +27,14 @@ export const LIMITS = {
 
 /**
  * Places the user's money is. A card's balance is normally below zero: what is owed on it. "crypto"
- * holds a coin and nothing else, and the others hold reais or dollars.
+ * holds a coin and nothing else, and the others hold reais or dollars. A loan is an account too: what
+ * was borrowed is below zero, what was lent above it.
  */
-export const MONEY_KINDS = ["cash", "bank", "savings", "card", "crypto"] as const;
+export const LOAN_KINDS = ["borrowed", "lent"] as const;
+export type LoanKind = (typeof LOAN_KINDS)[number];
+export const isLoan = (kind: unknown): kind is LoanKind => LOAN_KINDS.includes(kind as LoanKind);
+
+export const MONEY_KINDS = ["cash", "bank", "savings", "card", "crypto", ...LOAN_KINDS] as const;
 export type MoneyKind = (typeof MONEY_KINDS)[number];
 export const CATEGORY_KINDS = ["expense", "income"] as const;
 export type CategoryKind = (typeof CATEGORY_KINDS)[number];

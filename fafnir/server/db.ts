@@ -110,6 +110,18 @@ const migrations: ((db: DatabaseSync) => void)[] = [
         );
     `);
   },
+  // v4: loans are accounts and entries like any other. All they need is somewhere for interest to go,
+  // and the income side already has a category for it.
+  (db) => {
+    db.exec(`
+      INSERT INTO accounts (id, owner, name, kind, created_at, updated_at)
+        SELECT lower(hex(randomblob(16))), owner, 'Interest paid', 'expense', created_at, created_at FROM books b
+        WHERE NOT EXISTS (
+          SELECT 1 FROM accounts a
+          WHERE a.owner = b.owner AND a.kind = 'expense' AND a.name = 'Interest paid' COLLATE NOCASE
+        );
+    `);
+  },
 ];
 
 /** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */

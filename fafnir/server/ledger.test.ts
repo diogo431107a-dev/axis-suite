@@ -31,7 +31,7 @@ const category = (name: string, owner = ME) => {
 function addAccount(
   name: string,
   currency: Currency,
-  kind: "bank" | "card" | "crypto" = currency === "USD" || currency === "BRL" ? "bank" : "crypto",
+  kind: "bank" | "card" | "crypto" | "borrowed" | "lent" = currency === "USD" || currency === "BRL" ? "bank" : "crypto",
   starting = 0,
 ): string {
   const accountId = id();
@@ -1103,6 +1103,118 @@ describe("holdings", () => {
   });
 });
 
+describe("loan accounts", () => {
+  it("start at what is owed, the right way round", () => {
+    expect(code(() => addAccount("Caixa", "BRL", "borrowed", 100))).toBe("invalid");
+    expect(code(() => addAccount("Bruno", "BRL", "lent", -100))).toBe("invalid");
+    const caixa = addAccount("Caixa", "BRL", "borrowed", -50_000);
+    const bruno = addAccount("Bruno", "USD", "lent", 20_000);
+    expect(account(caixa).balance).toBe(-50_000);
+    expect(account(bruno).balance).toBe(20_000);
+    const book = ledger.load(ME, "2026-10");
+    expect(book.owe).toBe(10_000);
+    expect(book.have).toBe(20_000);
+    expectEverythingBalances();
+  });
+
+  it("can't hold a coin, or stop being a loan", () => {
+    expect(code(() => addAccount("Coin loan", "BTC", "borrowed"))).toBe("invalid");
+    const caixa = addAccount("Caixa", "BRL", "borrowed");
+    expect(code(() => ledger.changeAccount(ME, caixa, { kind: "lent" }))).toBe("invalid");
+    expect(code(() => ledger.changeAccount(ME, caixa, { kind: "bank" }))).toBe("invalid");
+    const bank = addAccount("Itaú", "BRL");
+    expect(code(() => ledger.changeAccount(ME, bank, { kind: "borrowed" }))).toBe("invalid");
+    expect(code(() => ledger.changeAccount(ME, caixa, { name: "Caixa car loan", kind: "borrowed" }))).toBe("accepted");
+  });
+
+  it("refuse spending, income and exchanges, which aren't what happens to a loan", () => {
+    const caixa = addAccount("Caixa", "BRL", "borrowed");
+    const bruno = addAccount("Bruno", "BRL", "lent");
+    const usd = addAccount("Chase", "USD");
+    const base = { date: DAY, amount: 100 };
+    expect(
+      code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "spent", account: caixa, other: category("Fun") })),
+    ).toBe("invalid");
+    expect(
+      code(() =>
+        ledger.addEntry(ME, { ...base, id: id(), kind: "received", account: bruno, other: category("Gifts") }),
+      ),
+    ).toBe("invalid");
+    expect(
+      code(() =>
+        ledger.addEntry(ME, { ...base, id: id(), kind: "exchanged", account: caixa, other: usd, arrived: 100 }),
+      ),
+    ).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "moved", account: caixa, other: bruno }))).toBe(
+      "invalid",
+    );
+  });
+
+  it("taking one out moves money without changing what you're worth", () => {
+    const bank = addAccount("Itaú", "BRL");
+    const caixa = addAccount("Caixa", "BRL", "borrowed");
+    const bruno = addAccount("Bruno", "BRL", "lent");
+    const worth = () => {
+      const { have, owe } = ledger.load(ME, "2026-10");
+      return have - owe;
+    };
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: caixa, other: bank, amount: 1_000_000 });
+    expect(account(bank).balance).toBe(1_000_000);
+    expect(account(caixa).balance).toBe(-1_000_000);
+    expect(worth()).toBe(0);
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: bank, other: bruno, amount: 300_000 });
+    expect(account(bruno).balance).toBe(300_000);
+    expect(worth()).toBe(0);
+    expect(ledger.load(ME, "2026-10").month.moneyOut).toBe(0);
+    expectEverythingBalances();
+  });
+
+  it("a fee on taking one out is what it costs", () => {
+    const bank = addAccount("Itaú", "BRL");
+    const caixa = addAccount("Caixa", "BRL", "borrowed");
+    // R$ 10,000 borrowed, R$ 9,800 arrives, and the rate is 5.
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "moved",
+      date: DAY,
+      account: caixa,
+      other: bank,
+      amount: 1_000_000,
+      fee: 20_000,
+    });
+    expect(account(caixa).balance).toBe(-1_000_000);
+    expect(account(bank).balance).toBe(980_000);
+    const { have, owe, month } = ledger.load(ME, "2026-10");
+    expect(have - owe).toBe(-4_000);
+    expect(month.moneyOut).toBe(4_000);
+    expectEverythingBalances();
+  });
+
+  it("are checked and closed like any account", () => {
+    const caixa = addAccount("Caixa", "BRL", "borrowed", -50_000);
+    expect(code(() => ledger.changeAccount(ME, caixa, { closed: true }))).toBe("conflict");
+    ledger.checkBalance(ME, caixa, { id: id(), date: DAY, actual: 0 });
+    ledger.changeAccount(ME, caixa, { closed: true });
+    expect(account(caixa).closed).toBe(true);
+    expectEverythingBalances();
+  });
+
+  it("move with the rate on the month's line, like any balance in reais", () => {
+    rateOn = (date) => ({ currency: "BRL", value: date >= "2026-09-30" ? 4 : 5, date, source: "test" });
+    const caixa = id();
+    ledger.addAccount(ME, {
+      id: caixa,
+      name: "Caixa",
+      kind: "borrowed",
+      currency: "BRL",
+      starting: -100_000,
+      date: "2026-08-10",
+    });
+    // R$ 1,000 owed was $200 and is now $250: the debt has grown in dollars.
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({ start: -20_000, end: -25_000, added: 0, rates: -5_000 });
+  });
+});
+
 describe("the upgrade to coins", () => {
   it("adds the two categories and leaves what was there alone", () => {
     const old = new DatabaseSync(":memory:");
@@ -1142,6 +1254,7 @@ describe("the upgrade to coins", () => {
     const names = (owner: string) => ledgerNow.load(owner, "2026-10").categories.map((c) => c.name);
     expect(names("odin")).toEqual(expect.arrayContaining(["Fees", "Food", "Staking rewards"]));
     expect(names("freya").filter((n) => n.toLowerCase() === "fees")).toEqual(["FEES"]);
+    expect(names("freya")).toContain("Interest paid");
     const [entry] = ledgerNow.listEntries("odin", {}).entries;
     expect(entry).toMatchObject({
       amount: 10_000,

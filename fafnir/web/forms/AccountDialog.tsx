@@ -21,6 +21,8 @@ const KIND_HINTS: Record<MoneyKind, string> = {
   savings: "Money you are setting aside.",
   card: "What you spend on it is money you owe until you pay the bill.",
   crypto: "Bitcoin, ICP or USDC, on an exchange or in a wallet of your own.",
+  borrowed: "Money you have to pay back.",
+  lent: "Money someone has to pay you back.",
 };
 
 /** Adds an account, or changes, closes, reopens or deletes one. */

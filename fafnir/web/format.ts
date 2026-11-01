@@ -91,4 +91,6 @@ export const KIND_NAMES: Record<MoneyKind, string> = {
   savings: "Savings",
   card: "Credit card",
   crypto: "Crypto",
+  borrowed: "Money I borrowed",
+  lent: "Money I lent",
 };
