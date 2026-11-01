@@ -1,6 +1,6 @@
 # Fafnir Personal Finances
 
-What you have, what you owe and where your money goes, added up in US dollars. Fafnir (FPF for short) is double-entry bookkeeping for people who have never heard of it: you say you spent, received or moved money, and the books are kept for you. It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own money and nobody else's.
+What you have, what you owe and where your money goes, crypto included, added up in US dollars. Fafnir (FPF for short) is double-entry bookkeeping for people who have never heard of it: you say you spent, received or moved money, and the books are kept for you. It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own money and nobody else's.
 
 | Layer    | Technology                                                                        |
 | -------- | --------------------------------------------------------------------------------- |
@@ -13,17 +13,19 @@ What you have, what you owe and where your money goes, added up in US dollars. F
 ```
 shared/
   protocol.ts        API types and limits: the wire format, used by the server and the page
+  currencies.ts      every currency, its decimals, and the arithmetic that depends on them
 server/
   index.ts           routes, /healthz, removed users' books, exports, graceful shutdown
   db.ts              SQLite schema and migrations (PRAGMA user_version)
   ledger.ts          entries into postings that add up to zero; balances and monthly totals
-  rates.ts           the USD/BRL rate of each day: fetching, keeping and looking it up
+  rates.ts           the rate and prices of each day: fetching, keeping and looking them up
+  holdings.ts        what each coin cost, replayed from the entries
 web/
   App.tsx            signing in, the sidebar, and which page and dialog are open
   api.ts             fetch for the API
   format.ts          reading and showing amounts and dates
   forms/             the dialogs: an entry, an account, Check balance, and the dollars line
-  views/             the pages: Home, Activity, Accounts, Categories
+  views/             the pages: Home, Activity, Accounts, Crypto, Categories
   ui/                the dialog and the About box
 deploy/
   fafnir.service     systemd unit (sandboxed)
@@ -54,9 +56,17 @@ deploy/
 
 **Prices in another currency.** A purchase or income can be in the other currency than its account: $20 charged as R$ 115 to a card in reais. The form suggests what was charged from the day's rate, for typing over from the statement. The account moves by what it was charged, the entry's value is the US dollar side, and the price is kept with it.
 
-**Why what you're worth changed.** For each month Home gives what the user was worth at its start and its end, each at that day's rate, with what lies between: money in less money out, starting balances and balance checks, and Exchange rate changes. That last one is what's left, so the sum always holds: reais worth more or fewer dollars than before, and what exchanging cost beyond the reference rate. A month that needs a rate nobody knows shows none of it.
+**Why what you're worth changed.** For each month Home gives what the user was worth at its start and its end, each at that day's rates and prices, with what lies between: money in less money out, starting balances and balance checks, and Price and exchange rate changes. That last one is what's left, so the sum always holds: reais and coins worth more or fewer dollars than before, and what exchanging cost beyond the reference rate. A month that needs a rate nobody knows shows none of it.
 
-**Accounts.** Cash, bank account, savings or credit card, each in USD or BRL, optionally in a group (the way to keep Coinbase's or Sparrow's balances together later). A card's balance is normally below zero: what is owed. An account with nothing in it can be closed, and one with no entries deleted.
+**Crypto.** Fafnir only keeps records. It never connects to a wallet or an exchange, never trades, and never stores seed phrases, private keys, API keys or a wallet's extended public key. A coin's amounts are in its smallest unit (8 decimals for BTC and ICP, 6 for USDC), and typing one, a lone `.` or `,` is always the decimal point, with the form saying what it read. "Set up Coinbase and Sparrow" makes Coinbase BTC, ICP and USDC, and Sparrow BTC. Sparrow only holds Bitcoin. Staked ICP is simply another account, and a staking reward is a Received entry.
+
+**What a coin's worth.** Prices are the daily close from Coinbase, or from Kraken if Coinbase is down, every 15 minutes, in US dollars. USDC counts as exactly $1 unless Kraken's price is more than 1% away, and then the market's figure counts, with a notice. A trade takes its dollars from the first of USD, USDC, BRL, BTC, ICP it involves, so 20 ICP for 50 USDC is $50, and the user can always type the dollars instead.
+
+**What a coin cost.** The Crypto page keeps an average cost in US dollars per coin, across all the user's accounts, so moving a coin between them doesn't change it. It's worked out from the entries each time and never stored. A reward costs its value on the day, and money already held costs what the user says, or the day's price. Selling or spending at more than the average is what "From coins sold" adds up; a balance check going down lowers the quantity without counting as a sale. If more goes out than ever came in, the rest counts as having cost nothing, and the page says so. These figures are for the user's own view, not a tax calculation.
+
+**Fees.** Moved and Exchanged can have a fee, as part of what left. It's recorded as spending under Fees and isn't part of what a coin cost: its value is its share of the trade, so it needs no second rate. A move sends the amount and delivers it less the fee, which is how a network fee is recorded.
+
+**Accounts.** Cash, bank account, savings or credit card, each in USD or BRL, or a crypto account holding one coin (BTC, ICP or USDC). Any of them can be in a group, which is how Coinbase's balances stay together. A card's balance is normally below zero: what is owed. An account with nothing in it can be closed, and one with no entries deleted.
 
 **Check balance.** The user types what the bank shows; if it differs from what is recorded on that day, the difference is added as a balance check. It can be deleted, not changed.
 
@@ -68,9 +78,8 @@ deploy/
 
 ## Not yet
 
-Phases 1 and 2 of the plan are done. Still to come, in order:
+Phases 1, 2 and 3 of the plan are done. Still to come, in order:
 
-3. **Crypto:** BTC, ICP and USDC, on Coinbase and in a self-custody Sparrow wallet (BTC only). Values given in BTC or USDC become dollars; average cost in dollars; transfers with network fees that keep their cost; staking rewards. Prices from Coinbase's public API, with Kraken as a fallback. USDC counts as exactly $1 unless the market is more than 1% away. Fafnir only keeps records: it never stores seed phrases, private keys, Coinbase API keys or a wallet's extended public key.
 4. **Loans:** money owed and owed to you, payments split into principal and interest.
 5. **Assets and savings:** a house or car with a value updated by hand; savings goals.
 6. **Understanding your money:** net worth over time, budgets, recurring entries.

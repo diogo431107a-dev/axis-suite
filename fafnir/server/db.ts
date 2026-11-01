@@ -92,6 +92,24 @@ const migrations: ((db: DatabaseSync) => void)[] = [
         SELECT lower(hex(randomblob(16))), owner, 'Currency exchange', 'exchange', created_at, created_at FROM books;
     `);
   },
+  // v3: coins. A transaction says which currency its rate is the rate of (until now, always reais), and
+  // everyone gets the two categories crypto needs, unless they already have one of that name.
+  (db) => {
+    db.exec(`
+      ALTER TABLE transactions ADD COLUMN rate_currency TEXT;
+      INSERT INTO accounts (id, owner, name, kind, created_at, updated_at)
+        SELECT lower(hex(randomblob(16))), owner, 'Fees', 'expense', created_at, created_at FROM books b
+        WHERE NOT EXISTS (
+          SELECT 1 FROM accounts a WHERE a.owner = b.owner AND a.kind = 'expense' AND a.name = 'Fees' COLLATE NOCASE
+        );
+      INSERT INTO accounts (id, owner, name, kind, created_at, updated_at)
+        SELECT lower(hex(randomblob(16))), owner, 'Staking rewards', 'income', created_at, created_at FROM books b
+        WHERE NOT EXISTS (
+          SELECT 1 FROM accounts a
+          WHERE a.owner = b.owner AND a.kind = 'income' AND a.name = 'Staking rewards' COLLATE NOCASE
+        );
+    `);
+  },
 ];
 
 /** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */
@@ -102,9 +120,14 @@ export function openDatabase(file: string): DatabaseSync {
   // Overwrite deleted entries with zeros instead of leaving them in free pages. The journal mode
   // stays the default: one file, nothing beside it to forget in a backup.
   db.exec("PRAGMA secure_delete = ON");
+  migrate(db);
+  return db;
+}
 
+/** Brings a database up to schema version `upTo`, by default the latest. */
+export function migrate(db: DatabaseSync, upTo = migrations.length): void {
   const { user_version: current } = db.prepare("PRAGMA user_version").get() as { user_version: number };
-  for (let v = current; v < migrations.length; v++) {
+  for (let v = current; v < upTo; v++) {
     db.exec("BEGIN");
     try {
       migrations[v]!(db);
@@ -115,5 +138,4 @@ export function openDatabase(file: string): DatabaseSync {
       throw err;
     }
   }
-  return db;
 }

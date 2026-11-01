@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
+import { COINS, CURRENCY_INFO, FIAT, isCoin } from "../../shared/currencies.ts";
 import {
-  CURRENCIES,
   MONEY_KINDS,
   type AccountChange,
   type Book,
@@ -12,7 +12,7 @@ import {
 import { ApiFailure, api, describeError } from "../api.ts";
 import { KIND_NAMES, localDate, parseAmount } from "../format.ts";
 import { Dialog } from "../ui/Dialog.tsx";
-import { Dollars } from "./Dollars.tsx";
+import { Dollars, ReadAs } from "./Dollars.tsx";
 import { typedUsd, useTypedDollars } from "./typed.ts";
 
 const KIND_HINTS: Record<MoneyKind, string> = {
@@ -20,24 +20,28 @@ const KIND_HINTS: Record<MoneyKind, string> = {
   bank: "An account you pay and get paid from.",
   savings: "Money you are setting aside.",
   card: "What you spend on it is money you owe until you pay the bill.",
+  crypto: "Bitcoin, ICP or USDC, on an exchange or in a wallet of your own.",
 };
 
 /** Adds an account, or changes, closes, reopens or deletes one. */
 export function AccountDialog({
   book,
   account,
+  startAs,
   onClose,
   onSaved,
 }: {
   book: Book;
   account?: MoneyAccount;
+  /** What a new account starts out as. */
+  startAs?: MoneyKind;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const [id] = useState(() => crypto.randomUUID());
   const [name, setName] = useState(account?.name ?? "");
-  const [kind, setKind] = useState<MoneyKind>(account?.kind ?? "bank");
-  const [currency, setCurrency] = useState<Currency>(account?.currency ?? "BRL");
+  const [kind, setKind] = useState<MoneyKind>(account?.kind ?? startAs ?? "bank");
+  const [currency, setCurrency] = useState<Currency>(account?.currency ?? (startAs === "crypto" ? "BTC" : "BRL"));
   const [group, setGroup] = useState(account?.group ?? "");
   const [startingText, setStartingText] = useState("");
   const [date, setDate] = useState(localDate());
@@ -46,9 +50,17 @@ export function AccountDialog({
   const [saving, setSaving] = useState(false);
 
   const groups = [...new Set(book.accounts.map((a) => a.group).filter(Boolean))];
-  const parsed = startingText.trim() === "" ? 0 : parseAmount(startingText);
+  const parsed = startingText.trim() === "" ? 0 : parseAmount(startingText, currency);
   // On a card the question is what is owed, so the number typed is the debt.
   const starting = parsed !== null && kind === "card" ? -parsed : parsed;
+  const holdsCoin = kind === "crypto";
+  // A coin's account can't turn into a bank account, or the other way round: what it holds would stop fitting.
+  const kinds = account ? MONEY_KINDS.filter((k) => (k === "crypto") === isCoin(account.currency)) : MONEY_KINDS;
+
+  const changeKind = (next: MoneyKind) => {
+    setKind(next);
+    if ((next === "crypto") !== isCoin(currency)) setCurrency(next === "crypto" ? "BTC" : "BRL");
+  };
 
   async function run(work: () => Promise<unknown>) {
     setError("");
@@ -93,14 +105,14 @@ export function AccountDialog({
             value={name}
             maxLength={100}
             onChange={(e) => setName(e.target.value)}
-            placeholder="Itaú, Wallet, Nubank…"
+            placeholder={holdsCoin ? "Coinbase BTC, Staked ICP…" : "Itaú, Wallet, Nubank…"}
           />
         </label>
 
         <label className="field">
           <span>What is it?</span>
-          <select value={kind} onChange={(e) => setKind(e.target.value as MoneyKind)}>
-            {MONEY_KINDS.map((k) => (
+          <select value={kind} onChange={(e) => changeKind(e.target.value as MoneyKind)}>
+            {kinds.map((k) => (
               <option key={k} value={k}>
                 {KIND_NAMES[k]}
               </option>
@@ -113,9 +125,9 @@ export function AccountDialog({
           <label className="field">
             <span>Currency</span>
             <select value={currency} onChange={(e) => setCurrency(e.target.value as Currency)}>
-              {CURRENCIES.map((c) => (
+              {(holdsCoin ? COINS : FIAT).map((c) => (
                 <option key={c} value={c}>
-                  {c === "BRL" ? "Brazilian reais (BRL)" : "US dollars (USD)"}
+                  {CURRENCY_INFO[c].name} ({c})
                 </option>
               ))}
             </select>
@@ -142,7 +154,13 @@ export function AccountDialog({
           <>
             <div className="two">
               <label className="field">
-                <span>{kind === "card" ? "How much do you owe on it?" : "How much is in it?"}</span>
+                <span>
+                  {kind === "card"
+                    ? "How much do you owe on it?"
+                    : holdsCoin
+                      ? "How much do you hold?"
+                      : "How much is in it?"}
+                </span>
                 <input
                   inputMode="decimal"
                   autoComplete="off"
@@ -150,13 +168,16 @@ export function AccountDialog({
                   onChange={(e) => setStartingText(e.target.value)}
                   placeholder="0.00"
                 />
+                <ReadAs text={startingText} currency={currency} />
               </label>
               <label className="field">
                 <span>On what day?</span>
                 <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
               </label>
             </div>
-            {starting !== 0 && <Dollars currency={currency} cents={starting} date={date} typed={typed} />}
+            {starting !== 0 && (
+              <Dollars currency={currency} amount={starting} date={date} typed={typed} asCost={holdsCoin} />
+            )}
           </>
         )}
 

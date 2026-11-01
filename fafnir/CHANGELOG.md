@@ -4,6 +4,16 @@ What changed in Fafnir, newest first. Each version is tagged in git as `fafnir-v
 
 ## Unreleased
 
+- Crypto: keep track of Bitcoin, ICP and USDC. Set up Coinbase and Sparrow with one button, or add your own crypto accounts. What I'm worth now includes your coins at the latest price.
+- The new Crypto page shows how much of each coin you have, where it sits, what it cost you on average and what it's worth, all in US dollars. Moving a coin between your accounts doesn't change what it cost.
+- Exchanged works between any two currencies, reading as Bought BTC or Sold BTC. A trade takes its US dollar value from the USDC, reais or BTC side, and you can always type it yourself.
+- Moved and Exchanged can have a fee: a network fee means less arrives. Fees show in your spending, under a new Fees category, and aren't part of what a coin cost.
+- A staking reward is a Received entry in the new Staking rewards category, valued at the day's price.
+- Amounts in a coin keep all their decimals. Typing `0,005` or `1.234` means what it looks like, and the form tells you what it read.
+- The line on Home is now called Price and exchange rate changes, and the spreadsheet download has two new columns for fees.
+- Fafnir only keeps records: it never connects to a wallet or an exchange, and never asks for a seed phrase, private key or API key.
+- **By hand:** back up `fafnir.db` before installing, since this version changes the database's layout. If the server limits outgoing connections, also allow HTTPS to `api.exchange.coinbase.com` and `api.kraken.com`.
+
 ## 0.0.4 — 2026-10-30
 
 - Exchanged: change money between an account in reais and one in dollars. Fafnir suggests what arrives from the day's rate, you type what actually did, and it shows the rate you really got.

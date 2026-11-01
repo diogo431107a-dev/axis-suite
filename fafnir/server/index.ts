@@ -1,6 +1,7 @@
 import express, { type ErrorRequestHandler, type Request } from "express";
 import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
-import { USER_HEADER, type ApiError, type Entry } from "../shared/protocol.ts";
+import { amountDigits } from "../shared/currencies.ts";
+import { USER_HEADER, type ApiError, type Currency, type Entry, type Foreign } from "../shared/protocol.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { StoreError } from "./errors.ts";
 import { createLedger, isMonth } from "./ledger.ts";
@@ -72,12 +73,17 @@ app.get("/api/book", async (req, res) => {
   res.json(ledger.load(owner(req), month));
 });
 
-// The rate a form is about to use.
-app.get("/api/rate", async (req, res) => {
+// The rates and prices a form is about to use.
+app.get("/api/rates", async (req, res) => {
   const date = param(req.query.date) ?? today();
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return void res.status(400).json({ error: "That date isn't valid" });
   await rates.ensure(date);
-  res.json({ rate: rates.lookup(date) });
+  res.json(rates.lookupAll(date));
+});
+
+app.get("/api/holdings", async (req, res) => {
+  await rates.ensure(today());
+  res.json(ledger.holdings(owner(req)));
 });
 
 app.get("/api/entries", (req, res) => {
@@ -130,7 +136,6 @@ const csvText = (text: string) => {
   const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text;
   return `"${safe.replace(/"/g, '""')}"`;
 };
-const decimal = (cents: number) => (cents / 100).toFixed(2);
 
 app.get("/api/export.json", (req, res) => {
   res.set("Content-Disposition", `attachment; filename="fafnir-${today()}.json"`);
@@ -140,6 +145,9 @@ app.get("/api/export.csv", (req, res) => {
   const me = owner(req);
   const { accounts, categories } = ledger.load(me, today().slice(0, 7));
   const names = new Map([...accounts, ...categories].map((a) => [a.id, a.name]));
+  // Exact and in full, with a plain point, whatever the currency. A dollar value comes out in dollars.
+  const decimal = (amount: number, currency: Currency) => `${amount < 0 ? "-" : ""}${amountDigits(amount, currency)}`;
+  const foreign = (f: Foreign | null) => (f ? [f.currency, decimal(f.amount, f.currency)] : ["", ""]);
   const row = (e: Entry) =>
     [
       e.date,
@@ -147,14 +155,15 @@ app.get("/api/export.csv", (req, res) => {
       csvText(names.get(e.account) ?? ""),
       csvText(e.other ? (names.get(e.other) ?? "") : ""),
       e.currency,
-      decimal(e.amount),
-      decimal(e.usd),
+      decimal(e.amount, e.currency),
+      decimal(e.usd, "USD"),
       e.rate ? e.rate.value : "",
-      (e.paid ?? e.arrived)?.currency ?? "",
-      e.paid || e.arrived ? decimal((e.paid ?? e.arrived)!.amount) : "",
+      ...foreign(e.paid ?? e.arrived),
+      ...foreign(e.fee),
       csvText(e.memo),
     ].join(",");
-  const header = "date,kind,account,category or destination,currency,amount,usd,rate,other currency,other amount,note";
+  const header =
+    "date,kind,account,category or destination,currency,amount,usd,rate,other currency,other amount,fee currency,fee,note";
   res.type("text/csv");
   res.set("Content-Disposition", `attachment; filename="fafnir-${today()}.csv"`);
   res.send([header, ...ledger.allEntries(me).map(row)].join("\r\n") + "\r\n");

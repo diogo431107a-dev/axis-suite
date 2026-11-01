@@ -1,7 +1,8 @@
-// Money and dates, as the page shows and reads them. Amounts are whole cents everywhere.
+// Money and dates, as the page shows and reads them. Amounts are whole numbers of a currency's
+// smallest unit everywhere.
+import { CURRENCY_INFO, amountDigits, isCoin, unitOf } from "../shared/currencies.ts";
 import type { Currency, IsoDate, MoneyKind } from "../shared/protocol.ts";
 
-const SYMBOL: Record<Currency, string> = { USD: "$", BRL: "R$ " };
 const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 const LONG_MONTHS = [
   "January",
@@ -18,34 +19,51 @@ const LONG_MONTHS = [
   "December",
 ];
 
-export function plainAmount(cents: number): string {
-  return (Math.abs(cents) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+export function plainAmount(amount: number, currency: Currency = "USD"): string {
+  return amountDigits(amount, currency, true);
 }
 
-export function money(cents: number, currency: Currency = "USD"): string {
-  return `${cents < 0 ? "−" : ""}${SYMBOL[currency]}${plainAmount(cents)}`;
+/** What goes in front of an amount typed in a field. */
+export const symbolOf = (currency: Currency | undefined): string =>
+  currency === undefined || currency === "USD" ? "$" : currency === "BRL" ? "R$" : currency;
+
+export function money(amount: number, currency: Currency = "USD"): string {
+  const sign = amount < 0 ? "−" : "";
+  if (isCoin(currency)) return `${sign}${plainAmount(amount, currency)} ${currency}`;
+  const symbol = currency === "BRL" ? "R$ " : "$";
+  return `${sign}${symbol}${plainAmount(amount, currency)}`;
 }
 
 /**
- * What the user typed, in cents; null if it can't be read. Takes both 1,234.56 and 1.234,56, since
- * bank apps in Brazil show the second: one or two digits after the last separator are the cents.
+ * What the user typed, in the currency's smallest unit; null if it can't be read. Takes both 1,234.56
+ * and 1.234,56, since bank apps in Brazil show the second.
+ *
+ * Whether a lone separator is the decimal point depends on the currency. In reais or dollars it is
+ * if one or two digits follow it, so 1.234 is a thousand and more. In a coin it always is, so 1.234
+ * BTC stays a little over one: there, a slip of a thousand times would cost real money.
  */
-export function parseAmount(text: string): number | null {
-  const cleaned = text.replace(/\s|R\$|\$/gi, "");
+export function parseAmount(text: string, currency: Currency = "USD"): number | null {
+  const cleaned = text.replace(/\s|R\$|\$|BTC|ICP|USDC/gi, "");
   const negative = /^[-−]/.test(cleaned);
   const digits = cleaned.replace(/^[-−]/, "");
   if (!/^\d[\d.,]*$/.test(digits)) return null;
 
+  const { decimals } = CURRENCY_INFO[currency];
+  const separators = digits.replace(/\d/g, "");
   const lastSep = Math.max(digits.lastIndexOf("."), digits.lastIndexOf(","));
   const after = lastSep === -1 ? "" : digits.slice(lastSep + 1);
-  const hasCents = lastSep !== -1 && after.length <= 2;
-  if (hasCents && after.length === 0) return null;
-  const whole = hasCents ? digits.slice(0, lastSep) : digits;
+  const mixed = separators.includes(".") && separators.includes(",");
+  // Several of one kind (1.234.567) can only be thousands, whatever the currency.
+  const hasDecimals =
+    lastSep !== -1 && (mixed || (isCoin(currency) ? separators.length === 1 : after.length <= decimals));
+  if (hasDecimals && (after.length === 0 || after.length > decimals)) return null;
+  const whole = hasDecimals ? digits.slice(0, lastSep) : digits;
   if (!/^\d+$/.test(whole) && !/^\d{1,3}([.,]\d{3})+$/.test(whole)) return null;
 
-  const cents = Number(whole.replace(/[.,]/g, "")) * 100 + (hasCents ? Number(after.padEnd(2, "0")) : 0);
-  if (!Number.isSafeInteger(cents)) return null;
-  return negative ? -cents : cents;
+  const fraction = hasDecimals ? Number(after.padEnd(decimals, "0")) : 0;
+  const amount = Number(whole.replace(/[.,]/g, "")) * unitOf(currency) + fraction;
+  if (!Number.isSafeInteger(amount)) return null;
+  return negative ? -amount : amount;
 }
 
 /** The user's calendar day, not the UTC one. */
@@ -72,4 +90,5 @@ export const KIND_NAMES: Record<MoneyKind, string> = {
   bank: "Bank account",
   savings: "Savings",
   card: "Credit card",
+  crypto: "Crypto",
 };

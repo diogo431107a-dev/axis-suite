@@ -464,6 +464,69 @@ dd {
   margin-top: 14px;
 }
 
+/* Crypto */
+.heading-icon {
+  width: 24px;
+  height: 24px;
+  vertical-align: -3px;
+}
+.welcome-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.neg {
+  color: var(--danger);
+}
+.coins {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.coin {
+  padding: 14px;
+  background: var(--bg-2);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.coin-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+.coin-top .amount,
+.coin-value {
+  overflow-wrap: anywhere;
+}
+.coin-value {
+  font-size: 18px;
+  font-weight: 600;
+}
+.coin-top .row-end {
+  white-space: normal;
+  text-align: right;
+}
+.coin-figures {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+}
+.coin-figures dd {
+  font-size: 15px;
+}
+.coin-places {
+  margin-top: 10px;
+  border-top: 1px solid var(--line);
+}
+.coin-places .row {
+  padding: 7px 6px;
+}
+.coin-places .amount {
+  font-size: 14px;
+  white-space: nowrap;
+}
+
 /* Categories */
 .category-columns {
   display: grid;

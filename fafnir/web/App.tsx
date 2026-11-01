@@ -1,5 +1,16 @@
 import { useCallback, useEffect, useState } from "react";
-import { CircleUser, Landmark, LayoutDashboard, ListTree, Menu, Plus, Receipt, X, type LucideIcon } from "lucide-react";
+import {
+  Bitcoin,
+  CircleUser,
+  Landmark,
+  LayoutDashboard,
+  ListTree,
+  Menu,
+  Plus,
+  Receipt,
+  X,
+  type LucideIcon,
+} from "lucide-react";
 import {
   SignedOutError,
   fetchMe,
@@ -8,7 +19,7 @@ import {
   watchForSignIn,
   type Me,
 } from "@axis-suite/heimdall-client/browser";
-import type { Book, Entry, MoneyAccount } from "../shared/protocol.ts";
+import type { Book, Entry, MoneyAccount, MoneyKind } from "../shared/protocol.ts";
 import { api, describeError, setPageUser, setSignedOutHandler } from "./api.ts";
 import { localDate } from "./format.ts";
 import { AccountDialog } from "./forms/AccountDialog.tsx";
@@ -18,14 +29,16 @@ import { AboutButton } from "./ui/About.tsx";
 import { Accounts } from "./views/Accounts.tsx";
 import { Activity } from "./views/Activity.tsx";
 import { Categories } from "./views/Categories.tsx";
+import { Crypto } from "./views/Crypto.tsx";
 import { Home } from "./views/Home.tsx";
 
-type View = "home" | "activity" | "accounts" | "categories";
+type View = "home" | "activity" | "accounts" | "crypto" | "categories";
 
 const NAV: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "home", label: "Home", icon: LayoutDashboard },
   { view: "activity", label: "Activity", icon: Receipt },
   { view: "accounts", label: "Accounts", icon: Landmark },
+  { view: "crypto", label: "Crypto", icon: Bitcoin },
   { view: "categories", label: "Categories", icon: ListTree },
 ];
 
@@ -36,7 +49,7 @@ const viewFromHash = (): View => {
 
 type Open =
   | { what: "entry"; entry?: Entry }
-  | { what: "account"; account?: MoneyAccount }
+  | { what: "account"; account?: MoneyAccount; startAs?: MoneyKind }
   | { what: "check"; account: MoneyAccount }
   | null;
 
@@ -253,6 +266,18 @@ function BookPage({ me }: { me: Me }) {
               }}
             />
           )}
+          {view === "crypto" && (
+            <Crypto
+              book={book}
+              version={version}
+              onChanged={saved}
+              onAddAccount={() => setOpen({ what: "account", startAs: "crypto" })}
+              onOpenAccount={(id) => {
+                setActivityAccount(id);
+                go("activity");
+              }}
+            />
+          )}
           {view === "categories" && <Categories book={book} onChanged={saved} />}
         </main>
       </div>
@@ -269,6 +294,7 @@ function BookPage({ me }: { me: Me }) {
         <AccountDialog
           book={book}
           {...(open.account ? { account: open.account } : {})}
+          {...(open.startAs ? { startAs: open.startAs } : {})}
           onClose={() => setOpen(null)}
           onSaved={saved}
         />
