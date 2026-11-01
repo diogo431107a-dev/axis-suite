@@ -84,6 +84,14 @@ export interface Rate {
 export const ENTRY_KINDS = ["spent", "received", "moved", "exchanged"] as const;
 export type EntryKind = (typeof ENTRY_KINDS)[number];
 
+/**
+ * What happens to a loan. "repaid" is you paying a debt, "collected" is someone paying you, and
+ * "interest" makes a loan's balance grow with no money moving.
+ */
+export const LOAN_ENTRY_KINDS = ["repaid", "collected", "interest"] as const;
+export type LoanEntryKind = (typeof LOAN_ENTRY_KINDS)[number];
+export const isLoanEntry = (kind: unknown): kind is LoanEntryKind => LOAN_ENTRY_KINDS.includes(kind as LoanEntryKind);
+
 /** An amount in a currency other than the account's. */
 export interface Foreign {
   currency: Currency;
@@ -91,7 +99,7 @@ export interface Foreign {
   amount: number;
 }
 
-/** A fee taken out of a move or an exchange, recorded as spending. */
+/** A fee taken out of a move or an exchange, or the interest in a loan payment. */
 export interface Fee extends Foreign {
   /** What it was worth in US cents. */
   usd: number;
@@ -100,12 +108,18 @@ export interface Fee extends Foreign {
 export interface Entry {
   id: string;
   /** "starting" and "adjustment" are made by adding an account and by Check balance. */
-  kind: EntryKind | "starting" | "adjustment";
+  kind: EntryKind | LoanEntryKind | "starting" | "adjustment";
   date: IsoDate;
   memo: string;
-  /** The account the money left (spent, moved) or reached (received); the one a balance is for. */
+  /**
+   * The account the money left (spent, moved) or reached (received); the one a balance is for. On
+   * "repaid" and "collected" it is the account that paid or got paid, and on "interest" the loan.
+   */
   account: string;
-  /** The category, or where a move or exchange went. Null on "starting" and "adjustment". */
+  /**
+   * The category, or where a move or exchange went. On "repaid" and "collected" it is the loan. Null on
+   * "starting" and "adjustment".
+   */
   other: string | null;
   currency: Currency;
   /**
@@ -123,16 +137,19 @@ export interface Entry {
   arrived: Foreign | null;
   /** On moved and exchanged: the part of `amount` that went on a fee. */
   fee: Fee | null;
+  /** On repaid and collected: the part of `amount` that was interest. */
+  interest: Fee | null;
 }
 
 export interface NewEntry {
   /** Made by the browser, so sending the same entry twice saves it once. */
   id: string;
-  kind: EntryKind;
+  kind: EntryKind | LoanEntryKind;
   date: IsoDate;
   memo?: string;
   account: string;
-  other: string;
+  /** Not on "interest", where Fafnir picks the category. */
+  other?: string;
   amount: number;
   /** The dollars, typed by the user instead of worked out from the rate. */
   usd?: number;
@@ -142,12 +159,13 @@ export interface NewEntry {
   arrived?: number;
   /** On moved and exchanged: how much of `amount` went on a fee, in the same currency. */
   fee?: number;
+  /** On repaid and collected: how much of `amount` was interest, in the same currency. */
+  interest?: number;
 }
 
 /** Changing an entry. "starting" takes only a date, an amount (which can be below zero) and a memo. */
-export interface EntryChange extends Omit<NewEntry, "kind" | "other" | "id"> {
-  kind: EntryKind | "starting";
-  other?: string;
+export interface EntryChange extends Omit<NewEntry, "kind" | "id"> {
+  kind: EntryKind | LoanEntryKind | "starting";
 }
 
 export interface NewAccount {
@@ -256,6 +274,37 @@ export interface Holding {
 
 export interface Holdings {
   holdings: Holding[];
+}
+
+/** One loan, read from its entries. Amounts are in its own currency, in the smallest unit. */
+export interface LoanSummary {
+  id: string;
+  name: string;
+  kind: LoanKind;
+  currency: Currency;
+  closed: boolean;
+  /** How many entries use it. Only a loan with none can be deleted. */
+  entries: number;
+  /** What's still owed, never below zero. */
+  left: number;
+  /** What has been paid beyond the whole loan. */
+  overpaid: number;
+  /** What `left` is worth in US cents at the latest rate; null while none is known. */
+  usdLeft: number | null;
+  /** What was borrowed or lent, including what was already owed when it was added. */
+  taken: number;
+  /** What has come off it, without the interest. */
+  paidOff: number;
+  /** Interest so far: in payments, and added with no payment. */
+  interest: number;
+  /** The last day anything was paid. Null if nothing has been. */
+  lastPayment: IsoDate | null;
+  /** The total of the last payment, to suggest for the next one. Null if there has been none. */
+  lastTotal: number | null;
+}
+
+export interface Loans {
+  loans: LoanSummary[];
 }
 
 export interface EntryPage {

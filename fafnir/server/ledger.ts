@@ -10,6 +10,7 @@ import {
   LIMITS,
   MONEY_KINDS,
   isLoan,
+  isLoanEntry,
   type Account,
   type AccountChange,
   type BalanceCheck,
@@ -23,6 +24,10 @@ import {
   type Holdings,
   type Foreign,
   type IsoDate,
+  type LoanEntryKind,
+  type LoanKind,
+  type LoanSummary,
+  type Loans,
   type MoneyAccount,
   type MoneyKind,
   type MonthSummary,
@@ -149,6 +154,8 @@ export interface Ledger {
   load(owner: string, month: string): Book;
   /** Each coin the user has or had: how much, where, what it cost and what it's worth. */
   holdings(owner: string): Holdings;
+  /** Each loan: what's left, what has come off it and what the interest has been. */
+  loans(owner: string): Loans;
   listEntries(
     owner: string,
     filter: { account?: string | undefined; q?: string | undefined; offset?: number | undefined },
@@ -201,14 +208,15 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     return row.id;
   }
 
-  // An exchange has four postings, and the money reaches the other account in the last one. A fee
-  // comes after the rest: the third posting of a move, the fifth of an exchange.
+  // An exchange has four postings, and the money reaches the other account in the last one. A fee or
+  // interest comes after the rest: the third posting of a move or a payment, the fifth of an exchange.
   const ENTRY_JOINS = `
     FROM transactions t
     JOIN postings p0 ON p0.tx_id = t.id AND p0.seq = 0
     JOIN postings p1 ON p1.tx_id = t.id AND p1.seq = 1
     LEFT JOIN postings p3 ON p3.tx_id = t.id AND p3.seq = 3
-    LEFT JOIN postings pf ON pf.tx_id = t.id AND pf.seq = CASE t.kind WHEN 'moved' THEN 2 WHEN 'exchanged' THEN 4 END
+    LEFT JOIN postings pf ON pf.tx_id = t.id AND pf.seq = CASE t.kind
+      WHEN 'moved' THEN 2 WHEN 'repaid' THEN 2 WHEN 'collected' THEN 2 WHEN 'exchanged' THEN 4 END
     JOIN accounts a1 ON a1.id = COALESCE(p3.account_id, p1.account_id)
   `;
   const ENTRY_SELECT = `
@@ -223,9 +231,19 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
 
   function toEntry(row: TxRow): Entry {
     const system = row.kind === "starting" || row.kind === "adjustment";
-    // The first posting is the account's: money leaving it is below zero, but a spent, moved or
-    // exchanged entry reads as a positive amount.
-    const flip = row.kind === "spent" || row.kind === "moved" || row.kind === "exchanged";
+    // The first posting is the account's: money leaving it is below zero, but a spent, moved, exchanged
+    // or repaid entry reads as a positive amount, and so does interest, whichever way it goes.
+    const flip =
+      row.kind === "spent" ||
+      row.kind === "moved" ||
+      row.kind === "exchanged" ||
+      row.kind === "repaid" ||
+      (row.kind === "interest" && row.amount < 0);
+    const third =
+      row.fee_currency === null
+        ? null
+        : { currency: row.fee_currency, amount: Math.abs(row.fee_amount!), usd: Math.abs(row.fee_usd!) };
+    const isPayment = row.kind === "repaid" || row.kind === "collected";
     return {
       id: row.id,
       kind: row.kind,
@@ -247,8 +265,8 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
             },
       paid: row.paid_currency === null ? null : { currency: row.paid_currency, amount: row.paid_amount! },
       arrived: row.arrived_currency === null ? null : { currency: row.arrived_currency, amount: row.arrived_amount! },
-      fee:
-        row.fee_currency === null ? null : { currency: row.fee_currency, amount: row.fee_amount!, usd: row.fee_usd! },
+      fee: isPayment ? null : third,
+      interest: isPayment ? third : null,
     };
   }
 
@@ -475,8 +493,79 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     return postings;
   }
 
-  /** What a spent, received, moved or exchanged entry is written as. `before` is the entry it replaces. */
+  /** What a payment on a loan, or interest added to one, is written as. `before` is the entry it replaces. */
+  function loanTx(owner: string, input: NewEntry | EntryChange, date: IsoDate, before?: Entry) {
+    const kind = input.kind as LoanEntryKind;
+    const previous = before ? [before.account, before.other] : [];
+    const account = usable(owner, input.account, previous);
+    if (!isMoneyKind(account.kind)) invalid("Pick an account");
+    const currency = account.currency as Currency;
+    const amount = checkAmount(input.amount, "The amount", currency);
+    const unchanged =
+      before !== undefined &&
+      before.kind === kind &&
+      before.date === date &&
+      before.amount === amount &&
+      before.currency === currency;
+    const keptOr = (same: boolean) =>
+      same && input.usd === undefined
+        ? { usd: before!.usd, rate: before!.rate }
+        : dollars(currency, amount, date, input.usd);
+
+    if (kind === "interest") {
+      if (!isLoan(account.kind)) invalid("Pick a loan");
+      const { usd, rate } = keptOr(unchanged);
+      // Interest makes a debt larger and costs you, or makes what you're owed larger and earns you.
+      const sign = account.kind === "borrowed" ? -1 : 1;
+      const category =
+        account.kind === "borrowed"
+          ? ownCategory(owner, "expense", INTEREST_PAID)
+          : ownCategory(owner, "income", INTEREST_EARNED);
+      const postings: Posting[] = [
+        { account: account.id, currency, amount: sign * amount, usd: sign * usd },
+        { account: category, currency, amount: -sign * amount, usd: -sign * usd },
+      ];
+      return { kind, rate, paid: null, postings };
+    }
+
+    if (isLoan(account.kind)) invalid("Pick the account the payment went through");
+    const loan = usable(owner, input.other, previous);
+    const expected: LoanKind = kind === "repaid" ? "borrowed" : "lent";
+    if (loan.kind !== expected) {
+      invalid(kind === "repaid" ? "Pick a loan you took" : "Pick a loan you gave");
+    }
+    if (loan.currency !== currency) {
+      invalid("A loan is paid in its own currency. Use Exchanged first to change the money.");
+    }
+    const interest =
+      input.interest === undefined || input.interest === 0 ? 0 : checkAmount(input.interest, "The interest", currency);
+    if (interest > amount) invalid("The interest can't be more than the whole payment");
+
+    const { usd, rate } = keptOr(unchanged && (before?.interest?.amount ?? 0) === interest);
+    // Interest is worth its share of the payment, like a fee.
+    const interestUsd = Math.round((usd * interest) / amount);
+    const sign = kind === "repaid" ? -1 : 1;
+    const postings: Posting[] = [
+      { account: account.id, currency, amount: sign * amount, usd: sign * usd },
+      { account: loan.id, currency, amount: -sign * (amount - interest), usd: -sign * (usd - interestUsd) },
+    ];
+    if (interest > 0) {
+      postings.push({
+        account:
+          kind === "repaid"
+            ? ownCategory(owner, "expense", INTEREST_PAID)
+            : ownCategory(owner, "income", INTEREST_EARNED),
+        currency,
+        amount: -sign * interest,
+        usd: -sign * interestUsd,
+      });
+    }
+    return { kind, rate, paid: null, postings };
+  }
+
+  /** What an entry is written as. `before` is the entry it replaces. */
   function everydayTx(owner: string, input: NewEntry | EntryChange, date: IsoDate, before?: Entry) {
+    if (isLoanEntry(input.kind)) return loanTx(owner, input, date, before);
     const { kind, account, other, amount } = everydayPostings(
       owner,
       input,
@@ -781,6 +870,96 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         };
       });
       return { holdings };
+    },
+
+    loans(owner) {
+      ensureBook(owner);
+      const rows = db
+        .prepare(
+          `
+          SELECT a.id, a.name, a.kind, a.currency, a.closed, COUNT(p.tx_id) AS entries,
+                 COALESCE(SUM(p.amount), 0) AS balance
+          FROM accounts a LEFT JOIN postings p ON p.account_id = a.id
+          WHERE a.owner = ? AND a.kind IN ('borrowed', 'lent')
+          GROUP BY a.id
+          ORDER BY a.name COLLATE NOCASE
+        `,
+        )
+        .all(owner) as unknown as {
+        id: string;
+        name: string;
+        kind: LoanKind;
+        currency: Currency;
+        closed: number;
+        entries: number;
+        balance: number;
+      }[];
+
+      const date = today();
+      const loans = new Map<string, LoanSummary>();
+      for (const row of rows) {
+        // What is owed, seen from the loan's side: above zero until it has been paid beyond that.
+        const owed = row.kind === "borrowed" ? -row.balance : row.balance;
+        loans.set(row.id, {
+          id: row.id,
+          name: row.name,
+          kind: row.kind,
+          currency: row.currency,
+          closed: row.closed === 1,
+          entries: row.entries,
+          left: Math.max(0, owed),
+          overpaid: Math.max(0, -owed),
+          usdLeft: valueOn(Math.max(0, owed), row.currency, date),
+          taken: 0,
+          paidOff: 0,
+          interest: 0,
+          lastPayment: null,
+          lastTotal: null,
+        });
+      }
+      if (loans.size === 0) return { loans: [] };
+
+      // Oldest first, so the last payment seen is the last one made.
+      for (const entry of this.allEntries(owner)) {
+        const from = loans.get(entry.account);
+        const to = entry.other ? loans.get(entry.other) : undefined;
+        if (!from && !to) continue;
+        switch (entry.kind) {
+          case "starting":
+            from!.taken += Math.abs(entry.amount);
+            break;
+          case "interest":
+            from!.interest += entry.amount;
+            break;
+          case "repaid":
+          case "collected": {
+            const interest = entry.interest?.amount ?? 0;
+            to!.paidOff += entry.amount - interest;
+            to!.interest += interest;
+            to!.lastPayment = entry.date;
+            to!.lastTotal = entry.amount;
+            break;
+          }
+          case "moved": {
+            // Into a debt or out of what you're owed is paying it off; the other way is more of it.
+            const arrives = entry.amount - (entry.fee?.amount ?? 0);
+            if (to?.kind === "borrowed") {
+              to.paidOff += arrives;
+              to.lastPayment = entry.date;
+            }
+            if (to?.kind === "lent") to.taken += arrives;
+            if (from?.kind === "borrowed") from.taken += entry.amount;
+            if (from?.kind === "lent") {
+              from.paidOff += entry.amount;
+              from.lastPayment = entry.date;
+            }
+            break;
+          }
+          default:
+            break;
+        }
+      }
+      return { loans: [...loans.values()] };
     },
 
     listEntries(owner, { account, q, offset }) {
