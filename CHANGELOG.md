@@ -4,6 +4,30 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.157 — 2026-11-02
+
+Fafnir 2.0.0: what you're worth at each month's end as a chart, where it is now, and monthly budgets per spending category in reais or dollars, with the last 12 months of spending. The other modules are unchanged.
+
+**By hand:** back up `fafnir.db` before installing, since its database layout changes.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.21  |
+| Loggbok   | 0.0.16  |
+| Yggdrasil | 1.0.2   |
+| Janus     | 0.0.7   |
+| Papyrus   | 0.0.7   |
+| Vinr      | 0.0.6   |
+| Chronos   | 0.0.7   |
+| Valkyrie  | 0.0.6   |
+| Althing   | 0.0.4   |
+| Mimir     | 0.0.6   |
+| Urd       | 2.1.0   |
+| Saga      | 1.0.0   |
+| Star      | 0.0.4   |
+| Fafnir    | 2.0.0   |
+| Tyr       | 0.0.8   |
+
 ## 0.0.153 — 2026-11-02
 
 Fafnir reaches 1.0.0: crypto (BTC, ICP and USDC, with what each coin cost), loans, and the things you own at a value you type. The other modules are unchanged.
