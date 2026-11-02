@@ -51,6 +51,10 @@ app.use("/api", auth.sameOriginWrites, auth.requireUser, (req, res, next) => {
 app.use("/api", express.json({ limit: "100kb" }));
 
 const owner = (req: Request) => auth.user(req).username;
+const followingMonth = (month: string): string => {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+};
 const param = (value: unknown) => (typeof value === "string" ? value : undefined);
 const bodyDate = (req: Request) => param((req.body as { date?: unknown } | undefined)?.date);
 
@@ -140,6 +144,31 @@ app.post("/api/accounts/:id/sell", async (req, res) => {
   ledger.sell(owner(req), req.params.id, req.body);
   res.json({ ok: true });
 });
+app.get("/api/worth", async (req, res) => {
+  const me = owner(req);
+  // Each month end needs its rates. One at a time, to go easy on the sources: answers are kept, so
+  // only the first look at an old month asks anything.
+  const first = ledger.firstMonth(me);
+  if (first) {
+    for (let month = first; month <= today().slice(0, 7); month = followingMonth(month)) {
+      await rates.ensure(monthSpan(month).end);
+    }
+  }
+  res.json(ledger.worthHistory(me));
+});
+
+app.get("/api/spending", (req, res) => {
+  res.json(ledger.spendingMonths(owner(req), param(req.query.month) ?? today().slice(0, 7), 12));
+});
+
+app.get("/api/budgets", (req, res) => {
+  res.json(ledger.budgets(owner(req), param(req.query.month) ?? today().slice(0, 7)));
+});
+app.put("/api/budgets/:category", (req, res) => {
+  ledger.setBudget(owner(req), req.params.category, req.body);
+  res.json({ ok: true });
+});
+
 app.get("/api/assets", async (req, res) => {
   await rates.ensure(today());
   res.json(ledger.assets(owner(req)));

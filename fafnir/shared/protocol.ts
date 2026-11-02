@@ -373,6 +373,69 @@ export interface Assets {
   assets: AssetSummary[];
 }
 
+/**
+ * The parts of what the user is worth: money in hand (cash, bank, savings), crypto, things they own,
+ * what they're owed, and debts. Any balance below zero counts as a debt, whatever its account.
+ */
+export const WORTH_PARTS = ["money", "crypto", "owned", "lent", "debts"] as const;
+export type WorthPart = (typeof WORTH_PARTS)[number];
+
+/** What the user was worth at the end of a month (or today), at that day's rates, in US cents. */
+export interface WorthPoint {
+  month: string;
+  date: IsoDate;
+  /** Null when a rate it needs isn't known. Debts are below zero. */
+  parts: Record<WorthPart, number> | null;
+  total: number | null;
+}
+
+export interface WorthHistory {
+  /** Oldest first, from the month of the first entry to this one. */
+  points: WorthPoint[];
+}
+
+/** A spending category's limit for a month, in the currency the user thinks of it in. */
+export interface Budget {
+  currency: "USD" | "BRL";
+  /** In the currency's smallest unit. */
+  amount: number;
+  /** The month it was set from; it holds until it is changed. */
+  from: string;
+}
+
+/** One spending category in a month: its budget, if any, and what was spent. */
+export interface BudgetLine {
+  category: string;
+  budget: Budget | null;
+  /** In the budget's currency (US cents without a budget). */
+  spent: number;
+  /** In US cents, at the rates of the days it was spent. */
+  spentUsd: number;
+  /** Some spending couldn't be put into reais for want of a rate, so `spent` leaves it out. */
+  missingRate: boolean;
+}
+
+export interface Budgets {
+  month: string;
+  lines: BudgetLine[];
+}
+
+/** Setting a budget from a month on. A null amount removes it from that month on. */
+export interface BudgetChange {
+  month: string;
+  currency: "USD" | "BRL";
+  amount: number | null;
+}
+
+/** Several months of spending and income side by side, oldest first, in US cents. */
+export interface SpendingMonths {
+  months: string[];
+  /** Each spending category with anything in those months; `usd` lines up with `months`. */
+  categories: { category: string; usd: number[] }[];
+  moneyIn: number[];
+  moneyOut: number[];
+}
+
 export interface EntryPage {
   entries: Entry[];
   /** How many entries match, on all pages. */

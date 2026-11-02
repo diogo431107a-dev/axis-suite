@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   Bitcoin,
   Car,
+  ChartLine,
   CircleUser,
   HandCoins,
   Landmark,
@@ -10,6 +11,7 @@ import {
   Menu,
   Plus,
   Receipt,
+  Wallet,
   X,
   type LucideIcon,
 } from "lucide-react";
@@ -26,6 +28,7 @@ import {
   type Book,
   type Entry,
   type AssetSummary,
+  type BudgetLine,
   type LoanSummary,
   type MoneyAccount,
   type MoneyKind,
@@ -34,6 +37,7 @@ import { api, describeError, setPageUser, setSignedOutHandler } from "./api.ts";
 import { localDate } from "./format.ts";
 import { AccountDialog } from "./forms/AccountDialog.tsx";
 import { AssetDialog } from "./forms/AssetDialog.tsx";
+import { BudgetDialog } from "./forms/BudgetDialog.tsx";
 import { CheckDialog } from "./forms/CheckDialog.tsx";
 import { EntryDialog } from "./forms/EntryDialog.tsx";
 import { InterestDialog } from "./forms/InterestDialog.tsx";
@@ -49,11 +53,15 @@ import { Categories } from "./views/Categories.tsx";
 import { Crypto } from "./views/Crypto.tsx";
 import { Home } from "./views/Home.tsx";
 import { Loans } from "./views/Loans.tsx";
+import { Spending } from "./views/Spending.tsx";
+import { Worth } from "./views/Worth.tsx";
 
-type View = "home" | "activity" | "accounts" | "loans" | "assets" | "crypto" | "categories";
+type View = "home" | "worth" | "spending" | "activity" | "accounts" | "loans" | "assets" | "crypto" | "categories";
 
 const NAV: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "home", label: "Home", icon: LayoutDashboard },
+  { view: "worth", label: "Worth", icon: ChartLine },
+  { view: "spending", label: "Spending", icon: Wallet },
   { view: "activity", label: "Activity", icon: Receipt },
   { view: "accounts", label: "Accounts", icon: Landmark },
   { view: "loans", label: "Loans", icon: HandCoins },
@@ -73,6 +81,7 @@ type Open =
   | { what: "check"; account: MoneyAccount }
   | { what: "loan" }
   | { what: "asset" }
+  | { what: "budget"; line: BudgetLine; month: string; name: string }
   | { what: "value"; asset: MoneyAccount }
   | { what: "sell"; asset: MoneyAccount }
   | { what: "payment"; loan: MoneyAccount; lastTotal?: number | null; entry?: Entry }
@@ -288,6 +297,14 @@ function BookPage({ me }: { me: Me }) {
               }}
             />
           )}
+          {view === "worth" && <Worth book={book} version={version} />}
+          {view === "spending" && (
+            <Spending
+              book={book}
+              version={version}
+              onBudget={(line, month, name) => setOpen({ what: "budget", line, month, name })}
+            />
+          )}
           {view === "activity" && (
             <Activity
               book={book}
@@ -375,6 +392,15 @@ function BookPage({ me }: { me: Me }) {
       )}
       {open?.what === "loan" && <LoanDialog book={book} onClose={() => setOpen(null)} onSaved={saved} />}
       {open?.what === "asset" && <AssetDialog book={book} onClose={() => setOpen(null)} onSaved={saved} />}
+      {open?.what === "budget" && (
+        <BudgetDialog
+          name={open.name}
+          line={open.line}
+          month={open.month}
+          onClose={() => setOpen(null)}
+          onSaved={saved}
+        />
+      )}
       {open?.what === "value" && <ValueDialog asset={open.asset} onClose={() => setOpen(null)} onSaved={saved} />}
       {open?.what === "sell" && (
         <SellDialog book={book} asset={open.asset} onClose={() => setOpen(null)} onSaved={saved} />
