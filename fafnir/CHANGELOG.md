@@ -4,6 +4,10 @@ What changed in Fafnir, newest first. Each version is tagged in git as `fafnir-v
 
 ## Unreleased
 
+- Things I own: a new page for a car, a house or anything else you could sell, counted in what you're worth at a value you type. Buying one is a move from the account or loan that paid, so it isn't spending.
+- New value updates what something is worth whenever you like. The difference shows on Home as Value changes, not as spending or income.
+- Sold it does it all in one go: the value becomes the price, the money reaches your account, and it moves to your sold things.
+
 - Loans: a new page for money you've borrowed and money you've lent, with what's left, what you've paid off and what the interest has come to.
 - Taking out a loan doesn't change what you're worth, since you have the money and you owe it. A fee taken out of it does, and shows in your spending.
 - Record a payment as a total and how much of it was interest. The interest counts as spending or income, the rest comes off the loan, and the form starts from your last payment. You type the interest: Fafnir doesn't work it out.

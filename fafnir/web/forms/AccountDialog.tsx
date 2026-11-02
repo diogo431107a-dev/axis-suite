@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { COINS, CURRENCY_INFO, FIAT, isCoin } from "../../shared/currencies.ts";
 import {
   MONEY_KINDS,
-  isLoan,
+  hasOwnPage,
   type AccountChange,
   type Book,
   type Currency,
@@ -59,8 +59,12 @@ export function AccountDialog({
   const starting = parsed !== null && kind === "card" ? -parsed : parsed;
   const holdsCoin = kind === "crypto";
   // A coin's account can't turn into a bank account, or the other way round: what it holds would stop fitting.
-  const kinds = MONEY_KINDS.filter((k) => !isLoan(k) && (!account || (k === "crypto") === isCoin(account.currency)));
-  const loan = isLoan(kind);
+  const kinds = MONEY_KINDS.filter(
+    (k) => !hasOwnPage(k) && (!account || (k === "crypto") === isCoin(account.currency)),
+  );
+  // A loan or something you own keeps its kind, so its field goes.
+  const ownPage = hasOwnPage(kind);
+  const what = kind === "asset" ? "it" : ownPage ? "loan" : "account";
 
   const changeKind = (next: MoneyKind) => {
     setKind(next);
@@ -102,7 +106,10 @@ export function AccountDialog({
   }
 
   return (
-    <Dialog title={loan ? "Change loan" : account ? "Change account" : "Add an account"} onClose={onClose}>
+    <Dialog
+      title={kind === "asset" ? "Change" : ownPage ? "Change loan" : account ? "Change account" : "Add an account"}
+      onClose={onClose}
+    >
       <form onSubmit={save} noValidate>
         <label className="field">
           <span>Name</span>
@@ -114,7 +121,7 @@ export function AccountDialog({
           />
         </label>
 
-        {!loan && (
+        {!ownPage && (
           <label className="field">
             <span>What is it?</span>
             <select value={kind} onChange={(e) => changeKind(e.target.value as MoneyKind)}>
@@ -203,7 +210,7 @@ export function AccountDialog({
                   disabled={saving}
                   onClick={() => void run(() => api(`/api/accounts/${account.id}`, { method: "DELETE" }))}
                 >
-                  Delete {loan ? "loan" : "account"}
+                  Delete {what}
                 </button>
               ) : (
                 <button
@@ -220,7 +227,7 @@ export function AccountDialog({
                     )
                   }
                 >
-                  {account.closed ? "Reopen" : "Close"} {loan ? "loan" : "account"}
+                  {account.closed ? "Reopen" : "Close"} {what}
                 </button>
               )}
             </div>

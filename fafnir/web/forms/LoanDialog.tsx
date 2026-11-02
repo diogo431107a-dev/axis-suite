@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { CURRENCY_INFO, FIAT } from "../../shared/currencies.ts";
 import {
-  isLoan,
+  hasOwnPage,
   type Book,
   type Currency,
   type LoanKind,
@@ -35,7 +35,7 @@ export function LoanDialog({ book, onClose, onSaved }: { book: Book; onClose: ()
   const [saving, setSaving] = useState(false);
 
   const borrowed = kind === "borrowed";
-  const accounts = book.accounts.filter((a) => !a.closed && !isLoan(a.kind) && a.currency === currency);
+  const accounts = book.accounts.filter((a) => !a.closed && !hasOwnPage(a.kind) && a.currency === currency);
   const chosen = accounts.find((a) => a.id === account)?.id ?? accounts[0]?.id ?? "";
   // With no account in this currency, an older loan is all it can be.
   const asOlder = older || accounts.length === 0;

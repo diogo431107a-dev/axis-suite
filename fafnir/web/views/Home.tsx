@@ -1,5 +1,5 @@
 import { ChevronLeft, ChevronRight, CircleAlert } from "lucide-react";
-import { isLoan, type Book, type MoneyAccount } from "../../shared/protocol.ts";
+import { hasOwnPage, isLoan, type Book, type MoneyAccount } from "../../shared/protocol.ts";
 import { addMonths, holdsDebt, localDate, money, showDate, showMonth } from "../format.ts";
 
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -61,7 +61,8 @@ export function Home({
   onAddAccount: () => void;
   onOpenAccount: (account: MoneyAccount) => void;
 }) {
-  const accounts = book.accounts.filter((a) => !a.closed && !isLoan(a.kind));
+  const accounts = book.accounts.filter((a) => !a.closed && !hasOwnPage(a.kind));
+  const things = book.accounts.filter((a) => !a.closed && a.kind === "asset");
   const loans = book.accounts.filter((a) => !a.closed && isLoan(a.kind));
   const names = new Map(book.categories.map((c) => [c.id, c.name]));
   const { moneyIn, moneyOut, spending, change } = book.month;
@@ -170,6 +171,15 @@ export function Home({
                   <dd>{signedMoney(change.added)}</dd>
                 </div>
               )}
+              {change.revalued !== 0 && (
+                <div>
+                  <dt>
+                    Value changes
+                    <small>New values you gave things you own.</small>
+                  </dt>
+                  <dd>{signedMoney(change.revalued)}</dd>
+                </div>
+              )}
               {change.rates !== 0 && (
                 <div>
                   <dt>
@@ -216,6 +226,15 @@ export function Home({
           </p>
         )}
       </section>
+
+      {things.length > 0 && (
+        <section className="panel">
+          <div className="panel-head">
+            <h2>Things I own</h2>
+          </div>
+          <AccountRows accounts={things} onOpen={onOpenAccount} />
+        </section>
+      )}
 
       {loans.length > 0 && (
         <section className="panel">
