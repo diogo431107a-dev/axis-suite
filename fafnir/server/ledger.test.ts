@@ -31,7 +31,9 @@ const category = (name: string, owner = ME) => {
 function addAccount(
   name: string,
   currency: Currency,
-  kind: "bank" | "card" | "crypto" | "borrowed" | "lent" = currency === "USD" || currency === "BRL" ? "bank" : "crypto",
+  kind: "bank" | "card" | "crypto" | "borrowed" | "lent" | "asset" = currency === "USD" || currency === "BRL"
+    ? "bank"
+    : "crypto",
   starting = 0,
 ): string {
   const accountId = id();
@@ -602,7 +604,13 @@ describe("why what you're worth changed", () => {
       other: category("Salary"),
       amount: 100_000,
     });
-    expect(ledger.load(ME, "2026-09").month.change).toEqual({ start: 20_000, end: 25_000, added: 0, rates: 5_000 });
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({
+      start: 20_000,
+      end: 25_000,
+      added: 0,
+      revalued: 0,
+      rates: 5_000,
+    });
   });
 
   it("adds up, with money in and out, starting balances and balance checks", () => {
@@ -648,7 +656,13 @@ describe("why what you're worth changed", () => {
       amount: 100_000,
       arrived: 18_000,
     });
-    expect(ledger.load(ME, "2026-09").month.change).toEqual({ start: 20_000, end: 18_000, added: 0, rates: -2_000 });
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({
+      start: 20_000,
+      end: 18_000,
+      added: 0,
+      revalued: 0,
+      rates: -2_000,
+    });
   });
 
   it("gives up rather than guess when a rate it needs is unknown", () => {
@@ -976,6 +990,7 @@ describe("what you're worth, with coins", () => {
       start: 5_000_000,
       end: 6_000_000,
       added: 0,
+      revalued: 0,
       rates: 1_000_000,
     });
   });
@@ -1211,7 +1226,13 @@ describe("loan accounts", () => {
       date: "2026-08-10",
     });
     // R$ 1,000 owed was $200 and is now $250: the debt has grown in dollars.
-    expect(ledger.load(ME, "2026-09").month.change).toEqual({ start: -20_000, end: -25_000, added: 0, rates: -5_000 });
+    expect(ledger.load(ME, "2026-09").month.change).toEqual({
+      start: -20_000,
+      end: -25_000,
+      added: 0,
+      revalued: 0,
+      rates: -5_000,
+    });
   });
 });
 
@@ -1453,6 +1474,178 @@ describe("the loans summary", () => {
   });
 });
 
+describe("things you own", () => {
+  // The rate is 5, so R$ 1,000 is $200.
+  const worth = () => {
+    const { have, owe } = ledger.load(ME, "2026-10");
+    return have - owe;
+  };
+
+  it("buying one with cash, or through a loan, leaves what you're worth alone", () => {
+    const bank = addAccount("Itaú", "BRL", "bank", 10_000_000);
+    const loan = addAccount("Car loan", "BRL", "borrowed");
+    const car = addAccount("Car", "BRL", "asset");
+    const house = addAccount("House", "BRL", "asset");
+    const before = worth();
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: bank, other: car, amount: 6_000_000 });
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: DAY, account: loan, other: house, amount: 30_000_000 });
+    expect(worth()).toBe(before);
+    expect(account(car).balance).toBe(6_000_000);
+    expect(account(house).balance).toBe(30_000_000);
+    const { month } = ledger.load(ME, "2026-10");
+    expect(month.moneyIn).toBe(0);
+    expect(month.moneyOut).toBe(0);
+    expectEverythingBalances();
+  });
+
+  it("one already owned is a starting balance, never below zero", () => {
+    const house = addAccount("House", "BRL", "asset", 50_000_000);
+    expect(account(house).balance).toBe(50_000_000);
+    expect(code(() => addAccount("Debt", "BRL", "asset", -100))).toBe("invalid");
+  });
+
+  it("holds reais or dollars, takes only moves, and stays what it is", () => {
+    expect(code(() => addAccount("Coin", "BTC", "asset"))).toBe("invalid");
+    const car = addAccount("Car", "BRL", "asset");
+    const other = addAccount("Bike", "BRL", "asset");
+    const bank = addAccount("Itaú", "BRL");
+    const usd = addAccount("Chase", "USD");
+    const base = { date: DAY, amount: 100 };
+    expect(
+      code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "spent", account: car, other: category("Fun") })),
+    ).toBe("invalid");
+    expect(
+      code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "exchanged", account: car, other: usd, arrived: 20 })),
+    ).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "moved", account: car, other }))).toBe("invalid");
+    expect(code(() => ledger.changeAccount(ME, car, { kind: "bank" }))).toBe("invalid");
+    expect(code(() => ledger.changeAccount(ME, bank, { kind: "asset" }))).toBe("invalid");
+    expect(code(() => ledger.addEntry(ME, { ...base, id: id(), kind: "repaid", account: car, other: car }))).toBe(
+      "invalid",
+    );
+  });
+
+  it("takes a new value as the difference, either way, at that day's rate", () => {
+    const car = addAccount("Car", "BRL", "asset", 6_000_000);
+    const down = ledger.setValue(ME, car, { id: id(), date: DAY, value: 5_800_000 });
+    expect(down.before).toBe(6_000_000);
+    expect(down.entry).toMatchObject({ kind: "revalued", amount: -200_000, usd: -40_000, other: null });
+    const up = ledger.setValue(ME, car, { id: id(), date: DAY, value: 5_900_000 });
+    expect(up.entry!.amount).toBe(100_000);
+    expect(account(car).balance).toBe(5_900_000);
+    expect(ledger.setValue(ME, car, { id: id(), date: DAY, value: 5_900_000 }).entry).toBeNull();
+    expectEverythingBalances();
+  });
+
+  it("does a new value sent twice once, and it can be deleted but not changed", () => {
+    const car = addAccount("Car", "BRL", "asset", 6_000_000);
+    const input = { id: id(), date: DAY, value: 5_000_000 };
+    const first = ledger.setValue(ME, car, input);
+    const again = ledger.setValue(ME, car, input);
+    expect(again.entry!.id).toBe(first.entry!.id);
+    expect(account(car).balance).toBe(5_000_000);
+    expect(
+      code(() => ledger.changeEntry(ME, first.entry!.id, { kind: "moved", date: DAY, account: car, amount: 1 })),
+    ).toBe("conflict");
+    ledger.removeEntry(ME, first.entry!.id);
+    expect(account(car).balance).toBe(6_000_000);
+  });
+
+  it("refuses a value below zero, and only takes one for something you own", () => {
+    const car = addAccount("Car", "BRL", "asset", 100);
+    const bank = addAccount("Itaú", "BRL");
+    expect(code(() => ledger.setValue(ME, car, { id: id(), date: DAY, value: -1 }))).toBe("invalid");
+    expect(code(() => ledger.setValue(ME, bank, { id: id(), date: DAY, value: 1 }))).toBe("not-found");
+  });
+
+  it("shows a new value on the month's walk as its own line, and the walk still adds up", () => {
+    const car = addAccount("Car", "BRL", "asset");
+    const bank = addAccount("Itaú", "BRL", "bank", 10_000_000);
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: "2026-08-10", account: bank, other: car, amount: 6_000_000 });
+    ledger.setValue(ME, car, { id: id(), date: "2026-09-15", value: 5_500_000 });
+    const { change, moneyIn, moneyOut } = ledger.load(ME, "2026-09").month;
+    // The bank starts in October, so the car is all there is: bought with money not yet recorded.
+    expect(change).toEqual({ start: 0, end: -100_000, added: 0, revalued: -100_000, rates: 0 });
+    expect(change!.end).toBe(change!.start + moneyIn - moneyOut + change!.added + change!.revalued + change!.rates);
+  });
+
+  it.each([
+    ["at its value", 6_000_000, 0],
+    ["above it", 6_500_000, 500_000],
+    ["below it", 5_000_000, -1_000_000],
+  ])("sells %s: the money arrives, the difference is a new value, and it closes", (_name, price, change) => {
+    const car = addAccount("Car", "BRL", "asset", 6_000_000);
+    const bank = addAccount("Itaú", "BRL");
+    const sale = { id: id(), valueId: id(), account: bank, amount: price, date: DAY };
+    ledger.sell(ME, car, sale);
+    expect(account(bank).balance).toBe(price);
+    expect(account(car).balance).toBe(0);
+    expect(account(car).closed).toBe(true);
+    const kinds = ledger.listEntries(ME, { account: car }).entries.map((e) => e.kind);
+    expect(kinds.filter((k) => k === "revalued")).toHaveLength(change === 0 ? 0 : 1);
+    expect(kinds).toContain("moved");
+    // Sent twice, it's done once.
+    ledger.sell(ME, car, sale);
+    expect(account(bank).balance).toBe(price);
+    expectEverythingBalances();
+  });
+
+  it("sells for nothing, as when a car is scrapped", () => {
+    const car = addAccount("Car", "BRL", "asset", 6_000_000);
+    const bank = addAccount("Itaú", "BRL");
+    ledger.sell(ME, car, { id: id(), valueId: id(), account: bank, amount: 0, date: DAY });
+    expect(account(car)).toMatchObject({ balance: 0, closed: true });
+    expect(account(bank).balance).toBe(0);
+  });
+
+  it("refuses a sale that doesn't fit, and changes nothing", () => {
+    const car = addAccount("Car", "BRL", "asset", 6_000_000);
+    const usd = addAccount("Chase", "USD");
+    const loan = addAccount("Loan", "BRL", "borrowed");
+    const bank = addAccount("Itaú", "BRL");
+    const sale = (input: Partial<Parameters<typeof ledger.sell>[2]>) =>
+      code(() => ledger.sell(ME, car, { id: id(), valueId: id(), account: bank, amount: 100, date: DAY, ...input }));
+    expect(sale({ account: usd })).toBe("invalid");
+    expect(sale({ account: loan })).toBe("invalid");
+    expect(sale({ amount: -1 })).toBe("invalid");
+    // An entry on a later day would be left behind.
+    ledger.setValue(ME, car, { id: id(), date: "2026-10-20", value: 5_000_000 });
+    expect(sale({})).toBe("conflict");
+    expect(account(car).closed).toBe(false);
+    expect(account(bank).balance).toBe(0);
+    expectEverythingBalances();
+  });
+
+  it("sums up what it cost, its changes and its sale, from the entries", () => {
+    const bank = addAccount("Itaú", "BRL", "bank", 10_000_000);
+    const car = addAccount("Car", "BRL", "asset");
+    const house = addAccount("House", "BRL", "asset", 50_000_000);
+    ledger.addEntry(ME, { id: id(), kind: "moved", date: "2026-08-10", account: bank, other: car, amount: 6_000_000 });
+    ledger.setValue(ME, car, { id: id(), date: "2026-09-15", value: 5_500_000 });
+    ledger.sell(ME, car, { id: id(), valueId: id(), account: bank, amount: 5_300_000, date: "2026-10-01" });
+    const summary = (assetId: string) => ledger.assets(ME).assets.find((a) => a.id === assetId)!;
+    expect(summary(car)).toMatchObject({
+      value: 0,
+      paid: 6_000_000,
+      owned: 0,
+      changes: -700_000,
+      sold: 5_300_000,
+      closed: true,
+      updated: "2026-10-01",
+    });
+    expect(summary(house)).toMatchObject({ value: 50_000_000, usdValue: 10_000_000, paid: 0, owned: 50_000_000 });
+    expect(ledger.assets("freya").assets).toEqual([]);
+  });
+
+  it("keeps the hidden account for value changes out of the page", () => {
+    const car = addAccount("Car", "BRL", "asset", 100);
+    ledger.setValue(ME, car, { id: id(), date: DAY, value: 50 });
+    const book = ledger.load(ME, "2026-10");
+    expect(book.accounts.map((a) => a.name)).toEqual(["Car"]);
+    expect(book.categories.map((c) => c.name)).not.toContain("Value changes");
+  });
+});
+
 describe("the upgrade to coins", () => {
   it("adds the two categories and leaves what was there alone", () => {
     const old = new DatabaseSync(":memory:");
@@ -1493,6 +1686,8 @@ describe("the upgrade to coins", () => {
     expect(names("odin")).toEqual(expect.arrayContaining(["Fees", "Food", "Staking rewards"]));
     expect(names("freya").filter((n) => n.toLowerCase() === "fees")).toEqual(["FEES"]);
     expect(names("freya")).toContain("Interest paid");
+    const hidden = old.prepare("SELECT owner FROM accounts WHERE kind = 'revaluation' ORDER BY owner").all();
+    expect(hidden).toEqual([{ owner: "freya" }, { owner: "odin" }]);
     const [entry] = ledgerNow.listEntries("odin", {}).entries;
     expect(entry).toMatchObject({
       amount: 10_000,

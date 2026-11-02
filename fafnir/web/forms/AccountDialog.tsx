@@ -24,6 +24,7 @@ const KIND_HINTS: Record<MoneyKind, string> = {
   crypto: "Bitcoin, ICP or USDC, on an exchange or in a wallet of your own.",
   borrowed: "Money you have to pay back.",
   lent: "Money someone has to pay you back.",
+  asset: "A car, a house or anything else you could sell, at a value you type.",
 };
 
 /** Adds an account, or changes, closes, reopens or deletes one. */

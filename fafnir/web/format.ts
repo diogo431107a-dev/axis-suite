@@ -96,4 +96,5 @@ export const KIND_NAMES: Record<MoneyKind, string> = {
   crypto: "Crypto",
   borrowed: "Money I borrowed",
   lent: "Money I lent",
+  asset: "Something I own",
 };
