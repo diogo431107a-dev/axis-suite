@@ -4,6 +4,30 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.153 — 2026-11-02
+
+Fafnir reaches 1.0.0: crypto (BTC, ICP and USDC, with what each coin cost), loans, and the things you own at a value you type. The other modules are unchanged.
+
+**By hand:** back up `fafnir.db` before installing, since its database layout changes. If the server limits outgoing connections, also allow HTTPS to `api.exchange.coinbase.com` and `api.kraken.com`.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.21  |
+| Loggbok   | 0.0.16  |
+| Yggdrasil | 1.0.2   |
+| Janus     | 0.0.7   |
+| Papyrus   | 0.0.7   |
+| Vinr      | 0.0.6   |
+| Chronos   | 0.0.7   |
+| Valkyrie  | 0.0.6   |
+| Althing   | 0.0.4   |
+| Mimir     | 0.0.6   |
+| Urd       | 2.1.0   |
+| Saga      | 1.0.0   |
+| Star      | 0.0.4   |
+| Fafnir    | 1.0.0   |
+| Tyr       | 0.0.8   |
+
 ## 0.0.142 — 2026-10-31
 
 Tyr gains care and trust: Handle with care, word given, concerns with a mandatory review, what was said about you, incidents and a briefing. The other modules are unchanged.

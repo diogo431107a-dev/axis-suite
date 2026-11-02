@@ -4,6 +4,10 @@ What changed in Fafnir, newest first. Each version is tagged in git as `fafnir-v
 
 ## Unreleased
 
+## 1.0.0 — 2026-11-02
+
+Fafnir reaches 1.0.0, with crypto, loans and the things you own. From now on each change is marked Major, Minor or Fix.
+
 - Things I own: a new page for a car, a house or anything else you could sell, counted in what you're worth at a value you type. Buying one is a move from the account or loan that paid, so it isn't spending.
 - New value updates what something is worth whenever you like. The difference shows on Home as Value changes, not as spending or income.
 - Sold it does it all in one go: the value becomes the price, the money reaches your account, and it moves to your sold things.
