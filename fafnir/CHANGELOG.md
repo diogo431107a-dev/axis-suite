@@ -4,6 +4,10 @@ What changed in Fafnir, newest first. Each version is tagged in git as `fafnir-v
 
 ## Unreleased
 
+- **Major:** Worth: a new page with what you're worth at the end of every month, as a chart of its parts (money, crypto, things you own, what you're owed, debts) and a table, and where it is now, by kind and by currency.
+- **Major:** Spending: a new page with budgets and the last 12 months. A budget is a monthly limit for a category, in reais or dollars, from the month you set it on; earlier months keep theirs. Spending in the other currency counts at its day's rate.
+- **Major:** The 12 months show each category's spending, and money in and out, side by side in US dollars.
+
 ## 1.0.0 — 2026-11-02
 
 Fafnir reaches 1.0.0, with crypto, loans and the things you own. From now on each change is marked Major, Minor or Fix.

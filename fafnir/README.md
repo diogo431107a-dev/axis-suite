@@ -1,6 +1,6 @@
 # Fafnir Personal Finances
 
-What you have, what you owe and where your money goes, with crypto, loans and the things you own, added up in US dollars. Fafnir (FPF for short) is double-entry bookkeeping for people who have never heard of it: you say you spent, received or moved money, and the books are kept for you. It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own money and nobody else's.
+What you have, what you owe and where your money goes, with crypto, loans, the things you own and budgets, added up in US dollars. Fafnir (FPF for short) is double-entry bookkeeping for people who have never heard of it: you say you spent, received or moved money, and the books are kept for you. It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is signed in there sees their own money and nobody else's.
 
 | Layer    | Technology                                                                        |
 | -------- | --------------------------------------------------------------------------------- |
@@ -25,8 +25,8 @@ web/
   api.ts             fetch for the API
   format.ts          reading and showing amounts and dates
   forms/             the dialogs: an entry, an account, a loan and its payments, something you own, its value
-                     and its sale, Check balance, and the dollars line
-  views/             the pages: Home, Activity, Accounts, Loans, Things I own, Crypto, Categories
+                     and its sale, a budget, Check balance, and the dollars line
+  views/             the pages: Home, Worth, Spending, Activity, Accounts, Loans, Things I own, Crypto, Categories
   ui/                the dialog and the About box
 deploy/
   fafnir.service     systemd unit (sandboxed)
@@ -71,6 +71,10 @@ deploy/
 
 **Things I own.** Something the user owns that isn't money but could be sold, like a car or a house, is an account in USD or BRL holding its value. Fafnir never looks a value up: the user types it, from a car's FIPE price or a valuation, and gives a new one whenever they like. Buying one is a move from the account or loan that paid, so it doesn't change what they're worth, and taxes or fees on top are ordinary spending. One already owned is added at its value today, as a starting balance. A new value is recorded as the difference, against a hidden "Value changes" account, so it shows on the month's walk as its own line, Value changes, and isn't spending or income; it can be deleted, not changed. Selling does three things in one transaction: the value becomes the price, the money moves to an account, and it closes. Savings need nothing of their own: a savings account is a kind of account, and its interest is a Received entry.
 
+**Worth.** What the user is worth at the end of every month since their first entry, each at that day's rates, drawn as a line over columns of its parts: money (cash, bank, savings), crypto, things they own, what they're owed, and debts below zero. Any balance below zero counts as a debt. A month whose rates aren't known is left blank rather than guessed. The same figures are there as a table. Below it, where it is now: today's worth by those parts and by currency, as shares of what they have, with debts set apart. The chart's five colours are a fixed order checked for colour blindness against the panel.
+
+**Spending and budgets.** A budget is a monthly limit for a spending category, in reais or dollars, as the user thinks of it. Fafnir doesn't hold the goals behind it, only the limit. It applies from the month it's set until it's changed, so past months keep the budget they had, and removing one also applies from its month on. Unused budget doesn't carry over. Spending in the budget's currency counts as typed; anything else goes from its fixed dollars into reais at its day's rate, so R$ 1,500 for food stays R$ 1,500 whatever the dollar does. Going over is shown, never blocked. The Spending page also has each category's spending and the month's money in and out for the last 12 months, in the dollars each entry was saved with.
+
 **Accounts.** Cash, bank account, savings or credit card, each in USD or BRL, or a crypto account holding one coin (BTC, ICP or USDC). Any of them can be in a group, which is how Coinbase's balances stay together. A card's balance is normally below zero: what is owed. An account with nothing in it can be closed, and one with no entries deleted.
 
 **Check balance.** The user types what the bank shows; if it differs from what is recorded on that day, the difference is added as a balance check. It can be deleted, not changed.
@@ -83,9 +87,7 @@ deploy/
 
 ## Not yet
 
-Phases 1 to 5 of the plan are done. Savings goals were left out on purpose: Fafnir records what you have, not what you plan. Still to come:
-
-6. **Understanding your money:** net worth over time, budgets, recurring entries.
+The six phases of the plan are done. Savings goals and recurring entries were left out on purpose: Fafnir records what happened and what you have.
 
 Later: bank, Coinbase and Sparrow file imports, card installments, loan schedules, and a report in reais for Brazilian tax returns (each entry keeps its reais and its rate, so one can be added).
 

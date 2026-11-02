@@ -1,7 +1,7 @@
 // Money and dates, as the page shows and reads them. Amounts are whole numbers of a currency's
 // smallest unit everywhere.
 import { CURRENCY_INFO, amountDigits, isCoin, unitOf } from "../shared/currencies.ts";
-import type { Currency, IsoDate, MoneyKind } from "../shared/protocol.ts";
+import type { Currency, IsoDate, MoneyKind, WorthPart } from "../shared/protocol.ts";
 
 /** Whether an account's balance below zero is what the user owes on it, rather than an overdraft. */
 export const holdsDebt = (account: { kind: MoneyKind }) => account.kind === "card" || account.kind === "borrowed";
@@ -97,4 +97,13 @@ export const KIND_NAMES: Record<MoneyKind, string> = {
   borrowed: "Money I borrowed",
   lent: "Money I lent",
   asset: "Something I own",
+};
+
+/** The parts of what the user is worth, as the page calls them. */
+export const PART_NAMES: Record<WorthPart, string> = {
+  money: "Money",
+  crypto: "Crypto",
+  owned: "Things I own",
+  lent: "Owed to me",
+  debts: "Debts",
 };
