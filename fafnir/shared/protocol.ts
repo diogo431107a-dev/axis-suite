@@ -394,6 +394,39 @@ export interface WorthHistory {
   points: WorthPoint[];
 }
 
+/** A spending category's limit for a month, in the currency the user thinks of it in. */
+export interface Budget {
+  currency: "USD" | "BRL";
+  /** In the currency's smallest unit. */
+  amount: number;
+  /** The month it was set from; it holds until it is changed. */
+  from: string;
+}
+
+/** One spending category in a month: its budget, if any, and what was spent. */
+export interface BudgetLine {
+  category: string;
+  budget: Budget | null;
+  /** In the budget's currency (US cents without a budget). */
+  spent: number;
+  /** In US cents, at the rates of the days it was spent. */
+  spentUsd: number;
+  /** Some spending couldn't be put into reais for want of a rate, so `spent` leaves it out. */
+  missingRate: boolean;
+}
+
+export interface Budgets {
+  month: string;
+  lines: BudgetLine[];
+}
+
+/** Setting a budget from a month on. A null amount removes it from that month on. */
+export interface BudgetChange {
+  month: string;
+  currency: "USD" | "BRL";
+  amount: number | null;
+}
+
 /** Several months of spending and income side by side, oldest first, in US cents. */
 export interface SpendingMonths {
   months: string[];

@@ -2,7 +2,7 @@
 // balances and totals back. Dollars are worked out once, when an entry is saved, and then stay.
 import { randomUUID } from "node:crypto";
 import type { DatabaseSync } from "node:sqlite";
-import { COINS, CURRENCY_INFO, isCoin, usdCents, type Coin } from "../shared/currencies.ts";
+import { COINS, CURRENCY_INFO, fromUsdCents, isCoin, usdCents, type Coin } from "../shared/currencies.ts";
 import {
   CATEGORY_KINDS,
   CURRENCIES,
@@ -19,6 +19,9 @@ import {
   type BalanceCheck,
   type BalanceCheckResult,
   type Book,
+  type Budget,
+  type BudgetChange,
+  type Budgets,
   type CategoryKind,
   type Currency,
   type Entry,
@@ -199,6 +202,10 @@ export interface Ledger {
   worthHistory(owner: string): WorthHistory;
   /** `count` months of spending and income, ending with `month`. */
   spendingMonths(owner: string, month: string, count: number): SpendingMonths;
+  /** Each spending category's budget in a month, and what was spent against it. */
+  budgets(owner: string, month: string): Budgets;
+  /** Sets or removes a spending category's budget from a month on. */
+  setBudget(owner: string, categoryId: string, input: BudgetChange): void;
   /** Everything of one user, as saved: their copy, and the way out. */
   exportAll(owner: string): unknown;
   /** Every entry, oldest first, for a spreadsheet. */
@@ -1465,6 +1472,75 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       return { months, categories, moneyIn, moneyOut };
     },
 
+    budgets(owner, month) {
+      if (!isMonth(month)) invalid("That month isn't valid");
+      ensureBook(owner);
+      const categories = db
+        .prepare("SELECT id, closed FROM accounts WHERE owner = ? AND kind = 'expense' ORDER BY name COLLATE NOCASE")
+        .all(owner) as unknown as { id: string; closed: number }[];
+      const inForce = db.prepare(`
+        SELECT currency, amount, from_month AS "from" FROM budgets
+        WHERE owner = ? AND category = ? AND from_month <= ? ORDER BY from_month DESC LIMIT 1
+      `);
+      const spending = db.prepare(`
+        SELECT t.date AS date, p.currency AS currency, p.amount AS amount, p.usd AS usd
+        FROM postings p JOIN transactions t ON t.id = p.tx_id
+        WHERE t.owner = ? AND p.account_id = ? AND t.date BETWEEN ? AND ?
+      `);
+
+      const lines = [];
+      for (const { id, closed } of categories) {
+        const row = inForce.get(owner, id, month) as unknown as
+          { currency: Budget["currency"]; amount: number | null; from: string } | undefined;
+        const budget =
+          row && row.amount !== null ? { currency: row.currency, amount: row.amount, from: row.from } : null;
+        const posted = spending.all(owner, id, `${month}-01`, `${month}-31`) as unknown as {
+          date: IsoDate;
+          currency: Currency;
+          amount: number;
+          usd: number;
+        }[];
+        // A closed category with nothing to show isn't worth a line.
+        if (closed && !budget && posted.length === 0) continue;
+
+        let spent = 0;
+        let spentUsd = 0;
+        let missingRate = false;
+        for (const p of posted) {
+          spentUsd += p.usd;
+          // Spending in the budget's own currency counts as typed. Anything else goes from its fixed
+          // dollars into reais at that day's rate.
+          if (!budget || budget.currency === "USD") spent += p.usd;
+          else if (p.currency === budget.currency) spent += p.amount;
+          else {
+            const rate = lookupRate("BRL", p.date);
+            if (rate) spent += fromUsdCents(p.usd, "BRL", rate.value);
+            else missingRate = true;
+          }
+        }
+        lines.push({ category: id, budget, spent, spentUsd, missingRate });
+      }
+      return { month, lines };
+    },
+
+    setBudget(owner, categoryId, input) {
+      ensureBook(owner);
+      transaction(db, () => {
+        const row = accountRow(owner, categoryId);
+        if (!row || row.kind !== "expense") notFound("spending category");
+        if (typeof input.month !== "string" || !isMonth(input.month)) invalid("That month isn't valid");
+        if (input.currency !== "USD" && input.currency !== "BRL") invalid("A budget is in US dollars or reais");
+        const amount = input.amount === null ? null : checkAmount(input.amount, "The budget", input.currency);
+        db.prepare(
+          `
+          INSERT INTO budgets (owner, category, from_month, currency, amount, updated_at) VALUES (?, ?, ?, ?, ?, ?)
+          ON CONFLICT (owner, category, from_month) DO UPDATE
+            SET currency = excluded.currency, amount = excluded.amount, updated_at = excluded.updated_at
+        `,
+        ).run(owner, categoryId, input.month, input.currency, amount, now());
+      });
+    },
+
     exportAll(owner) {
       ensureBook(owner);
       const accounts = db.prepare("SELECT * FROM accounts WHERE owner = ? ORDER BY created_at").all(owner);
@@ -1479,6 +1555,9 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         }),
         entries: this.allEntries(owner),
         history: history.map((h) => ({ ...h, snapshot: JSON.parse(h.snapshot) as unknown })),
+        budgets: db
+          .prepare("SELECT category, from_month, currency, amount FROM budgets WHERE owner = ? ORDER BY from_month")
+          .all(owner),
       };
     },
 
@@ -1500,6 +1579,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
           };
           db.prepare("DELETE FROM transactions WHERE owner = ?").run(owner);
           db.prepare("DELETE FROM history WHERE owner = ?").run(owner);
+          db.prepare("DELETE FROM budgets WHERE owner = ?").run(owner);
           db.prepare("DELETE FROM accounts WHERE owner = ?").run(owner);
           db.prepare("DELETE FROM books WHERE owner = ?").run(owner);
           removed.push({ owner, entries: n });

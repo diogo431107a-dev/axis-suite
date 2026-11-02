@@ -130,6 +130,21 @@ const migrations: ((db: DatabaseSync) => void)[] = [
         SELECT lower(hex(randomblob(16))), owner, 'Value changes', 'revaluation', created_at, created_at FROM books;
     `);
   },
+  // v6: budgets. Each row holds from its month until a later row for the same category; a null amount
+  // means there is none from then on.
+  (db) => {
+    db.exec(`
+      CREATE TABLE budgets (
+        owner      TEXT NOT NULL,
+        category   TEXT NOT NULL REFERENCES accounts(id) ON DELETE CASCADE,
+        from_month TEXT NOT NULL,                    -- YYYY-MM
+        currency   TEXT NOT NULL,                    -- USD or BRL
+        amount     INTEGER,                          -- in the currency's smallest unit; NULL for none
+        updated_at TEXT NOT NULL,
+        PRIMARY KEY (owner, category, from_month)
+      ) WITHOUT ROWID;
+    `);
+  },
 ];
 
 /** Opens (creating if needed) the database at `file`, or ":memory:", at the latest schema. */

@@ -161,6 +161,14 @@ app.get("/api/spending", (req, res) => {
   res.json(ledger.spendingMonths(owner(req), param(req.query.month) ?? today().slice(0, 7), 12));
 });
 
+app.get("/api/budgets", (req, res) => {
+  res.json(ledger.budgets(owner(req), param(req.query.month) ?? today().slice(0, 7)));
+});
+app.put("/api/budgets/:category", (req, res) => {
+  ledger.setBudget(owner(req), req.params.category, req.body);
+  res.json({ ok: true });
+});
+
 app.get("/api/assets", async (req, res) => {
   await rates.ensure(today());
   res.json(ledger.assets(owner(req)));

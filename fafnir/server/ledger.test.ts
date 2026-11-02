@@ -1759,6 +1759,96 @@ describe("spending over the months", () => {
   });
 });
 
+describe("budgets", () => {
+  const line = (month: string, categoryId: string, owner = ME) =>
+    ledger.budgets(owner, month).lines.find((l) => l.category === categoryId)!;
+
+  it("applies from its month until it's changed, and past months keep theirs", () => {
+    const food = category("Food");
+    ledger.setBudget(ME, food, { month: "2026-08", currency: "BRL", amount: 150_000 });
+    ledger.setBudget(ME, food, { month: "2026-10", currency: "BRL", amount: 120_000 });
+    expect(line("2026-07", food).budget).toBeNull();
+    expect(line("2026-08", food).budget).toEqual({ currency: "BRL", amount: 150_000, from: "2026-08" });
+    expect(line("2026-09", food).budget).toEqual({ currency: "BRL", amount: 150_000, from: "2026-08" });
+    expect(line("2026-10", food).budget!.amount).toBe(120_000);
+    expect(line("2027-03", food).budget!.amount).toBe(120_000);
+  });
+
+  it("is removed from a month on, and can come back", () => {
+    const food = category("Food");
+    ledger.setBudget(ME, food, { month: "2026-08", currency: "BRL", amount: 150_000 });
+    ledger.setBudget(ME, food, { month: "2026-10", currency: "BRL", amount: null });
+    expect(line("2026-09", food).budget).not.toBeNull();
+    expect(line("2026-10", food).budget).toBeNull();
+    ledger.setBudget(ME, food, { month: "2026-12", currency: "USD", amount: 30_000 });
+    expect(line("2026-12", food).budget).toEqual({ currency: "USD", amount: 30_000, from: "2026-12" });
+  });
+
+  it("counts spending in reais as typed against a budget in reais, and converts the rest at its day's rate", () => {
+    const food = category("Food");
+    const brl = addAccount("Itaú", "BRL", "bank", 1_000_000);
+    const usd = addAccount("Chase", "USD", "bank", 100_000);
+    const btc = addAccount("Sparrow BTC", "BTC", "crypto", 100_000_000);
+    ledger.setBudget(ME, food, { month: "2026-10", currency: "BRL", amount: 150_000 });
+    const spend = (account: string, amount: number) =>
+      ledger.addEntry(ME, { id: id(), kind: "spent", date: DAY, account, other: food, amount });
+    spend(brl, 10_000);
+    // $20 at a rate of 5 is R$ 100, and 0.0002 BTC at $50,000 is $10, so R$ 50.
+    spend(usd, 2_000);
+    spend(btc, 20_000);
+    expect(line("2026-10", food)).toMatchObject({ spent: 25_000, spentUsd: 5_000, missingRate: false });
+  });
+
+  it("uses the fixed dollars against a budget in dollars, and without one", () => {
+    const food = category("Food");
+    const fun = category("Fun");
+    const brl = addAccount("Itaú", "BRL", "bank", 1_000_000);
+    ledger.setBudget(ME, food, { month: "2026-10", currency: "USD", amount: 30_000 });
+    ledger.addEntry(ME, { id: id(), kind: "spent", date: DAY, account: brl, other: food, amount: 10_000 });
+    ledger.addEntry(ME, { id: id(), kind: "spent", date: DAY, account: brl, other: fun, amount: 5_000 });
+    // The rate moves afterwards: the dollars stay as they were saved.
+    rate = { ...RATE, value: 4 };
+    expect(line("2026-10", food)).toMatchObject({ spent: 2_000, spentUsd: 2_000 });
+    expect(line("2026-10", fun)).toMatchObject({ budget: null, spent: 1_000 });
+  });
+
+  it("says when a rate is missing rather than guess", () => {
+    const food = category("Food");
+    const usd = addAccount("Chase", "USD", "bank", 100_000);
+    ledger.setBudget(ME, food, { month: "2026-10", currency: "BRL", amount: 150_000 });
+    ledger.addEntry(ME, { id: id(), kind: "spent", date: DAY, account: usd, other: food, amount: 2_000 });
+    rate = null;
+    expect(line("2026-10", food)).toMatchObject({ spent: 0, spentUsd: 2_000, missingRate: true });
+  });
+
+  it("is only for spending categories, in dollars or reais, and within limits", () => {
+    const bank = addAccount("Itaú", "BRL");
+    const set = (categoryId: string, input: Partial<Parameters<typeof ledger.setBudget>[2]>) =>
+      code(() => ledger.setBudget(ME, categoryId, { month: "2026-10", currency: "BRL", amount: 100, ...input }));
+    expect(set(category("Salary"), {})).toBe("not-found");
+    expect(set(bank, {})).toBe("not-found");
+    expect(set(category("Food"), { currency: "BTC" as "USD" })).toBe("invalid");
+    expect(set(category("Food"), { amount: 0 })).toBe("invalid");
+    expect(set(category("Food"), { amount: 1.5 })).toBe("invalid");
+    expect(set(category("Food"), { amount: 1e18 })).toBe("invalid");
+    expect(set(category("Food"), { month: "2026-13" })).toBe("invalid");
+  });
+
+  it("keeps each user's budgets apart, and goes with its category", () => {
+    const food = category("Food");
+    ledger.setBudget(ME, food, { month: "2026-10", currency: "BRL", amount: 100 });
+    expect(code(() => ledger.setBudget("freya", food, { month: "2026-10", currency: "BRL", amount: 100 }))).toBe(
+      "not-found",
+    );
+    expect(ledger.budgets("freya", "2026-10").lines.every((l) => l.budget === null)).toBe(true);
+    const snack = id();
+    ledger.addCategory(ME, { id: snack, name: "Snacks", kind: "expense" });
+    ledger.setBudget(ME, snack, { month: "2026-10", currency: "BRL", amount: 100 });
+    ledger.removeAccount(ME, snack);
+    expect(db.prepare("SELECT COUNT(*) AS n FROM budgets WHERE category = ?").get(snack)).toEqual({ n: 0 });
+  });
+});
+
 describe("the upgrade to coins", () => {
   it("adds the two categories and leaves what was there alone", () => {
     const old = new DatabaseSync(":memory:");
@@ -1801,6 +1891,7 @@ describe("the upgrade to coins", () => {
     expect(names("freya")).toContain("Interest paid");
     const hidden = old.prepare("SELECT owner FROM accounts WHERE kind = 'revaluation' ORDER BY owner").all();
     expect(hidden).toEqual([{ owner: "freya" }, { owner: "odin" }]);
+    expect(old.prepare("SELECT COUNT(*) AS n FROM budgets").get()).toEqual({ n: 0 });
     const [entry] = ledgerNow.listEntries("odin", {}).entries;
     expect(entry).toMatchObject({
       amount: 10_000,
@@ -1860,6 +1951,7 @@ describe("double entry", () => {
 describe("removed users", () => {
   it("lose their books; others and the rates stay", () => {
     addAccount("Itaú", "BRL", "bank", 100);
+    ledger.setBudget(ME, category("Food"), { month: "2026-10", currency: "BRL", amount: 100 });
     ledger.load("freya", "2026-10");
     db.prepare(
       "INSERT INTO rates (date, base, quote, value, source, fetched_at) VALUES (?, 'USD', 'BRL', 5, 'test', 'now')",
@@ -1867,6 +1959,7 @@ describe("removed users", () => {
     expect(ledger.removeUnknownOwners(new Set(["freya"]))).toEqual([{ owner: ME, entries: 1 }]);
     expect(db.prepare("SELECT COUNT(*) AS n FROM accounts WHERE owner = ?").get(ME)).toEqual({ n: 0 });
     expect(db.prepare("SELECT COUNT(*) AS n FROM postings").get()).toEqual({ n: 0 });
+    expect(db.prepare("SELECT COUNT(*) AS n FROM budgets").get()).toEqual({ n: 0 });
     expect(db.prepare("SELECT COUNT(*) AS n FROM rates").get()).toEqual({ n: 1 });
     expect(ledger.load("freya", "2026-10").categories.length).toBeGreaterThan(0);
   });
