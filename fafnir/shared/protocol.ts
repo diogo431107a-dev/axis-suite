@@ -34,8 +34,14 @@ export const LOAN_KINDS = ["borrowed", "lent"] as const;
 export type LoanKind = (typeof LOAN_KINDS)[number];
 export const isLoan = (kind: unknown): kind is LoanKind => LOAN_KINDS.includes(kind as LoanKind);
 
-export const MONEY_KINDS = ["cash", "bank", "savings", "card", "crypto", ...LOAN_KINDS] as const;
+export const MONEY_KINDS = ["cash", "bank", "savings", "card", "crypto", ...LOAN_KINDS, "asset"] as const;
 export type MoneyKind = (typeof MONEY_KINDS)[number];
+
+/**
+ * Loans and things the user owns ("asset", a car or a house at a value they type) each have a page of
+ * their own, and stay out of the everyday forms.
+ */
+export const hasOwnPage = (kind: unknown): boolean => isLoan(kind) || kind === "asset";
 export const CATEGORY_KINDS = ["expense", "income"] as const;
 export type CategoryKind = (typeof CATEGORY_KINDS)[number];
 
@@ -108,7 +114,8 @@ export interface Fee extends Foreign {
 export interface Entry {
   id: string;
   /** "starting" and "adjustment" are made by adding an account and by Check balance. */
-  kind: EntryKind | LoanEntryKind | "starting" | "adjustment";
+  /** "revalued" is a new value typed for something the user owns. */
+  kind: EntryKind | LoanEntryKind | "starting" | "adjustment" | "revalued";
   date: IsoDate;
   memo: string;
   /**
@@ -205,6 +212,36 @@ export interface BalanceCheck {
   usd?: number;
 }
 
+/** A new value for something the user owns. */
+export interface NewValue {
+  /** Made by the browser, like an entry's: it becomes the entry's id. */
+  id: string;
+  date: IsoDate;
+  /** What it's worth now, in the smallest unit. */
+  value: number;
+  usd?: number;
+}
+
+export interface NewValueResult {
+  /** What it was worth before, on that day. */
+  before: number;
+  /** The entry for the difference; null if the value hadn't changed. */
+  entry: Entry | null;
+}
+
+/** Selling something the user owns: its value becomes the price, the money moves, and it closes. */
+export interface Sale {
+  /** The move's id, made by the browser. */
+  id: string;
+  /** The new value's id, made by the browser. */
+  valueId: string;
+  /** Where the money went. */
+  account: string;
+  /** What it sold for, in the smallest unit. */
+  amount: number;
+  date: IsoDate;
+}
+
 export interface BalanceCheckResult {
   /** What Fafnir had recorded on that day, in the smallest unit. */
   recorded: number;
@@ -228,7 +265,7 @@ export interface MonthSummary {
   change: WorthChange | null;
 }
 
-/** end = start + moneyIn - moneyOut + added + rates, all in US cents. */
+/** end = start + moneyIn - moneyOut + added + revalued + rates, all in US cents. */
 export interface WorthChange {
   /** What the user was worth as the month began, at that day's rate. */
   start: number;
@@ -236,6 +273,8 @@ export interface WorthChange {
   end: number;
   /** Starting balances and balance checks. */
   added: number;
+  /** New values typed for things the user owns. */
+  revalued: number;
   /** What's left: reais and coins worth more or fewer dollars, and what exchanging cost. */
   rates: number;
 }
@@ -305,6 +344,33 @@ export interface LoanSummary {
 
 export interface Loans {
   loans: LoanSummary[];
+}
+
+/** Something the user owns, read from its entries. Amounts are in its own currency, in the smallest unit. */
+export interface AssetSummary {
+  id: string;
+  name: string;
+  currency: Currency;
+  closed: boolean;
+  entries: number;
+  /** What it's worth, as last typed. */
+  value: number;
+  /** `value` in US cents at the latest rate; null while none is known. */
+  usdValue: number | null;
+  /** What was paid for it, through the user's accounts or a loan. Zero if it was added as already owned. */
+  paid: number;
+  /** Its value when it was added as already owned. Zero if it was bought. */
+  owned: number;
+  /** All the new values typed for it, added up: below zero if it has lost value. */
+  changes: number;
+  /** What it sold for. */
+  sold: number;
+  /** The last day it was bought, added, sold or given a new value. */
+  updated: IsoDate | null;
+}
+
+export interface Assets {
+  assets: AssetSummary[];
 }
 
 export interface EntryPage {

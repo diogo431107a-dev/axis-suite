@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import {
   Bitcoin,
+  Car,
   CircleUser,
   HandCoins,
   Landmark,
@@ -21,9 +22,10 @@ import {
   type Me,
 } from "@axis-suite/heimdall-client/browser";
 import {
-  isLoan,
+  hasOwnPage,
   type Book,
   type Entry,
+  type AssetSummary,
   type LoanSummary,
   type MoneyAccount,
   type MoneyKind,
@@ -31,26 +33,31 @@ import {
 import { api, describeError, setPageUser, setSignedOutHandler } from "./api.ts";
 import { localDate } from "./format.ts";
 import { AccountDialog } from "./forms/AccountDialog.tsx";
+import { AssetDialog } from "./forms/AssetDialog.tsx";
 import { CheckDialog } from "./forms/CheckDialog.tsx";
 import { EntryDialog } from "./forms/EntryDialog.tsx";
 import { InterestDialog } from "./forms/InterestDialog.tsx";
 import { LoanDialog } from "./forms/LoanDialog.tsx";
 import { PaymentDialog } from "./forms/PaymentDialog.tsx";
+import { SellDialog } from "./forms/SellDialog.tsx";
+import { ValueDialog } from "./forms/ValueDialog.tsx";
 import { AboutButton } from "./ui/About.tsx";
 import { Accounts } from "./views/Accounts.tsx";
 import { Activity } from "./views/Activity.tsx";
+import { Assets } from "./views/Assets.tsx";
 import { Categories } from "./views/Categories.tsx";
 import { Crypto } from "./views/Crypto.tsx";
 import { Home } from "./views/Home.tsx";
 import { Loans } from "./views/Loans.tsx";
 
-type View = "home" | "activity" | "accounts" | "loans" | "crypto" | "categories";
+type View = "home" | "activity" | "accounts" | "loans" | "assets" | "crypto" | "categories";
 
 const NAV: { view: View; label: string; icon: LucideIcon }[] = [
   { view: "home", label: "Home", icon: LayoutDashboard },
   { view: "activity", label: "Activity", icon: Receipt },
   { view: "accounts", label: "Accounts", icon: Landmark },
   { view: "loans", label: "Loans", icon: HandCoins },
+  { view: "assets", label: "Things I own", icon: Car },
   { view: "crypto", label: "Crypto", icon: Bitcoin },
   { view: "categories", label: "Categories", icon: ListTree },
 ];
@@ -65,6 +72,9 @@ type Open =
   | { what: "account"; account?: MoneyAccount; startAs?: MoneyKind }
   | { what: "check"; account: MoneyAccount }
   | { what: "loan" }
+  | { what: "asset" }
+  | { what: "value"; asset: MoneyAccount }
+  | { what: "sell"; asset: MoneyAccount }
   | { what: "payment"; loan: MoneyAccount; lastTotal?: number | null; entry?: Entry }
   | { what: "interest"; loan: MoneyAccount; entry?: Entry }
   | null;
@@ -162,7 +172,9 @@ function BookPage({ me }: { me: Me }) {
   };
 
   const addEntry = () =>
-    setOpen(book && book.accounts.some((a) => !a.closed && !isLoan(a.kind)) ? { what: "entry" } : { what: "account" });
+    setOpen(
+      book && book.accounts.some((a) => !a.closed && !hasOwnPage(a.kind)) ? { what: "entry" } : { what: "account" },
+    );
 
   /** An entry opens in the form that made it. */
   const openEntry = (entry: Entry) => {
@@ -174,7 +186,7 @@ function BookPage({ me }: { me: Me }) {
   };
 
   /** The account behind a line on the Loans page, then what to do with it. */
-  const withLoan = (summary: LoanSummary, then: (loan: MoneyAccount) => void) => {
+  const withLoan = (summary: LoanSummary | AssetSummary, then: (loan: MoneyAccount) => void) => {
     const loan = book?.accounts.find((a) => a.id === summary.id);
     if (loan) then(loan);
   };
@@ -313,6 +325,21 @@ function BookPage({ me }: { me: Me }) {
               }}
             />
           )}
+          {view === "assets" && (
+            <Assets
+              version={version}
+              onAdd={() => setOpen({ what: "asset" })}
+              actions={{
+                onValue: (s) => withLoan(s, (asset) => setOpen({ what: "value", asset })),
+                onSell: (s) => withLoan(s, (asset) => setOpen({ what: "sell", asset })),
+                onEdit: (s) => withLoan(s, (account) => setOpen({ what: "account", account })),
+                onActivity: (s) => {
+                  setActivityAccount(s.id);
+                  go("activity");
+                },
+              }}
+            />
+          )}
           {view === "crypto" && (
             <Crypto
               book={book}
@@ -347,6 +374,11 @@ function BookPage({ me }: { me: Me }) {
         />
       )}
       {open?.what === "loan" && <LoanDialog book={book} onClose={() => setOpen(null)} onSaved={saved} />}
+      {open?.what === "asset" && <AssetDialog book={book} onClose={() => setOpen(null)} onSaved={saved} />}
+      {open?.what === "value" && <ValueDialog asset={open.asset} onClose={() => setOpen(null)} onSaved={saved} />}
+      {open?.what === "sell" && (
+        <SellDialog book={book} asset={open.asset} onClose={() => setOpen(null)} onSaved={saved} />
+      )}
       {open?.what === "payment" && (
         <PaymentDialog
           book={book}

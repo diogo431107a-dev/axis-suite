@@ -131,6 +131,19 @@ app.delete("/api/accounts/:id", (req, res) => {
   ledger.removeAccount(owner(req), req.params.id);
   res.status(204).end();
 });
+app.post("/api/accounts/:id/value", async (req, res) => {
+  await ensureRate(req);
+  res.json(ledger.setValue(owner(req), req.params.id, req.body));
+});
+app.post("/api/accounts/:id/sell", async (req, res) => {
+  await ensureRate(req);
+  ledger.sell(owner(req), req.params.id, req.body);
+  res.json({ ok: true });
+});
+app.get("/api/assets", async (req, res) => {
+  await rates.ensure(today());
+  res.json(ledger.assets(owner(req)));
+});
 app.post("/api/accounts/:id/check", async (req, res) => {
   await ensureRate(req);
   res.json(ledger.checkBalance(owner(req), req.params.id, req.body));

@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { isCoin, unitOf } from "../../shared/currencies.ts";
 import {
   ENTRY_KINDS,
-  isLoan,
+  hasOwnPage,
   type Account,
   type Book,
   type Currency,
@@ -120,9 +120,9 @@ export function EntryDialog({
 }) {
   const everyday = entry === undefined || (entry.kind !== "starting" && entry.kind !== "adjustment");
   const [id] = useState(() => crypto.randomUUID());
-  // A loan's payments have their own form, so a loan is only here if this entry already uses one.
+  // Loans and things you own have their own forms, so one is only here if this entry already uses it.
   const open = book.accounts.filter(
-    (a) => (!a.closed && !isLoan(a.kind)) || a.id === entry?.account || a.id === entry?.other,
+    (a) => (!a.closed && !hasOwnPage(a.kind)) || a.id === entry?.account || a.id === entry?.other,
   );
 
   const [kind, setKind] = useState<EntryKind>(entry && everyday ? (entry.kind as EntryKind) : "spent");
@@ -275,13 +275,17 @@ export function EntryDialog({
   const deleteControls = entry && <DeleteEntry disabled={saving} onDelete={() => void remove()} />;
 
   // A balance check only says what the bank showed on a day: to redo one, delete it and check again.
-  if (entry?.kind === "adjustment") {
+  if (entry?.kind === "adjustment" || entry?.kind === "revalued") {
+    const revalued = entry.kind === "revalued";
     return (
-      <Dialog title="Balance check" onClose={onClose}>
+      <Dialog title={revalued ? "New value" : "Balance check"} onClose={onClose}>
         <p className="lead">
-          {from?.name} was {entry.amount > 0 ? "higher" : "lower"} than recorded by{" "}
-          <strong>{money(Math.abs(entry.amount), entry.currency)}</strong>, so this difference was added on{" "}
-          {showDate(entry.date)}.
+          {revalued
+            ? `${from?.name ?? "It"} was given a value `
+            : `${from?.name} was ${entry.amount > 0 ? "higher" : "lower"} than recorded `}
+          {revalued ? (entry.amount > 0 ? "higher " : "lower ") : ""}
+          by <strong>{money(Math.abs(entry.amount), entry.currency)}</strong> on {showDate(entry.date)}.{" "}
+          {revalued ? "To change it, delete it and give a new value again." : ""}
         </p>
         {error && (
           <p className="form-error" role="alert">

@@ -9,10 +9,13 @@ import {
   ENTRY_KINDS,
   LIMITS,
   MONEY_KINDS,
+  hasOwnPage,
   isLoan,
   isLoanEntry,
   type Account,
   type AccountChange,
+  type Assets,
+  type AssetSummary,
   type BalanceCheck,
   type BalanceCheckResult,
   type Book,
@@ -34,6 +37,9 @@ import {
   type NewAccount,
   type NewCategory,
   type NewEntry,
+  type NewValue,
+  type NewValueResult,
+  type Sale,
   type Rate,
   type RatedCurrency,
   type WorthChange,
@@ -168,6 +174,12 @@ export interface Ledger {
   changeAccount(owner: string, id: string, input: AccountChange): void;
   removeAccount(owner: string, id: string): void;
   checkBalance(owner: string, accountId: string, input: BalanceCheck): BalanceCheckResult;
+  /** A new value for something the user owns. */
+  setValue(owner: string, assetId: string, input: NewValue): NewValueResult;
+  /** Sells something the user owns: its value becomes the price, the money moves, and it closes. */
+  sell(owner: string, assetId: string, input: Sale): void;
+  /** Each thing the user owns: what it's worth, what it cost and how its value has changed. */
+  assets(owner: string): Assets;
   /** Everything of one user, as saved: their copy, and the way out. */
   exportAll(owner: string): unknown;
   /** Every entry, oldest first, for a spreadsheet. */
@@ -191,6 +203,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       add.run(randomUUID(), owner, "Starting balance", "starting", at, at);
       add.run(randomUUID(), owner, "Balance check", "adjustment", at, at);
       add.run(randomUUID(), owner, "Currency exchange", "exchange", at, at);
+      add.run(randomUUID(), owner, "Value changes", "revaluation", at, at);
       for (const kind of CATEGORY_KINDS) {
         for (const name of STARTING_CATEGORIES[kind]) add.run(randomUUID(), owner, name, kind, at, at);
       }
@@ -203,7 +216,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       AccountRow | undefined;
   }
 
-  function systemAccount(owner: string, kind: "starting" | "adjustment" | "exchange"): string {
+  function systemAccount(owner: string, kind: "starting" | "adjustment" | "exchange" | "revaluation"): string {
     const row = db.prepare("SELECT id FROM accounts WHERE owner = ? AND kind = ?").get(owner, kind) as { id: string };
     return row.id;
   }
@@ -230,7 +243,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
   `;
 
   function toEntry(row: TxRow): Entry {
-    const system = row.kind === "starting" || row.kind === "adjustment";
+    const system = row.kind === "starting" || row.kind === "adjustment" || row.kind === "revalued";
     // The first posting is the account's: money leaving it is below zero, but a spent, moved, exchanged
     // or repaid entry reads as a positive amount, and so does interest, whichever way it goes.
     const flip =
@@ -400,8 +413,12 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     if (!isMoneyKind(account.kind)) invalid("Pick an account");
     const amount = checkAmount(input.amount, "The amount", account.currency as Currency);
     const other = usable(owner, input.other, previous);
-    if (kind !== "moved" && (isLoan(account.kind) || isLoan(other.kind))) {
-      invalid("A loan only takes moves and payments. Record a payment on the Loans page.");
+    if (kind !== "moved" && (hasOwnPage(account.kind) || hasOwnPage(other.kind))) {
+      invalid(
+        isLoan(account.kind) || isLoan(other.kind)
+          ? "A loan only takes moves and payments. Record a payment on the Loans page."
+          : "Something you own only takes moves. Give it a new value on the Things I own page.",
+      );
     }
     if (kind === "spent" && other.kind !== "expense") invalid("Pick a spending category");
     if (kind === "received" && other.kind !== "income") invalid("Pick an income category");
@@ -409,6 +426,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       if (!isMoneyKind(other.kind)) invalid("Pick the account the money went to");
       if (other.id === account.id) invalid("Pick two different accounts");
       if (isLoan(account.kind) && isLoan(other.kind)) invalid("Money can't move straight from one loan to another");
+      if (account.kind === "asset" && other.kind === "asset") invalid("Pick an account, or a loan, for the money");
       if (other.currency !== account.currency) {
         invalid("A move stays in one currency. Use Exchanged to change money into another currency.");
       }
@@ -528,7 +546,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
       return { kind, rate, paid: null, postings };
     }
 
-    if (isLoan(account.kind)) invalid("Pick the account the payment went through");
+    if (hasOwnPage(account.kind)) invalid("Pick the account the payment went through");
     const loan = usable(owner, input.other, previous);
     const expected: LoanKind = kind === "repaid" ? "borrowed" : "lent";
     if (loan.kind !== expected) {
@@ -652,6 +670,39 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     ];
   }
 
+  /**
+   * Records what something the user owns is worth on a day, as an entry for the difference. Null if
+   * the value hasn't changed. It runs inside the caller's transaction.
+   */
+  function revalue(
+    owner: string,
+    asset: AccountRow,
+    id: string,
+    date: IsoDate,
+    value: number,
+    typed: unknown,
+  ): { before: number; entry: Entry | null } {
+    const currency = asset.currency as Currency;
+    const before = balanceOf(asset.id, date);
+    const difference = value - before;
+    if (difference === 0) return { before, entry: null };
+    if (Math.abs(difference) > CURRENCY_INFO[currency].largest) invalid("The difference is too large");
+    roomForEntries(owner);
+    const { usd, rate } = dollars(currency, difference, date, typed);
+    const other = systemAccount(owner, "revaluation");
+    writeTx(
+      owner,
+      id,
+      "revalued",
+      date,
+      "",
+      rate,
+      postingsOf("revalued", asset.id, other, currency, difference, usd),
+      true,
+    );
+    return { before, entry: readEntry(owner, id)! };
+  }
+
   function balanceOf(accountId: string, through?: IsoDate): number {
     const row = (
       through === undefined
@@ -732,16 +783,17 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     const start = worthOn(owner, startDay);
     const end = worthOn(owner, endDay);
     if (start === null || end === null) return null;
-    const { added } = db
+    const { added, revalued } = db
       .prepare(
         `
-        SELECT COALESCE(SUM(p.usd), 0) AS added
+        SELECT COALESCE(SUM(CASE WHEN t.kind <> 'revalued' THEN p.usd END), 0) AS added,
+               COALESCE(SUM(CASE WHEN t.kind = 'revalued' THEN p.usd END), 0) AS revalued
         FROM transactions t JOIN postings p ON p.tx_id = t.id AND p.seq = 0
-        WHERE t.owner = ? AND t.date > ? AND t.date <= ? AND t.kind IN ('starting', 'adjustment')
+        WHERE t.owner = ? AND t.date > ? AND t.date <= ? AND t.kind IN ('starting', 'adjustment', 'revalued')
       `,
       )
-      .get(owner, startDay, endDay) as { added: number };
-    return { start, end, added, rates: end - start - moneyIn + moneyOut - added };
+      .get(owner, startDay, endDay) as { added: number; revalued: number };
+    return { start, end, added, revalued, rates: end - start - moneyIn + moneyOut - added - revalued };
   }
 
   function monthSummary(owner: string, month: string): MonthSummary {
@@ -778,7 +830,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
           SELECT a.*, COUNT(p.tx_id) AS entries,
                  COALESCE(SUM(CASE WHEN a.currency IS NOT NULL THEN p.amount END), 0) AS balance
           FROM accounts a LEFT JOIN postings p ON p.account_id = a.id
-          WHERE a.owner = ? AND a.kind NOT IN ('starting', 'adjustment', 'exchange')
+          WHERE a.owner = ? AND a.kind NOT IN ('starting', 'adjustment', 'exchange', 'revaluation')
           GROUP BY a.id
           ORDER BY a.grp COLLATE NOCASE, a.name COLLATE NOCASE
         `,
@@ -1012,6 +1064,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         const before = readEntry(owner, id);
         if (!before) notFound("entry");
         if (before.kind === "adjustment") conflict("A balance check can't be changed, only deleted");
+        if (before.kind === "revalued") conflict("A new value can't be changed, only deleted");
         if ((input.kind === "starting") !== (before.kind === "starting")) {
           invalid("A starting balance can't become another kind of entry");
         }
@@ -1065,6 +1118,7 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         const group = checkText(input.group, "The group", LIMITS.group);
         const starting =
           input.starting === undefined ? 0 : checkAmount(input.starting, "The balance", input.currency, true);
+        if (input.kind === "asset" && starting < 0) invalid("Something you own can't be worth less than nothing");
         if ((input.kind === "borrowed" && starting > 0) || (input.kind === "lent" && starting < 0)) {
           invalid("A loan you took starts at what you owe, and one you gave at what you're owed");
         }
@@ -1125,8 +1179,12 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
           if ((input.kind === "crypto") !== isCoin(row.currency)) {
             invalid("A crypto account holds a coin, and only a crypto account can");
           }
-          if ((isLoan(row.kind) || isLoan(input.kind)) && input.kind !== row.kind) {
-            invalid("A loan stays a loan, and which way it goes can't change");
+          if ((hasOwnPage(row.kind) || hasOwnPage(input.kind)) && input.kind !== row.kind) {
+            invalid(
+              row.kind === "asset" || input.kind === "asset"
+                ? "Something you own stays that, and an account stays an account"
+                : "A loan stays a loan, and which way it goes can't change",
+            );
           }
           kind = input.kind;
         }
@@ -1181,6 +1239,128 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         writeTx(owner, id, "adjustment", date, "", rate, postings, true);
         return { recorded, entry: readEntry(owner, id)! };
       });
+    },
+
+    setValue(owner, assetId, input) {
+      const id = checkId(input.id);
+      return transaction(db, () => {
+        const asset = accountRow(owner, assetId);
+        if (!asset || asset.kind !== "asset") notFound("thing you own");
+        const date = checkDate(input.date);
+        const existing = readEntry(owner, id);
+        if (existing) return { before: balanceOf(assetId, date) - existing.amount, entry: existing };
+        if (db.prepare("SELECT 1 FROM transactions WHERE id = ?").get(id)) invalid("That id isn't valid");
+        if (asset.closed) invalid(`${asset.name} has been sold`);
+        const value = checkAmount(input.value, "The value", asset.currency as Currency, true);
+        if (value < 0) invalid("Something you own can't be worth less than nothing");
+        return revalue(owner, asset, id, date, value, input.usd);
+      });
+    },
+
+    sell(owner, assetId, input) {
+      const id = checkId(input.id);
+      const valueId = checkId(input.valueId);
+      if (id === valueId) invalid("That id isn't valid");
+      transaction(db, () => {
+        const asset = accountRow(owner, assetId);
+        if (!asset || asset.kind !== "asset") notFound("thing you own");
+        // Sent twice (the first answer got lost): the first one stands.
+        if (readEntry(owner, id)) return;
+        for (const taken of [id, valueId]) {
+          if (db.prepare("SELECT 1 FROM transactions WHERE id = ?").get(taken)) invalid("That id isn't valid");
+        }
+        if (asset.closed) invalid(`${asset.name} has already been sold`);
+        const currency = asset.currency as Currency;
+        const date = checkDate(input.date);
+        const amount = checkAmount(input.amount, "The price", currency, true);
+        if (amount < 0) invalid("The price can't be below zero");
+        const account = usable(owner, input.account);
+        if (!isMoneyKind(account.kind) || hasOwnPage(account.kind)) invalid("Pick the account the money went to");
+        if (account.currency !== currency) {
+          invalid("It's sold in its own currency. Use Exchanged afterwards to change the money.");
+        }
+        // Its value becomes what it sold for, then that much leaves it: nothing is left behind.
+        revalue(owner, asset, valueId, date, amount, undefined);
+        if (amount > 0) {
+          roomForEntries(owner);
+          const { usd, rate } = dollars(currency, amount, date, undefined);
+          writeTx(
+            owner,
+            id,
+            "moved",
+            date,
+            "",
+            rate,
+            postingsOf("moved", asset.id, account.id, currency, amount, usd),
+            true,
+          );
+        }
+        if (balanceOf(asset.id) !== 0) {
+          conflict(`${asset.name} has entries after that day. Sell it on the day of its last entry, or later.`);
+        }
+        db.prepare("UPDATE accounts SET closed = 1, updated_at = ? WHERE id = ? AND owner = ?").run(
+          now(),
+          asset.id,
+          owner,
+        );
+      });
+    },
+
+    assets(owner) {
+      ensureBook(owner);
+      const rows = db
+        .prepare(
+          `
+          SELECT a.id, a.name, a.currency, a.closed, COUNT(p.tx_id) AS entries, COALESCE(SUM(p.amount), 0) AS balance
+          FROM accounts a LEFT JOIN postings p ON p.account_id = a.id
+          WHERE a.owner = ? AND a.kind = 'asset'
+          GROUP BY a.id
+          ORDER BY a.name COLLATE NOCASE
+        `,
+        )
+        .all(owner) as unknown as {
+        id: string;
+        name: string;
+        currency: Currency;
+        closed: number;
+        entries: number;
+        balance: number;
+      }[];
+      if (rows.length === 0) return { assets: [] };
+
+      const date = today();
+      const assets = new Map<string, AssetSummary>();
+      for (const row of rows) {
+        assets.set(row.id, {
+          id: row.id,
+          name: row.name,
+          currency: row.currency,
+          closed: row.closed === 1,
+          entries: row.entries,
+          value: row.balance,
+          usdValue: valueOn(row.balance, row.currency, date),
+          paid: 0,
+          owned: 0,
+          changes: 0,
+          sold: 0,
+          updated: null,
+        });
+      }
+      // Oldest first, so the last date seen is the last update.
+      for (const entry of this.allEntries(owner)) {
+        const into = entry.other ? assets.get(entry.other) : undefined;
+        const out = assets.get(entry.account);
+        if (entry.kind === "moved" && into) {
+          into.paid += entry.amount - (entry.fee?.amount ?? 0);
+          into.updated = entry.date;
+        }
+        if (!out) continue;
+        if (entry.kind === "moved") out.sold += entry.amount;
+        if (entry.kind === "starting" || entry.kind === "adjustment") out.owned += entry.amount;
+        if (entry.kind === "revalued") out.changes += entry.amount;
+        out.updated = entry.date;
+      }
+      return { assets: [...assets.values()] };
     },
 
     exportAll(owner) {

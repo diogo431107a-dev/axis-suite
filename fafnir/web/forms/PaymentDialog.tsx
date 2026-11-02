@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import {
-  isLoan,
+  hasOwnPage,
   type Book,
   type Entry,
   type EntryChange,
@@ -36,7 +36,7 @@ export function PaymentDialog({
   const borrowed = loan.kind === "borrowed";
   const [id] = useState(() => crypto.randomUUID());
   const accounts = book.accounts.filter(
-    (a) => a.currency === currency && !isLoan(a.kind) && (!a.closed || a.id === entry?.account),
+    (a) => a.currency === currency && !hasOwnPage(a.kind) && (!a.closed || a.id === entry?.account),
   );
   const start = entry?.amount ?? lastTotal;
   const [totalText, setTotalText] = useState(start ? plainAmount(start, currency) : "");

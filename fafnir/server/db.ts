@@ -23,7 +23,7 @@ const migrations: ((db: DatabaseSync) => void)[] = [
         id         TEXT PRIMARY KEY,
         owner      TEXT NOT NULL,
         name       TEXT NOT NULL,
-        kind       TEXT NOT NULL,                    -- cash, bank, savings, card, expense, income, starting, adjustment, exchange
+        kind       TEXT NOT NULL,                    -- what it is; see MONEY_KINDS, CATEGORY_KINDS and the hidden ones
         currency   TEXT,                             -- NULL unless it is one of cash, bank, savings, card
         grp        TEXT NOT NULL DEFAULT '',
         closed     INTEGER NOT NULL DEFAULT 0,
@@ -120,6 +120,14 @@ const migrations: ((db: DatabaseSync) => void)[] = [
           SELECT 1 FROM accounts a
           WHERE a.owner = b.owner AND a.kind = 'expense' AND a.name = 'Interest paid' COLLATE NOCASE
         );
+    `);
+  },
+  // v5: things the user owns. A new value typed for one is set against a hidden account of its own, so
+  // it shows apart from balance checks.
+  (db) => {
+    db.exec(`
+      INSERT INTO accounts (id, owner, name, kind, created_at, updated_at)
+        SELECT lower(hex(randomblob(16))), owner, 'Value changes', 'revaluation', created_at, created_at FROM books;
     `);
   },
 ];

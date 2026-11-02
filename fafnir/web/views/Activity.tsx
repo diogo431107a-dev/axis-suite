@@ -12,9 +12,12 @@ function title(entry: Entry, names: Map<string, string>, kinds: Map<string, stri
   if (entry.kind === "repaid") return `Paid ${other}`;
   if (entry.kind === "collected") return `${other} paid`;
   if (entry.kind === "interest") return `Interest on ${account}`;
+  if (entry.kind === "revalued") return `New value for ${account}`;
   if (entry.kind === "moved") {
     const to = entry.other ? kinds.get(entry.other) : undefined;
     const from = kinds.get(entry.account);
+    if (to === "asset") return `Bought ${other}`;
+    if (from === "asset") return `Sold ${account}`;
     if (from === "borrowed") return `Borrowed from ${account}`;
     if (to === "lent") return `Lent to ${other}`;
     if (to === "borrowed") return `Paid ${other}`;
@@ -179,7 +182,9 @@ export function Activity({
                   {e.arrived ? (
                     <small className="muted">became {money(e.arrived.amount, e.arrived.currency)}</small>
                   ) : (
-                    e.currency !== "USD" && <small className="muted">{money(amount < 0 ? -e.usd : e.usd)}</small>
+                    e.currency !== "USD" && (
+                      <small className="muted">{money(Math.sign(amount) * Math.abs(e.usd))}</small>
+                    )
                   )}
                 </span>
               </button>
