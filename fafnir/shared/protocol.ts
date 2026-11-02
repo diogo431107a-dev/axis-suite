@@ -373,6 +373,36 @@ export interface Assets {
   assets: AssetSummary[];
 }
 
+/**
+ * The parts of what the user is worth: money in hand (cash, bank, savings), crypto, things they own,
+ * what they're owed, and debts. Any balance below zero counts as a debt, whatever its account.
+ */
+export const WORTH_PARTS = ["money", "crypto", "owned", "lent", "debts"] as const;
+export type WorthPart = (typeof WORTH_PARTS)[number];
+
+/** What the user was worth at the end of a month (or today), at that day's rates, in US cents. */
+export interface WorthPoint {
+  month: string;
+  date: IsoDate;
+  /** Null when a rate it needs isn't known. Debts are below zero. */
+  parts: Record<WorthPart, number> | null;
+  total: number | null;
+}
+
+export interface WorthHistory {
+  /** Oldest first, from the month of the first entry to this one. */
+  points: WorthPoint[];
+}
+
+/** Several months of spending and income side by side, oldest first, in US cents. */
+export interface SpendingMonths {
+  months: string[];
+  /** Each spending category with anything in those months; `usd` lines up with `months`. */
+  categories: { category: string; usd: number[] }[];
+  moneyIn: number[];
+  moneyOut: number[];
+}
+
 export interface EntryPage {
   entries: Entry[];
   /** How many entries match, on all pages. */

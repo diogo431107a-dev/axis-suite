@@ -1646,6 +1646,119 @@ describe("things you own", () => {
   });
 });
 
+describe("worth over time", () => {
+  // The rate is 5 until the end of September, when it is 4.
+  const fiveThenFour = (date: string): Rate => ({
+    currency: "BRL",
+    value: date >= "2026-09-30" ? 4 : 5,
+    date,
+    source: "test",
+  });
+
+  it("splits each month's worth into its parts, which add up to the total", () => {
+    rateOn = fiveThenFour;
+    const start = (name: string, currency: Currency, kind: Parameters<typeof addAccount>[2], amount: number) => {
+      const accountId = id();
+      ledger.addAccount(ME, { id: accountId, name, kind: kind!, currency, starting: amount, date: "2026-08-10" });
+      return accountId;
+    };
+    start("Itaú", "BRL", "bank", 100_000);
+    start("Sparrow BTC", "BTC", "crypto", 100_000_000);
+    start("Car", "BRL", "asset", 5_000_000);
+    start("Bruno", "USD", "lent", 30_000);
+    start("Nubank", "BRL", "card", -50_000);
+    start("Overdrawn", "USD", "bank", -1_000);
+
+    const { points } = ledger.worthHistory(ME);
+    expect(points[0]).toEqual({
+      month: "2026-08",
+      date: "2026-08-31",
+      parts: { money: 20_000, crypto: 5_000_000, owned: 1_000_000, lent: 30_000, debts: -11_000 },
+      total: 6_039_000,
+    });
+    // In September the rate is 4 at the month's end: reais are worth more dollars.
+    expect(points[1]).toMatchObject({
+      month: "2026-09",
+      parts: { money: 25_000, owned: 1_250_000, debts: -13_500 },
+    });
+    for (const point of points) {
+      const sum = Object.values(point.parts!).reduce((a, b) => a + b, 0);
+      expect(sum).toBe(point.total);
+    }
+  });
+
+  it("has one point a month from the first entry to today, matching Home's walk", () => {
+    rateOn = fiveThenFour;
+    const bank = addAccount("Itaú", "BRL");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: "2026-07-20",
+      account: bank,
+      other: category("Salary"),
+      amount: 100_000,
+    });
+    const { points } = ledger.worthHistory(ME);
+    const now = new Date().toISOString().slice(0, 7);
+    expect(points[0]!.month).toBe("2026-07");
+    expect(points.at(-1)!.month).toBe(now);
+    const months = points.map((p) => p.month);
+    expect(new Set(months).size).toBe(months.length);
+    expect(points.find((p) => p.month === "2026-09")!.total).toBe(ledger.load(ME, "2026-09").month.change!.end);
+  });
+
+  it("leaves a month out rather than guess when a rate is missing", () => {
+    const bank = addAccount("Itaú", "BRL");
+    ledger.addEntry(ME, {
+      id: id(),
+      kind: "received",
+      date: "2026-08-10",
+      account: bank,
+      other: category("Salary"),
+      amount: 100_000,
+    });
+    rate = null;
+    expect(ledger.worthHistory(ME).points[0]).toMatchObject({ month: "2026-08", parts: null, total: null });
+  });
+
+  it("has nothing to show before the first entry", () => {
+    expect(ledger.worthHistory(ME).points).toEqual([]);
+    expect(ledger.firstMonth(ME)).toBeNull();
+  });
+});
+
+describe("spending over the months", () => {
+  it("matches each month's summary on Home", () => {
+    const bank = addAccount("Itaú", "BRL", "bank", 10_000_000);
+    const add = (date: string, kind: "spent" | "received", other: string, amount: number) =>
+      ledger.addEntry(ME, { id: id(), kind, date, account: bank, other, amount });
+    add("2026-08-05", "spent", category("Food"), 10_000);
+    add("2026-08-20", "spent", category("Food"), 5_000);
+    add("2026-09-05", "spent", category("Fun"), 10_000);
+    add("2026-09-06", "received", category("Salary"), 100_000);
+    add("2026-10-01", "spent", category("Food"), 1_000);
+    const result = ledger.spendingMonths(ME, "2026-10", 3);
+    expect(result.months).toEqual(["2026-08", "2026-09", "2026-10"]);
+    for (const [i, month] of result.months.entries()) {
+      const summary = ledger.load(ME, month).month;
+      expect(result.moneyIn[i]).toBe(summary.moneyIn);
+      expect(result.moneyOut[i]).toBe(summary.moneyOut);
+      for (const { category: c, usd } of summary.spending) {
+        expect(result.categories.find((x) => x.category === c)!.usd[i]).toBe(usd);
+      }
+    }
+    // Food is the most over the three months, so it comes first.
+    expect(result.categories.map((c) => c.category)).toEqual([category("Food"), category("Fun")]);
+    expect(result.categories[0]!.usd).toEqual([3_000, 0, 200]);
+  });
+
+  it("crosses a year, and refuses what isn't a month", () => {
+    expect(ledger.spendingMonths(ME, "2026-02", 4).months).toEqual(["2025-11", "2025-12", "2026-01", "2026-02"]);
+    expect(code(() => ledger.spendingMonths(ME, "2026-13", 3))).toBe("invalid");
+    expect(code(() => ledger.spendingMonths(ME, "2026-10", 0))).toBe("invalid");
+  });
+});
+
 describe("the upgrade to coins", () => {
   it("adds the two categories and leaves what was there alone", () => {
     const old = new DatabaseSync(":memory:");

@@ -42,11 +42,24 @@ import {
   type Sale,
   type Rate,
   type RatedCurrency,
+  type SpendingMonths,
   type WorthChange,
+  type WorthHistory,
+  type WorthPart,
+  type WorthPoint,
 } from "../shared/protocol.ts";
 import { StoreError, conflict, invalid, notFound, tooMany, transaction } from "./errors.ts";
 import { coinCosts, type CoinChange } from "./holdings.ts";
 import { addDays, monthSpan, today } from "./rates.ts";
+
+const nextMonth = (month: string): string => {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  return m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, "0")}`;
+};
+const previousMonth = (month: string): string => {
+  const [y, m] = month.split("-").map(Number) as [number, number];
+  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+};
 
 const FEES = "Fees";
 const INTEREST_PAID = "Interest paid";
@@ -180,6 +193,12 @@ export interface Ledger {
   sell(owner: string, assetId: string, input: Sale): void;
   /** Each thing the user owns: what it's worth, what it cost and how its value has changed. */
   assets(owner: string): Assets;
+  /** The month of the user's first entry; null if they have none. */
+  firstMonth(owner: string): string | null;
+  /** What the user was worth at the end of each month, from their first entry to today. */
+  worthHistory(owner: string): WorthHistory;
+  /** `count` months of spending and income, ending with `month`. */
+  spendingMonths(owner: string, month: string, count: number): SpendingMonths;
   /** Everything of one user, as saved: their copy, and the way out. */
   exportAll(owner: string): unknown;
   /** Every entry, oldest first, for a spreadsheet. */
@@ -746,6 +765,15 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
     if (taken) conflict(`You already have ${name}`);
   }
 
+  /** Which part of what the user is worth a balance belongs to. Anything below zero is owed. */
+  function partOf(kind: MoneyKind, usd: number): WorthPart {
+    if (usd < 0 || kind === "card" || kind === "borrowed") return usd < 0 ? "debts" : "money";
+    if (kind === "crypto") return "crypto";
+    if (kind === "asset") return "owned";
+    if (kind === "lent") return "lent";
+    return "money";
+  }
+
   /** What an amount is worth in US cents on a day; null if it needs a rate nobody knows. */
   function valueOn(amount: number, currency: Currency, date: IsoDate): number | null {
     if (currency === "USD") return amount;
@@ -755,10 +783,15 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
 
   /** What the user was worth at the end of a day, at that day's rate; null if the rate is needed and unknown. */
   function worthOn(owner: string, date: IsoDate): number | null {
+    return worthByKind(owner, date)?.total ?? null;
+  }
+
+  /** What the user was worth at the end of a day, split into its parts; null if a rate is needed and unknown. */
+  function worthByKind(owner: string, date: IsoDate): { parts: Record<WorthPart, number>; total: number } | null {
     const rows = db
       .prepare(
         `
-        SELECT a.currency AS currency, SUM(p.amount) AS balance
+        SELECT a.kind AS kind, a.currency AS currency, SUM(p.amount) AS balance
         FROM postings p
         JOIN transactions t ON t.id = p.tx_id
         JOIN accounts a ON a.id = p.account_id
@@ -766,15 +799,17 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         GROUP BY a.id
       `,
       )
-      .all(owner, date) as unknown as { currency: Currency; balance: number }[];
-    let worth = 0;
-    for (const { currency, balance } of rows) {
+      .all(owner, date) as unknown as { kind: MoneyKind; currency: Currency; balance: number }[];
+    const parts: Record<WorthPart, number> = { money: 0, crypto: 0, owned: 0, lent: 0, debts: 0 };
+    let total = 0;
+    for (const { kind, currency, balance } of rows) {
       if (balance === 0) continue;
       const usd = valueOn(balance, currency, date);
       if (usd === null) return null;
-      worth += usd;
+      parts[partOf(kind, usd)] += usd;
+      total += usd;
     }
-    return worth;
+    return { parts, total };
   }
 
   function worthChange(owner: string, month: string, moneyIn: number, moneyOut: number): WorthChange | null {
@@ -1361,6 +1396,73 @@ export function createLedger(db: DatabaseSync, lookupRate: (currency: Currency, 
         out.updated = entry.date;
       }
       return { assets: [...assets.values()] };
+    },
+
+    firstMonth(owner) {
+      const row = db.prepare("SELECT MIN(date) AS first FROM transactions WHERE owner = ?").get(owner) as {
+        first: string | null;
+      };
+      return row.first ? row.first.slice(0, 7) : null;
+    },
+
+    worthHistory(owner) {
+      ensureBook(owner);
+      const first = this.firstMonth(owner);
+      if (!first) return { points: [] };
+      const points: WorthPoint[] = [];
+      const last = today().slice(0, 7);
+      for (let month = first; month <= last; month = nextMonth(month)) {
+        const { end: date } = monthSpan(month);
+        const worth = worthByKind(owner, date);
+        points.push({ month, date, parts: worth?.parts ?? null, total: worth?.total ?? null });
+      }
+      return { points };
+    },
+
+    spendingMonths(owner, month, count) {
+      if (!isMonth(month)) invalid("That month isn't valid");
+      if (!Number.isSafeInteger(count) || count < 1 || count > 36) invalid("That many months isn't possible");
+      ensureBook(owner);
+      const months: string[] = [];
+      for (let m = month, i = 0; i < count; i++, m = previousMonth(m)) months.unshift(m);
+      const rows = db
+        .prepare(
+          `
+          SELECT substr(t.date, 1, 7) AS month, a.id AS category, a.kind AS kind, SUM(p.usd) AS usd
+          FROM postings p
+          JOIN transactions t ON t.id = p.tx_id
+          JOIN accounts a ON a.id = p.account_id
+          WHERE t.owner = ? AND t.date BETWEEN ? AND ? AND a.kind IN ('expense', 'income')
+          GROUP BY month, a.id
+        `,
+        )
+        .all(owner, `${months[0]}-01`, `${month}-31`) as unknown as {
+        month: string;
+        category: string;
+        kind: CategoryKind;
+        usd: number;
+      }[];
+      const at = new Map(months.map((m, i) => [m, i]));
+      const byCategory = new Map<string, number[]>();
+      const moneyIn = months.map(() => 0);
+      const moneyOut = months.map(() => 0);
+      for (const row of rows) {
+        const i = at.get(row.month)!;
+        if (row.kind === "income") {
+          moneyIn[i]! -= row.usd;
+          continue;
+        }
+        if (row.usd === 0) continue;
+        const line = byCategory.get(row.category) ?? months.map(() => 0);
+        line[i] = row.usd;
+        byCategory.set(row.category, line);
+        moneyOut[i]! += row.usd;
+      }
+      // The biggest over all the months first.
+      const categories = [...byCategory]
+        .map(([category, usd]) => ({ category, usd }))
+        .sort((a, b) => b.usd.reduce((x, y) => x + y, 0) - a.usd.reduce((x, y) => x + y, 0));
+      return { months, categories, moneyIn, moneyOut };
     },
 
     exportAll(owner) {
