@@ -36,6 +36,7 @@ export interface Draft {
   content: string;
   note?: string;
   completed?: boolean;
+  collapsed?: boolean;
   children: Draft[];
 }
 
@@ -296,6 +297,28 @@ export function toggleStar(ctx: Ctx, ids: readonly string[]): Result {
   };
 }
 
+/**
+ * Alt+M: copies the bullets, with everything under them, right after the last one. The copies
+ * keep the text, note, completion and collapsing, not the star. The caret goes to the first copy.
+ */
+export function duplicate(ctx: Ctx, ids: readonly string[]): (Result & { ids: string[] }) | null {
+  const targets = ids.filter((id) => id !== ctx.root);
+  if (targets.length === 0) return null;
+  const draftOf = (id: string): Draft => {
+    const node = get(ctx, id);
+    return {
+      content: node.content,
+      note: node.note,
+      completed: node.completedAt !== null,
+      collapsed: node.collapsed,
+      children: liveChildren(ctx, id).map(draftOf),
+    };
+  };
+  const parentId = get(ctx, targets[0]!).parentId;
+  const result = insertDrafts(ctx, parentId, targets.at(-1)!, targets.map(draftOf));
+  return { ...result, caret: { id: result.ids[0]!, offset: get(ctx, targets[0]!).content.length } };
+}
+
 // ---- Inserting whole subtrees (paste, import) -----------------------------------------------
 
 /** Creates for drafts under parentId after afterId, parents before children. */
@@ -313,6 +336,7 @@ export function insertDrafts(
     if (draft.content) op.content = draft.content;
     if (draft.note) op.note = draft.note;
     if (draft.completed) op.completedAt = now;
+    if (draft.collapsed) op.collapsed = true;
     ops.push(op);
     addAll(draft.children, id, generateNKeysBetween(null, null, draft.children.length));
     return id;

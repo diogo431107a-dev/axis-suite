@@ -1,13 +1,13 @@
 // The menu of a bullet's dot (right-click the dot, or the ⋯ button on the row). It offers only
-// what the user may do: a bullet shared with them to read can only be starred, exported or linked.
-// Starring is also Alt+S.
+// what the user may do: a bullet shared with them to read can only be zoomed into, starred, exported or linked.
+// Starring is also Alt+S, duplicating Alt+M. Zoom in is here for phones, where the dot is hard to tap.
 // (The top of a bullet shared with them is never a row: it is taken off their list in the sidebar.)
 import { useEffect, useRef, type ReactNode } from "react";
-import { Check, Download, Link, Paperclip, Share2, Star, Trash2 } from "lucide-react";
+import { Check, Copy, Download, Link, Paperclip, Share2, Star, Trash2, ZoomIn } from "lucide-react";
 import { attachFiles, pickFiles } from "../files/upload.ts";
 import * as cmd from "../model/commands.ts";
 import { useNode, useOutliner } from "./hooks.ts";
-import { pathOf } from "./nav.ts";
+import { pathOf, zoomTo } from "./nav.ts";
 
 interface Props {
   id: string;
@@ -44,6 +44,15 @@ export function BulletMenu({ id, onClose }: Props) {
       role="menu"
       className="absolute left-0 top-[1.6em] z-30 w-56 rounded-md border border-gray-200 bg-white py-1 text-sm shadow-lg"
     >
+      <Item
+        icon={<ZoomIn className="h-4 w-4" />}
+        onClick={act(() => {
+          zoomTo(o, id);
+          o.ui.clearCaret();
+        })}
+      >
+        Zoom in
+      </Item>
       <Item icon={<Star className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.toggleStar(ctx, [id])))}>
         {node.starred ? "Remove star" : "Star"}
       </Item>
@@ -58,6 +67,11 @@ export function BulletMenu({ id, onClose }: Props) {
       {role !== "viewer" && (
         <Item icon={<Check className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.toggleComplete(ctx, [id])))}>
           {node.completedAt ? "Mark as not completed" : "Complete"}
+        </Item>
+      )}
+      {role !== "viewer" && (
+        <Item icon={<Copy className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.duplicate(ctx, [id])))}>
+          Duplicate
         </Item>
       )}
       {role === "owner" && (

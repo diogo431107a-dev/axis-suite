@@ -207,6 +207,12 @@ export function editorKeyDown(o: Outliner, e: Keys, ta: HTMLTextAreaElement, id:
       o.run((ctx) => cmd.toggleStar(ctx, [id]));
       return handled();
 
+    case "m":
+      // Alt+M: a copy of the bullet, with everything under it, right below it.
+      if (!e.altKey || mod || e.shiftKey) return;
+      o.run((ctx) => cmd.duplicate(ctx, [id]));
+      return handled();
+
     case "Escape":
       selectBlock(o, id);
       return handled();
@@ -269,6 +275,16 @@ export function selectionKeyDown(o: Outliner, e: Keys): void {
       if (!e.altKey || mod || e.shiftKey) return;
       o.run((ctx) => cmd.toggleStar(ctx, ids));
       return handled();
+
+    case "m": {
+      // Alt+M: the copies come right after the selection, and are selected instead.
+      if (!e.altKey || mod || e.shiftKey) return;
+      const copies = cmd.duplicate(o.ctx(), ids);
+      if (copies && o.commit({ ops: copies.ops }, { after: { kind: "blocks", ids: copies.ids } })) {
+        o.ui.select({ parentId: sel.parentId, anchor: copies.ids[0]!, head: copies.ids.at(-1)! }, copies.ids);
+      }
+      return handled();
+    }
 
     case "Backspace":
     case "Delete":

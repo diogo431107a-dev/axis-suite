@@ -4,6 +4,9 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 
 ## Unreleased
 
+- **Minor:** Alt+M duplicates a bullet, with its note and everything under it: the copy appears right below and the caret moves into it. It also works on bullets selected with Esc, and is in the bullet's ⋯ menu as **Duplicate**. The copy has no star and is not shared.
+- **Minor:** On a phone, the ⋯ menu at the right of every bullet is always shown, and its new first item, **Zoom in**, opens the bullet. Tapping the dot also opens it more reliably: a slightly shaky tap no longer counts as dragging the bullet.
+
 - **Fix:** After some saves, the page asked the server for the bullet it had just saved, which it already had. It no longer does. Nothing you will notice: just one request fewer.
 
 ## 1.0.2 — 2026-10-25

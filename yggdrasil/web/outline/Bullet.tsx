@@ -49,7 +49,8 @@ export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: n
             onMouseDown={(e) => e.preventDefault()}
             onClick={() => o.run((ctx) => cmd.setCollapsed(ctx, id, !node.collapsed))}
             className="absolute -left-5 top-0 flex h-[1.6em] w-5 items-center justify-center text-gray-400
-                       opacity-0 transition-opacity hover:text-gray-700 group-hover:opacity-100"
+                       opacity-0 transition-opacity hover:text-gray-700 group-hover:opacity-100
+                       pointer-coarse:opacity-100"
           >
             <ChevronRight className={`h-3.5 w-3.5 transition-transform ${expanded ? "rotate-90" : ""}`} />
           </button>
@@ -97,7 +98,7 @@ export const Bullet = memo(function Bullet({ id, depth }: { id: string; depth: n
           onMouseDown={(e) => e.preventDefault()}
           onClick={() => setMenu((m) => !m)}
           className="ml-1 flex h-[1.6em] w-6 shrink-0 items-center justify-center text-gray-300 opacity-0
-                     transition-opacity hover:text-gray-600 group-hover:opacity-100"
+                     transition-opacity hover:text-gray-600 group-hover:opacity-100 pointer-coarse:opacity-100"
         >
           <Ellipsis className="h-4 w-4" />
         </button>

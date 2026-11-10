@@ -46,7 +46,7 @@ deploy/
 
 ## Using it
 
-Click any text to edit it; the caret lands on the character you clicked. A bullet's dot zooms into it (drag the dot to move the bullet; right-click it for its menu). The URL of a zoomed-in bullet is `/n/<id>`, so Back and Forward work and links to bullets can be shared with yourself.
+Click any text to edit it; the caret lands on the character you clicked. A bullet's dot zooms into it (drag the dot to move the bullet; right-click it for its menu). The menu is also the ⋯ at the row's right, which appears on hover, and is always shown on a phone: its **Zoom in** is the easy way there, and **Duplicate** copies the bullet with everything under it (Alt+M). The URL of a zoomed-in bullet is `/n/<id>`, so Back and Forward work and links to bullets can be shared with yourself.
 
 | Keys                                | Action                                                                              |
 | ----------------------------------- | ----------------------------------------------------------------------------------- |
@@ -66,6 +66,7 @@ Click any text to edit it; the caret lands on the character you clicked. A bulle
 | Ctrl+B / Ctrl+I / Ctrl+K            | Bold / italic / link around the selection                                           |
 | Alt+D                               | Insert today's date                                                                 |
 | Alt+S                               | Star / unstar (also on bullets selected with Esc)                                   |
+| Alt+M                               | Duplicate, with everything under it (also on bullets selected with Esc)             |
 
 **Text.** The syntax is Dynalist's: `**bold**`, `__italic__`, `~~strike~~`, `` `code` ``, `[text](url)` and bare URLs, `#tags`, `@mentions`, and dates as `!(2026-10-11)` or `!(2026-10-11 14:30)`. Dates show as chips (Today, Tomorrow, a weekday; red when overdue) and open a date picker when clicked. Links only ever point to `http(s):` or `mailto:` addresses, or to a file uploaded to Yggdrasil.
 

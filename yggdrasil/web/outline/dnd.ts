@@ -8,8 +8,9 @@ import type { Outliner } from "../model/outliner.ts";
 import { INDENT } from "./layout.ts";
 import { zoomTo } from "./nav.ts";
 
-/** Pixels to move before a press becomes a drag. */
+/** Pixels to move before a press becomes a drag; more for a finger, which wobbles as it taps. */
 const DRAG_THRESHOLD = 5;
+const TOUCH_DRAG_THRESHOLD = 10;
 /** Scroll when the pointer is this close to the top or bottom of the window. */
 const SCROLL_EDGE = 60;
 
@@ -83,6 +84,7 @@ export function onDotPointerDown(o: Outliner, id: string, e: ReactPointerEvent<H
   const startY = e.clientY;
   // The pointer's distance from the dot's left edge, so depth is judged by the dot, not the pointer.
   const grab = startX - dot.getBoundingClientRect().left;
+  const threshold = e.pointerType === "touch" ? TOUCH_DRAG_THRESHOLD : DRAG_THRESHOLD;
   const ids = o.ui.isSelected(id) && o.ui.selection ? o.ui.selection.ids : [id];
   const dragged = new Set(ids);
   let dragging = false;
@@ -109,7 +111,7 @@ export function onDotPointerDown(o: Outliner, id: string, e: ReactPointerEvent<H
 
   const move = (ev: PointerEvent) => {
     if (!dragging) {
-      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < DRAG_THRESHOLD) return;
+      if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < threshold) return;
       begin();
     }
     if (ev.clientY < SCROLL_EDGE) window.scrollBy(0, -12);

@@ -400,6 +400,61 @@ describe("other commands", () => {
     expect(cmd.setCollapsed(ctxOf(store), "E", true)).toBeNull();
   });
 
+  it("duplicates a bullet with everything under it, right after it", () => {
+    const store = build(
+      outline(`
+      A [+]
+        B [x]
+          C
+        D
+      E
+    `),
+    );
+    store.applyAll([
+      { op: "update", id: "A", note: "n", starred: true },
+      { op: "delete", id: "D" },
+    ]);
+    const result = cmd.duplicate(ctxOf(store), ["A"])!;
+    expect(result.caret).toEqual({ id: "new1", offset: 1 });
+    check(
+      store,
+      result,
+      `
+      A [+]
+        B [x]
+          C
+      A [+]
+        B [x]
+          C
+      E
+    `,
+    );
+    const copy = store.get("new1")!;
+    expect(copy.note).toBe("n");
+    expect(copy.starred).toBe(false);
+  });
+
+  it("duplicates several bullets after the last one, but not the zoomed-in one", () => {
+    const store = build(TREE);
+    const result = cmd.duplicate(ctxOf(store, "A"), ["A", "B", "D"])!;
+    expect(result.ids).toEqual(["new1", "new3"]);
+    check(
+      store,
+      result,
+      `
+      A
+        B
+          C
+        D
+        B
+          C
+        D
+      E
+    `,
+    );
+    expect(cmd.duplicate(ctxOf(store, "A"), ["A"])).toBeNull();
+  });
+
   it("pastes a tree after the bullet, or into it when it is empty", () => {
     const drafts: cmd.Draft[] = [
       { content: "P", note: "n", children: [{ content: "Q", children: [] }] },
