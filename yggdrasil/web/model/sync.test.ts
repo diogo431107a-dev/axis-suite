@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { Op } from "../../shared/protocol.ts";
+import type { Op, RevEvent } from "../../shared/protocol.ts";
 import { Store, newNode } from "./store.ts";
 import { Sync, enqueue, guardedParts, takeBatch } from "./sync.ts";
 
@@ -60,15 +60,21 @@ describe("guardedParts", () => {
 
 interface Pending {
   url: string;
-  answer(body: unknown): void;
+  /** Answers with body, which can be read once `arrived` resolves (straight away by default). */
+  answer(body: unknown, arrived?: Promise<void>): void;
 }
 
 let pending: Pending[] = [];
 
 function fakeFetch(url: string): Promise<Response> {
   return new Promise((resolve) => {
-    const answer = (body: unknown) =>
-      resolve({ status: 200, ok: true, json: async () => body, text: async () => JSON.stringify(body) } as Response);
+    const answer = (body: unknown, arrived = Promise.resolve()) =>
+      resolve({
+        status: 200,
+        ok: true,
+        json: () => arrived.then(() => body),
+        text: () => arrived.then(() => JSON.stringify(body)),
+      } as Response);
     pending.push({ url, answer });
   });
 }
@@ -103,8 +109,8 @@ class FakeEventSource {
     this.readyState = FakeEventSource.CLOSED;
   }
 
-  emit(type: string): void {
-    for (const listener of this.#listeners.get(type) ?? []) listener({ data: "null" });
+  emit(type: string, data: RevEvent | null = null): void {
+    for (const listener of this.#listeners.get(type) ?? []) listener({ data: JSON.stringify(data) });
   }
 }
 
@@ -176,6 +182,20 @@ describe("Sync", () => {
     tree.answer({ rev: 2, nodes: [row("hello ")], shares: NO_SHARES });
     await settle();
     expect(store.get(X)!.content).toBe("hello world");
+  });
+
+  it("fetches nothing for its own save, even when the event comes before the answer is read", async () => {
+    const { sync, type, events } = await open();
+    type("hello");
+    let bodyArrives!: () => void;
+    request("/api/ops").answer({ rev: 2, rejected: [] }, new Promise((resolve) => (bodyArrives = resolve)));
+    await settle();
+    // The answer's headers are in, its body not yet: the server announces the save to every tab.
+    events.emit("rev", { rev: 2, clientId: sync.clientId });
+    bodyArrives();
+    await settle();
+    expect(pending.map((p) => p.url)).toEqual([]);
+    expect(sync.state).toEqual({ kind: "saved" });
   });
 
   it("closes its event stream and heartbeat when stopped", async () => {
