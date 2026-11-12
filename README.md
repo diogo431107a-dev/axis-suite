@@ -19,6 +19,7 @@ Small self-hosted web apps ("modules") that share one sign-in (all but Saga, whi
 | [Star](star/README.md)           | Every Man is a Star: the people you know and their families, charted as a night sky.                     | 3012 | 8454       |
 | [Fafnir](fafnir/README.md)       | Fafnir Personal Finances: what you have, what you owe and where your money goes, in US dollars.          | 3013 | 8455       |
 | [Tyr](tyr/README.md)             | A dossier of people: what was said, when and where, and how you came to know it.                         | 3014 | 8456       |
+| [Valhalla](valhalla/README.md)   | Companions you define, through the Claude API: characters, the personas you meet them as, conversations. | 3015 | 8457       |
 
 Shared code lives in `packages/`:
 
@@ -45,11 +46,13 @@ browser ──https──▶ Caddy ──▶ heimdall   127.0.0.1:3000   account
                         ├──▶ saga       127.0.0.1:3011   game API + static frontend (its own accounts)
                         ├──▶ star       127.0.0.1:3012   night-sky API + static frontend
                         ├──▶ fafnir     127.0.0.1:3013   finances API + static frontend
-                        └──▶ tyr        127.0.0.1:3014   dossier API + static frontend
+                        ├──▶ tyr        127.0.0.1:3014   dossier API + static frontend
+                        └──▶ valhalla   127.0.0.1:3015   companions API, streamed replies + static frontend
 
 each module's API ── GET /whoami ──▶ heimdall (server to server, with the browser's cookie)
 althing's API     ── GET /online ──▶ heimdall (who has a live session, for the "online" list)
-fafnir's API      ── HTTPS ──▶ Banco Central, Frankfurter, Coinbase, Kraken (exchange rates and coin prices; the only module that calls outside)
+fafnir's API      ── HTTPS ──▶ Banco Central, Frankfurter, Coinbase, Kraken (exchange rates and coin prices)
+valhalla's API    ── HTTPS ──▶ api.anthropic.com (the Claude API, on the server's own API key)
 ```
 
 Saga is the exception: its players are its own, so it never asks Heimdall anything. What follows is about every other module.
@@ -64,7 +67,7 @@ Saga is the exception: its players are its own, so it never asks Heimdall anythi
 
 Every module stands on its own. This is why each has its own SQLite file, and it holds for every module to come.
 
-- **A module talks only to Heimdall.** No module calls another, reads another's database or imports from another. Saga doesn't even talk to Heimdall, and the exchange-rate sources Fafnir calls are outside the suite, not modules.
+- **A module talks only to Heimdall.** No module calls another, reads another's database or imports from another. Saga doesn't even talk to Heimdall, and the exchange-rate sources Fafnir calls and the Claude API Valhalla calls are outside the suite, not modules.
 - **A module answers only for its own data.** There are no shared person IDs, no links or reminders between modules, and nothing that keeps two modules in agreement. Vinr, Star and Tyr can each know the same person; whether what they hold matches is up to the user, and the suite doesn't enforce it. The same goes for any other overlap.
 - **Modules are meant to differ.** Each covers a different need, so each is designed and built for that need, in how it looks and how it works. A resemblance between two modules would suggest a connection that doesn't exist. A design choice is shared only when it is generic and makes things easier for the user, such as finding the version in the About box behind the logo at the top left.
 
@@ -93,6 +96,7 @@ saga/                Habits Saga, the game
 star/                Every Man is a Star, the night sky of people
 fafnir/              Fafnir Personal Finances
 tyr/                 Tyr, the dossier of people
+valhalla/            Valhalla, companions through the Claude API
 ```
 
 Every module has the same shape:
@@ -117,7 +121,7 @@ Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in 
 
 ```bash
 pnpm install
-pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga, :5184 for Star, :5185 for Fafnir, :5186 for Tyr
+pnpm dev          # every module at once; open http://127.0.0.1:5173 for Loggbok, :5174 for Yggdrasil, :5175 for Janus, :5176 for Papyrus, :5177 for Vinr, :5178 for Chronos, :5179 for Valkyrie, :5180 for Althing, :5181 for Mimir, :5182 for Urd, :5183 for Saga, :5184 for Star, :5185 for Fafnir, :5186 for Tyr, :5187 for Valhalla
 ```
 
 Use `127.0.0.1`, not `localhost`: browsers send Heimdall's cookie (`127.0.0.1:3000`) to the other modules only on the same host. Demo accounts: `odin` / `allfather-demo`, `freya` / `folkvangr-demo`, `john` / `john-demo`. Local data goes in each module's `data/` folder, which git ignores.
@@ -175,9 +179,12 @@ sudo bash axis-suite/deploy/install.sh saga
 sudo bash axis-suite/deploy/install.sh star
 sudo bash axis-suite/deploy/install.sh fafnir
 sudo bash axis-suite/deploy/install.sh tyr
+sudo bash axis-suite/deploy/install.sh valhalla
 ```
 
 Janus's first install makes its encryption key, `/etc/axis-suite/janus.key`. Back it up right away, apart from the server: without it, nobody can read the vaults (see [Janus](janus/README.md#installing-and-data)).
+
+Valhalla needs the Claude API key in `/etc/axis-suite/valhalla-anthropic.key` before its first install, put there by hand; it never goes in the repository (see [Valhalla](valhalla/README.md#installing-and-data)).
 
 To update: `cd ~/axis-suite && git pull`, then re-run the installer for each module that changed.
 
@@ -203,14 +210,15 @@ sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh saga
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh star
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh fafnir
 sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh tyr
+sudo bash /mnt/c/Users/diogo/Claude/axis-suite/deploy/install.sh valhalla
 ```
 
-Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452, Saga at https://localhost:8453, Star at https://localhost:8454, Fafnir at https://localhost:8455 and Tyr at https://localhost:8456. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
+Heimdall is then at https://localhost, Loggbok at https://localhost:8443, Yggdrasil at https://localhost:8444, Janus at https://localhost:8445, Papyrus at https://localhost:8446, Vinr at https://localhost:8447, Chronos at https://localhost:8448, Valkyrie at https://localhost:8449, Althing at https://localhost:8450, Mimir at https://localhost:8451, Urd at https://localhost:8452, Saga at https://localhost:8453, Star at https://localhost:8454, Fafnir at https://localhost:8455, Tyr at https://localhost:8456 and Valhalla at https://localhost:8457. Caddy signs `localhost` with its own local CA, which Windows doesn't trust, so browsers warn until you import its root certificate into Windows' _Trusted Root Certification Authorities_. It is at `/var/lib/caddy/.local/share/caddy/pki/authorities/local/root.crt`; that folder is root-only, so copy the file out first, e.g. `sudo cp …/root.crt /mnt/c/Users/<you>/caddy-root.crt`.
 
 ## Operating it
 
 ```bash
-systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga star fafnir tyr   # running?
+systemctl status heimdall loggbok yggdrasil janus papyrus vinr chronos valkyrie althing mimir urd saga star fafnir tyr valhalla   # running?
 journalctl -u loggbok -f                                                          # a module's log
 sudo systemctl restart loggbok                                                    # restart one module
 cat /etc/axis-suite/suite.env                                                     # the domain, URLs and usernames every module was given
@@ -236,6 +244,7 @@ Each module keeps its data in its own systemd `StateDirectory`, `/var/lib/<modul
 | Star      | every user's sky: the people, their memos and how they connect         | `/var/lib/star/star.db`         |
 | Fafnir    | every user's accounts and entries, and the exchange rates              | `/var/lib/fafnir/fafnir.db`     |
 | Tyr       | every user's files on people: their entries, places and profiles       | `/var/lib/tyr/tyr.db`           |
+| Valhalla  | every user's characters, personas and conversations, as plain files    | `/var/lib/valhalla/users/`      |
 
 Back up a module's data with its service stopped, and keep the copies where only you can read them:
 
