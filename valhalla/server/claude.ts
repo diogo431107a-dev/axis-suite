@@ -8,18 +8,27 @@ import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
 import type { ContentBlock, Settings, StreamEvent, Turn } from "../shared/protocol.ts";
 import { StoreError } from "./errors.ts";
+import { loadApiKey } from "./key.ts";
 import type { SystemBlock } from "./prompt.ts";
 
-// No arguments: the SDK finds ANTHROPIC_API_KEY, or ANTHROPIC_AUTH_TOKEN, or the profile left by
-// `ant auth login`. The key is read here, in the server process, and never reaches the browser.
-const client = new Anthropic();
+// The key from key.ts. Without one (development only) the SDK finds ANTHROPIC_AUTH_TOKEN or the
+// profile left by `ant auth login` on its own. Either way it stays in this process.
+const key = loadApiKey();
+const client = key ? new Anthropic({ apiKey: key.apiKey }) : new Anthropic();
+
+/** Where the key came from, for the server's log. */
+export const keySource = (): string =>
+  key?.from === "credential"
+    ? "the systemd credential"
+    : key
+      ? "ANTHROPIC_API_KEY"
+      : "none set: an `ant auth login` profile is used, if there is one";
 
 /**
- * Whether an API key is set in the environment. False does not mean no credential — an
- * `ant auth login` profile works too, and only a request can tell. The page says as much.
+ * Whether the server has an API key. False does not mean no credential in development — an
+ * `ant auth login` profile works too, and only a request can tell.
  */
-export const hasApiKeyInEnvironment = (): boolean =>
-  Boolean(process.env.ANTHROPIC_API_KEY ?? process.env.ANTHROPIC_AUTH_TOKEN);
+export const hasApiKey = (): boolean => key !== null || Boolean(process.env.ANTHROPIC_AUTH_TOKEN);
 
 /** Turns stored turns into what the Messages API expects. The content blocks go back untouched. */
 const asMessages = (turns: Turn[]): Anthropic.Beta.BetaMessageParam[] =>
@@ -155,9 +164,10 @@ export async function contextWindow(model: string): Promise<number | null> {
 /** An API failure as something the page can show, keeping what the API actually said. */
 export function asStoreError(err: unknown): StoreError {
   if (err instanceof Anthropic.AuthenticationError) {
+    // Not 401: from this API that means "not signed in", and the page would send you to Heimdall.
     return new StoreError(
-      401,
-      "Claude refused the credential. Check ANTHROPIC_API_KEY, or sign in again.",
+      502,
+      "Claude refused the server's API key. Whoever runs this Valhalla needs to check it.",
       "no-credential",
     );
   }
@@ -180,13 +190,9 @@ export function asStoreError(err: unknown): StoreError {
   if (err instanceof Anthropic.AnthropicError) {
     // Not an APIError, so the SDK gave up before sending anything. In practice that means it
     // found no credential to use, which is worth saying plainly rather than as a 500.
-    return hasApiKeyInEnvironment()
+    return hasApiKey()
       ? new StoreError(502, `Claude could not be called: ${err.message}`, "api")
-      : new StoreError(
-          401,
-          "No Claude credential. Put ANTHROPIC_API_KEY in dev.env, or sign in with `ant auth login`.",
-          "no-credential",
-        );
+      : new StoreError(503, "No Claude API key is set up on the server.", "no-credential");
   }
   if (err instanceof StoreError) return err;
   console.error(err);

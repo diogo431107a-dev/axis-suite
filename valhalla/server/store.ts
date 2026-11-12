@@ -1,14 +1,12 @@
 // The characters you talk to, and the people you are when you talk to them.
 //
-// One readable JSON file each, under data/characters and data/personas. Nothing here is a cache
+// One readable JSON file each, under characters/ and personas/ in the person's own folder. Nothing here is a cache
 // of anything: the file on disk is the truth, so editing one by hand is a supported way to work.
 import { LIMITS, type Character, type Persona } from "../shared/protocol.ts";
 import { object, required, settings, text } from "./check.ts";
 import { notFound, tooMany } from "./errors.ts";
-import { listIds, pathOf, readJson, remove, writeJson } from "./files.ts";
-
-const characterFile = (id: string) => pathOf("characters", `${id}.json`);
-const personaFile = (id: string) => pathOf("personas", `${id}.json`);
+import { join } from "node:path";
+import { listIds, readJson, remove, writeJson } from "./files.ts";
 
 const byName = (a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name);
 
@@ -33,7 +31,12 @@ function checkedPersona(body: unknown) {
   };
 }
 
-export function createStore() {
+/** One person's characters and personas, kept under root (see users.ts). */
+export function createStore(root: string) {
+  const pathOf = (...parts: string[]) => join(root, ...parts);
+  const characterFile = (id: string) => pathOf("characters", `${id}.json`);
+  const personaFile = (id: string) => pathOf("personas", `${id}.json`);
+
   async function characters(): Promise<Character[]> {
     const ids = await listIds(pathOf("characters"));
     const all = await Promise.all(ids.map((id) => readJson(characterFile(id))));

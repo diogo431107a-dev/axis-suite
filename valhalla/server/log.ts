@@ -13,14 +13,17 @@ import {
 } from "../shared/protocol.ts";
 import { id as checkId, object, settings as checkSettings, text } from "./check.ts";
 import { conflict, notFound, tooMany } from "./errors.ts";
-import { appendLines, listFolders, pathOf, readJson, readLines, remove, writeJson } from "./files.ts";
+import { join } from "node:path";
+import { appendLines, listFolders, readJson, readLines, remove, writeJson } from "./files.ts";
 import type { Store } from "./store.ts";
 
-const folderOf = (id: string) => pathOf("conversations", id);
-const metaFile = (id: string) => pathOf("conversations", id, "conversation.json");
-export const turnsFile = (id: string) => pathOf("conversations", id, "turns.jsonl");
+/** One person's conversations, kept under root (see users.ts) beside their store's files. */
+export function createConversations(store: Store, root: string) {
+  const pathOf = (...parts: string[]) => join(root, ...parts);
+  const folderOf = (id: string) => pathOf("conversations", id);
+  const metaFile = (id: string) => pathOf("conversations", id, "conversation.json");
+  const turnsFile = (id: string) => pathOf("conversations", id, "turns.jsonl");
 
-export function createConversations(store: Store) {
   async function get(id: string): Promise<Conversation> {
     return ((await readJson(metaFile(id))) as Conversation | null) ?? notFound("conversation");
   }

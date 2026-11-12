@@ -7,7 +7,20 @@ are when you speak to them: before a king you might be a servant; in a wolf pack
 talk. One character can be met by any of your personas, and one persona can be used with any
 character.
 
-It runs on your own machine, for you alone, and everything it keeps is a plain file you can open.
+It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is
+signed in there sees their own characters, personas and conversations and nobody else's. Everything it
+keeps is a plain file you can open.
+
+|          |                                                                                      |
+| -------- | ------------------------------------------------------------------------------------ |
+| Frontend | React 19, Vite 8, Tailwind 4                                                         |
+| Backend  | Express 5, the Claude API through `@anthropic-ai/sdk`                                |
+| Data     | plain files: `/var/lib/valhalla/users/<username>/` on a server, `data/users/` in dev |
+| Sign-in  | Heimdall, through `@axis-suite/heimdall-client`                                      |
+| Address  | `https://valhalla.<domain>`; https://localhost:8457 in WSL; port 5187 in `pnpm dev`  |
+
+Valhalla is the one module besides Fafnir that calls outside the suite: every message goes to
+`api.anthropic.com`, on the server's API key, which whoever runs the suite pays for.
 
 ## Minimum interference
 
@@ -30,36 +43,45 @@ way Valhalla itself filters nothing.
 
 ## Running it
 
+From the suite's root, with Heimdall running beside it (`pnpm dev` starts every module):
+
 ```bash
 pnpm install
-cp dev.env.example dev.env   # then put your key in it
-pnpm dev
+pnpm --filter heimdall --filter valhalla dev
 ```
 
-Then open http://127.0.0.1:5200. The API runs beside it on 127.0.0.1:3100 and the page talks to it
-through Vite's proxy.
+Then open http://127.0.0.1:5187 and sign in as one of the demo accounts. The API runs on
+127.0.0.1:3015 and the page talks to it through Vite's proxy.
 
-Your key is read by the server process and never reaches the browser. If you have signed in with
-`ant auth login` instead, leave the key out — the SDK finds that profile by itself.
+**The API key never goes in `dev.env`.** That file is committed, and the repository is public. Put
+it in `data/secret.env`, which git ignores and the installer never copies:
 
 ```bash
-pnpm check    # formatting, lint, types, tests
-pnpm build    # dist/ — the API compiled, and the page
-pnpm start    # the built API, serving on 127.0.0.1:3100
-pnpm smoke    # one real conversation against the API. Spends a fraction of a cent.
+echo 'ANTHROPIC_API_KEY=<your key>' > valhalla/data/secret.env
+```
+
+If you have signed in with `ant auth login` instead, leave it out: the SDK finds that profile by
+itself. The key is read by the server process and never reaches the browser.
+
+```bash
+pnpm --filter valhalla test    # none of the tests calls the real API
+pnpm --filter valhalla smoke   # one real conversation against the API. Spends a fraction of a cent.
 ```
 
 ## Where everything is kept
 
+Each person has a folder of their own, named after their Heimdall username:
+
 ```
-data/
+/var/lib/valhalla/users/<username>/       (data/users/<username>/ in development)
   characters/<id>.json
   personas/<id>.json
   conversations/<id>/conversation.json    who is talking to whom, and the settings
   conversations/<id>/turns.jsonl          the dialogue, one turn per line
 ```
 
-Open them, edit them, copy the folder to back it up. A write lands whole or not at all, and a log
+Open them, edit them, copy the folder to back it up. When someone is removed from Heimdall, their
+folder is deleted the next time Valhalla starts. A write lands whole or not at all, and a log
 cut short by a crash loses only the unfinished line.
 
 The turn log is **append-only**, and that is not a storage preference. Thinking blocks the API
@@ -103,24 +125,56 @@ Each of these is a real feature with a reason to wait, not an oversight.
 - **Branching and reroll** — a fork of the conversation from any turn. The append-only rule above
   makes this the only correct shape for it, and it deserves doing properly.
 - **Images** — appearance is text that feeds the prompt.
-- **Accounts, deploy, more than one person** — it listens on 127.0.0.1 and serves you.
 
 ## How it is built
 
-One package holding both halves, in the style of the `axis-suite` modules next door.
+One module holding both halves, like the rest of the suite.
 
 |                      |                                                                   |
 | -------------------- | ----------------------------------------------------------------- |
 | `shared/protocol.ts` | the wire format, the limits, the models and their prices          |
 | `shared/sse.ts`      | how a reply travels while it is being written, and how it is read |
+| `server/users.ts`    | whose folder is whose, and removing the folders of removed users  |
 | `server/files.ts`    | atomic writes, one queue per file, a log that survives a crash    |
 | `server/store.ts`    | characters and personas                                           |
 | `server/log.ts`      | conversations and their append-only turn log                      |
 | `server/prompt.ts`   | the system prompt. Deterministic, or the cache never hits         |
+| `server/key.ts`      | where the API key comes from: the systemd credential, or the env  |
 | `server/claude.ts`   | the only file that talks to the Claude API                        |
-| `server/index.ts`    | the routes                                                        |
+| `server/busy.ts`     | one reply at a time per conversation                              |
+| `server/index.ts`    | the routes, sign-in, and removed users' folders                   |
 | `web/`               | React, Vite and Tailwind; `useState` and one context, no router   |
+| `deploy/`            | the systemd unit (sandboxed, with the key) and the Caddy site     |
 
 Tests sit beside the code as `<name>.test.ts` and none of them calls the real API — including the
 refusal and fallback paths, which are driven through synthetic replies. `pnpm smoke` is the one
 thing that spends money, and you run it by hand.
+
+## Installing and data
+
+Install it like every module (see the [suite README](../README.md#installing-on-a-server)), with one
+step before the first install: **put the Claude API key on the server.** systemd hands it to the
+service as a credential, readable by nobody else, and refuses to start Valhalla while it is missing.
+Typed in, it stays out of the shell's history:
+
+```
+read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla-anthropic.key && unset KEY
+sudo bash deploy/install.sh valhalla
+```
+
+To change the key, run the first line again, then `sudo systemctl restart valhalla`. It is not named
+`valhalla.key` on purpose: for that name the installer would write a random key of its own.
+
+Everyone who can sign in to Heimdall can talk to companions on this key, so give the suite a key of
+its own and set a monthly spend limit for it in the Claude Console.
+
+A backup is the whole folder. It holds everyone's private conversations, so keep backups where only
+you can read them, taken with the service stopped (`/var/lib/private/valhalla` is where systemd
+really keeps it):
+
+```
+sudo systemctl stop valhalla
+sudo tar -czf ~/valhalla-backup-$(date +%Y%m%d).tar.gz -C /var/lib/private valhalla
+sudo systemctl start valhalla
+sudo chown "$USER": ~/valhalla-backup-*.tar.gz && chmod 600 ~/valhalla-backup-*.tar.gz
+```

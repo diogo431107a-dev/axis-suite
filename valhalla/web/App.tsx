@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { Menu, Plus, X } from "lucide-react";
+import { SignedOutError, fetchMe, goToSignIn, type Me } from "@axis-suite/heimdall-client/browser";
 import type { Character, ConversationSummary, Persona } from "../shared/protocol.ts";
 import { api, describeError } from "./api.ts";
 import { PageContext, usePage, type Health, type Page, type Selection } from "./page.ts";
@@ -21,6 +22,7 @@ const empty: Lists = { characters: [], personas: [], conversations: [] };
 export function App() {
   const [lists, setLists] = useState<Lists>(empty);
   const [health, setHealth] = useState<Health | null>(null);
+  const [me, setMe] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [selection, setSelection] = useState<Selection>({ kind: "none" });
@@ -39,10 +41,16 @@ export function App() {
     let alive = true;
     const load = async () => {
       try {
+        // Nobody signed in: off to Heimdall, which sends you back here.
+        const who = await fetchMe();
         const got = await api<Health>("/api/health");
         await reload();
-        if (alive) setHealth(got);
+        if (alive) {
+          setMe(who);
+          setHealth(got);
+        }
       } catch (err) {
+        if (err instanceof SignedOutError) return goToSignIn(err);
         if (alive) setLoadError(describeError(err));
       } finally {
         if (alive) setLoading(false);
@@ -66,15 +74,15 @@ export function App() {
       </p>
     );
   }
-  if (loadError) {
+  if (loadError || !me) {
     return (
       <div role="alert" className="p-6">
-        <Notice>{loadError}</Notice>
+        <Notice>{loadError || "Valhalla could not find out who is signed in."}</Notice>
       </div>
     );
   }
 
-  const page: Page = { ...lists, health, reload, open };
+  const page: Page = { ...lists, health, me, reload, open };
 
   return (
     <PageContext.Provider value={page}>
@@ -106,6 +114,13 @@ export function App() {
           </div>
           <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-4">
             <Rail selection={selection} />
+          </div>
+          <div className="border-t border-rule px-4 py-3 text-sm">
+            <span className="text-ink">{me.name}</span>
+            <span className="text-faint"> · </span>
+            <a href={me.accountUrl} className="text-faint hover:text-accent">
+              Account
+            </a>
           </div>
         </nav>
 

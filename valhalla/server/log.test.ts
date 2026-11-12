@@ -23,9 +23,7 @@ vi.mock("node:fs/promises", async (importOriginal) => {
   };
 });
 
-// files.ts reads the data folder once, when it is loaded, so it has to be chosen before that.
 const dir = mkdtempSync(join(tmpdir(), "valhalla-log-"));
-process.env.VALHALLA_DATA = dir;
 const { createConversations } = await import("./log.ts");
 
 afterAll(() => {
@@ -72,7 +70,7 @@ const turn = (role: Turn["role"], text: string, at: string): Turn => ({
 });
 
 async function conversation(id: string) {
-  const conversations = createConversations(store);
+  const conversations = createConversations(store, dir);
   await conversations.create({ id, characterId: maid.id, personaId: master.id });
   return conversations;
 }

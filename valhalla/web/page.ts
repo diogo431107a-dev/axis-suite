@@ -1,10 +1,11 @@
 // What every view needs: the lists in the rail, and a way to ask for them again after a write.
 import { createContext, useContext } from "react";
+import type { Me } from "@axis-suite/heimdall-client/browser";
 import type { Character, ConversationSummary, Persona } from "../shared/protocol.ts";
 
 export interface Health {
-  apiKeyInEnvironment: boolean;
-  dataDir: string;
+  /** Whether the server has a Claude API key to send with. */
+  apiKey: boolean;
 }
 
 export interface Page {
@@ -12,6 +13,8 @@ export interface Page {
   personas: Persona[];
   conversations: ConversationSummary[];
   health: Health | null;
+  /** Who is signed in through Heimdall. */
+  me: Me;
   /** Reads the lists again. Called after anything is saved or deleted. */
   reload: () => Promise<void>;
   /** Shows a conversation, a definition, or the welcome. */

@@ -1,4 +1,4 @@
-// Reading and writing the data folder.
+// Reading and writing each person's folder (see users.ts).
 //
 // Everything Valhalla keeps is a plain file you can open in an editor: one JSON file per
 // character and persona, and one append-only JSONL log per conversation. Three things make that
@@ -9,13 +9,8 @@
 //   - a log cut short by a crash loses only the unfinished line,
 //   - a file Windows has briefly locked is written anyway, by waiting for the lock to go.
 import { mkdir, readFile, readdir, rename, rm, writeFile, appendFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname } from "node:path";
 import { StoreError } from "./errors.ts";
-
-/** Where everything is kept. Relative to wherever the server was started. */
-export const DATA_DIR = process.env.VALHALLA_DATA ?? "data";
-
-export const pathOf = (...parts: string[]): string => join(DATA_DIR, ...parts);
 
 // One queue per path. Writes to the same file run one after another, so a read never catches a
 // half-written file and two requests never race.

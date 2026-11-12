@@ -17,25 +17,24 @@ export function About() {
       </button>
       <Dialog open={open} onClose={() => setOpen(false)} title="Valhalla">
         <div className="space-y-3 text-sm">
-          <p>Version {__VALHALLA_VERSION__}</p>
+          <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1">
+            <dt className="text-faint">Version</dt>
+            <dd className="tabular-nums">{__AXIS_VERSIONS__.module}</dd>
+            <dt className="text-faint">Axis Suite</dt>
+            <dd className="tabular-nums">{__AXIS_VERSIONS__.suite}</dd>
+          </dl>
+          {import.meta.env.DEV ? (
+            <p className="text-xs text-faint">Development: these are the numbers of the last release.</p>
+          ) : null}
           <p className="text-faint">
             Companions you define, through the Claude API. You write the personality, the appearance and the behavior;
             Valhalla sends them with every message and adds no words, no checks and no warnings of its own. What the
             model says is what you get.
           </p>
-          {health ? (
-            <>
-              <p className="text-faint">
-                Everything is kept as plain files in <span className="font-mono">{health.dataDir}</span>, which you are
-                free to open, edit and copy.
-              </p>
-              <p className="text-faint">
-                {health.apiKeyInEnvironment
-                  ? "An API key is set in this server's environment."
-                  : "No ANTHROPIC_API_KEY in this server's environment — a profile from `ant auth login` is used instead, if there is one."}
-              </p>
-            </>
-          ) : null}
+          <p className="text-faint">
+            Your characters, personas and conversations are yours alone: nobody else who signs in sees them.
+          </p>
+          {health && !health.apiKey ? <p className="text-faint">No Claude API key is set up on the server.</p> : null}
         </div>
       </Dialog>
     </>

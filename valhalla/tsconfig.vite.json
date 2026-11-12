@@ -1,6 +1,6 @@
 {
   // The build tooling, the hand-run scripts, and the tests. Type-checked, never emitted.
-  "extends": "./tsconfig.base.json",
+  "extends": "../tsconfig.base.json",
   "compilerOptions": {
     "noEmit": true,
     "tsBuildInfoFile": "node_modules/.tmp/tsconfig.vite.tsbuildinfo"

@@ -1,4 +1,5 @@
 // fetch() for Valhalla's API, and the reader for a reply as it is written.
+import { SignedOutError, goToSignIn } from "@axis-suite/heimdall-client/browser";
 import type { ApiError, ErrorCode, StreamEvent } from "../shared/protocol.ts";
 import { createFrameReader } from "../shared/sse.ts";
 
@@ -11,6 +12,16 @@ export class ApiFailure extends Error {
     this.status = status;
     this.code = code;
   }
+}
+
+/**
+ * Turns a refused request into an ApiFailure. A 401 means the Heimdall session is gone: the page
+ * leaves for the sign-in page, which brings you back here afterwards.
+ */
+async function failure(res: Response): Promise<ApiFailure> {
+  const err = (await res.json().catch(() => ({ error: res.statusText }))) as ApiError & { loginUrl?: string };
+  if (res.status === 401 && err.loginUrl) goToSignIn(new SignedOutError(err.loginUrl));
+  return new ApiFailure(res.status, err.error || `Error ${res.status}`, err.code);
 }
 
 export interface ApiOptions {
@@ -27,12 +38,9 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
     });
   } catch {
-    throw new ApiFailure(0, "Valhalla can't be reached. Is the server still running?");
+    throw new ApiFailure(0, "Valhalla can't be reached. Check the connection and try again.");
   }
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({ error: res.statusText }))) as ApiError;
-    throw new ApiFailure(res.status, err.error || `Error ${res.status}`, err.code);
-  }
+  if (!res.ok) throw await failure(res);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -63,13 +71,10 @@ export async function sendMessage(
       body: JSON.stringify({ text }),
     });
   } catch {
-    throw new ApiFailure(0, "Valhalla can't be reached. Is the server still running?");
+    throw new ApiFailure(0, "Valhalla can't be reached. Check the connection and try again.");
   }
   // A refusal before the stream starts is still ordinary JSON.
-  if (!res.ok) {
-    const err = (await res.json().catch(() => ({ error: res.statusText }))) as ApiError;
-    throw new ApiFailure(res.status, err.error || `Error ${res.status}`, err.code);
-  }
+  if (!res.ok) throw await failure(res);
   if (!res.body) throw new ApiFailure(0, "Valhalla sent no reply to read.");
 
   const reader = res.body.getReader();

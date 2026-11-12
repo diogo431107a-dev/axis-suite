@@ -1,11 +1,19 @@
 # Changelog
 
+What changed in Valhalla, newest first. Each version is tagged in git as `valhalla-v<version>`. How versions are numbered and released is in the [suite README](../README.md#versions-and-changelogs).
+
 ## Unreleased
 
-- Valhalla's first version. Write characters and write who you are when you speak to them, then
-  hold a conversation that streams in as it is written.
-- Everything is kept as plain files under `data/`, which you can open and edit. A conversation's
-  turns are written one per line and never rewritten.
+- Valhalla's first version in the Axis Suite. Write characters and write who you are when you speak
+  to them, then hold a conversation that streams in as it is written.
+- Sign in through Heimdall, like every module. Each person has their own characters, personas and
+  conversations, and nobody else sees them. Someone removed from Heimdall loses their folder the
+  next time Valhalla starts.
+- Everything is kept as plain files, one folder per person, which you can open and edit. A
+  conversation's turns are written one per line and never rewritten.
+- Clicking Valhalla at the top left opens an About box with Valhalla's version and the suite's.
+- While a reply is being written, a second message to the same conversation (from another tab, or a
+  double click) is refused instead of muddling the conversation.
 - What a companion sets between asterisks — an action, a glance, the light in a room — is drawn a
   step back from the dialogue, in a fainter italic. The asterisks stay where they were written, and
   so does the turn on disk.
@@ -22,5 +30,7 @@
   out, and a turn and its reply go into the log in one write — so a failure to stamp the time
   on them no longer reports a message as lost after it was saved and answered.
 
-**By hand:** copy `dev.env.example` to `dev.env` and put your `ANTHROPIC_API_KEY` in it before the
-first conversation. If you have signed in with `ant auth login`, you can leave it out.
+**By hand:** before the first install, put the Claude API key in
+`/etc/axis-suite/valhalla-anthropic.key`, root-only (the command is under "Installing and data" in
+Valhalla's README). Without it the service doesn't start. Everyone who can sign in to Heimdall
+spends this key, so give the suite a key of its own with a monthly spend limit in the Claude Console.

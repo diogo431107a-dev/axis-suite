@@ -31,11 +31,10 @@ export function Start() {
         </p>
       </div>
 
-      {health && !health.apiKeyInEnvironment ? (
+      {health && !health.apiKey ? (
         <Notice kind="quiet">
-          There is no ANTHROPIC_API_KEY in the server&apos;s environment. If you signed in with{" "}
-          <span className="font-mono">ant auth login</span>, that is used instead and this is nothing to worry about.
-          Otherwise, put the key in <span className="font-mono">dev.env</span> and restart.
+          No Claude API key is set up on the server, so a message may not get an answer. Whoever runs this Valhalla can
+          add one.
         </Notice>
       ) : null}
 
