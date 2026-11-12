@@ -41,9 +41,37 @@ export const MODELS = [
   { id: "claude-opus-5-5", label: "Opus 5.5", input: 4.0, output: 20.0, cacheRead: 0.2 },
   { id: "claude-fable-5-2", label: "Fable 5.2", input: 8.0, output: 40.0, cacheRead: 0.2 },
   { id: "claude-sonnet-5-5", label: "Sonnet 5.5", input: 2.0, output: 10.0, cacheRead: 0.1 },
-  // Haiku's cache-read price is not published separately; the general rule is a tenth of input.
+  // Haiku has two rates: these, and five times as much for a prompt over 100K tokens (see PRICES).
   { id: "claude-haiku-5-5", label: "Haiku 5.5", input: 0.1, output: 0.5, cacheRead: 0.01 },
 ] as const;
+
+/** Whether the API can hand a declined turn to another model. It has no fallback for Haiku. */
+export const hasFallback = (model: string): boolean => !model.startsWith("claude-haiku-");
+
+export interface Price {
+  input: number;
+  output: number;
+  cacheRead: number;
+  /** A dearer rate for a prompt longer than `over` tokens. */
+  long?: { over: number; input: number; output: number; cacheRead: number };
+}
+
+/**
+ * What every model a turn can come from costs, per million tokens: the ones in the picker, and
+ * the older ones the API may hand a declined turn to. Prices as published on 2026-11-03.
+ */
+export const PRICES: Readonly<Record<string, Price>> = {
+  ...Object.fromEntries(MODELS.map(({ id, input, output, cacheRead }) => [id, { input, output, cacheRead }])),
+  "claude-haiku-5-5": {
+    input: 0.1,
+    output: 0.5,
+    cacheRead: 0.01,
+    long: { over: 100_000, input: 0.5, output: 2.5, cacheRead: 0.05 },
+  },
+  "claude-opus-5": { input: 5.0, output: 25.0, cacheRead: 0.5 },
+  "claude-opus-4-8": { input: 5.0, output: 25.0, cacheRead: 0.5 },
+  "claude-sonnet-5": { input: 2.0, output: 10.0, cacheRead: 0.2 },
+};
 
 export const DEFAULT_SETTINGS: Settings = {
   model: "claude-opus-5-5",
@@ -117,6 +145,13 @@ export interface TurnUsage {
   output_tokens: number;
   cache_read_input_tokens: number | null;
   cache_creation_input_tokens: number | null;
+  /** Of those written, how many went into the 1-hour cache, which costs more to write. */
+  cache_creation_1h_input_tokens?: number | null;
+}
+
+/** One model's attempt at a turn: the one that declined, and the one that answered. */
+export interface Attempt extends TurnUsage {
+  model: string | null;
 }
 
 export interface RefusalDetails {
@@ -135,8 +170,12 @@ export interface Turn {
   stopReason?: string | null;
   stopDetails?: RefusalDetails | null;
   usage?: TurnUsage | null;
-  /** Set when a fallback model answered after this turn's model declined. */
+  /** Set when a fallback model answered instead of the conversation's model. */
   servedBy?: string | null;
+  /** The model that declined this turn before the fallback answered, when that happened now. */
+  declinedBy?: string | null;
+  /** Every attempt the API made at this turn, when there was more than one. `usage` is only the last. */
+  attempts?: Attempt[] | null;
 }
 
 /** A conversation as the list rail shows it: enough to name it without reading its log. */

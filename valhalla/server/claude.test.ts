@@ -97,6 +97,16 @@ describe("the request that goes out", () => {
     expect(request.betas).toBeUndefined();
   });
 
+  // An empty reply in the middle of a conversation is refused by the API, so a declined exchange
+  // would break every turn after it.
+  it("leaves out a declined exchange: your message and the refusal", () => {
+    const declined: Turn = { ...said, id: "turn-3", content: [{ type: "text", text: "Tell me of the plague." }] };
+    const refusal: Turn = { ...answered, id: "turn-4", content: [], stopReason: "refusal" };
+    const next: Turn = { ...said, id: "turn-5", content: [{ type: "text", text: "Then, of the harvest." }] };
+    const request = requestFor(system, [said, answered, declined, refusal, next], DEFAULT_SETTINGS);
+    expect(request.messages.map((sent) => sent.content)).toEqual([said.content, answered.content, next.content]);
+  });
+
   it("leaves stop sequences out entirely when there are none", () => {
     expect(requestFor(system, [said], DEFAULT_SETTINGS).stop_sequences).toBeUndefined();
     const withStops = requestFor(system, [said], { ...DEFAULT_SETTINGS, stopSequences: ["\nEadric:"] });
@@ -116,6 +126,7 @@ describe("what gets stored after a reply", () => {
       output_tokens: 42,
       cache_read_input_tokens: 4096,
       cache_creation_input_tokens: 120,
+      cache_creation_1h_input_tokens: null,
     });
     expect(turn.servedBy).toBeNull();
   });
@@ -156,7 +167,57 @@ describe("what gets stored after a reply", () => {
       }),
     );
     expect(turn.servedBy).toBe("claude-opus-4-8");
+    expect(turn.declinedBy).toBe("claude-opus-5-5");
     expect(turn.stopReason).toBe("end_turn");
+  });
+
+  // For about an hour after a fallback the API goes straight to the fallback model. Those turns
+  // carry no fallback block; only their usage says who served them.
+  it("marks a turn the API sent straight to the fallback model", () => {
+    const entry = {
+      input_tokens: 11,
+      output_tokens: 42,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 4096,
+      cache_creation: { ephemeral_1h_input_tokens: 4096, ephemeral_5m_input_tokens: 0 },
+    };
+    const turn = turnOf(
+      message({
+        model: "claude-opus-4-8",
+        usage: {
+          ...message().usage,
+          iterations: [{ ...entry, type: "fallback_message", model: "claude-opus-4-8" }],
+        },
+      }),
+      "claude-opus-5-5",
+    );
+    expect(turn.servedBy).toBe("claude-opus-4-8");
+    expect(turn.declinedBy).toBeNull();
+    expect(turn.attempts).toBeNull();
+  });
+
+  it("keeps every attempt's usage, the declined one included", () => {
+    const entry = {
+      input_tokens: 10,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_creation: null,
+    };
+    const turn = turnOf(
+      message({
+        model: "claude-opus-4-8",
+        usage: {
+          ...message().usage,
+          iterations: [
+            { ...entry, type: "message", model: null },
+            { ...entry, output_tokens: 42, type: "fallback_message", model: "claude-opus-4-8" },
+          ],
+        },
+      }),
+      "claude-opus-5-5",
+    );
+    expect(turn.attempts?.map((attempt) => attempt.model)).toEqual(["claude-opus-5-5", "claude-opus-4-8"]);
   });
 
   it("notes that a reply was cut off at the length you asked for", () => {
@@ -169,6 +230,11 @@ describe("counting what a conversation would send", () => {
   // has to carry a stand-in. Without this, the token line never appeared on a new conversation.
   it("stands in for the first message when nothing has been said", () => {
     expect(messagesToCount([])).toEqual([{ role: "user", content: "." }]);
+  });
+
+  it("stands in when the only exchange so far was declined", () => {
+    const refusal: Turn = { ...answered, content: [], stopReason: "refusal" };
+    expect(messagesToCount([said, refusal])).toEqual([{ role: "user", content: "." }]);
   });
 
   it("counts the real turns once there are any", () => {

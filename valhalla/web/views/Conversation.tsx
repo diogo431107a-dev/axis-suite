@@ -59,6 +59,9 @@ function Spoken({ turn, who }: { turn: Turn; who: string }) {
             {turn.stopDetails?.explanation ? (
               <p className="mt-1 text-sm text-faint">{turn.stopDetails.explanation}</p>
             ) : null}
+            <p className="mt-1 text-xs text-faint">
+              This exchange is kept here but not sent again, so the model never sees it. Say it another way.
+            </p>
           </div>
         ) : null}
         {turn.stopReason === "max_tokens" ? (
@@ -68,7 +71,9 @@ function Spoken({ turn, who }: { turn: Turn; who: string }) {
         ) : null}
         {turn.servedBy ? (
           <p className="mt-2 text-xs text-faint">
-            {turn.model} declined; answered by {turn.servedBy}.
+            {turn.declinedBy
+              ? `${turn.declinedBy} declined; answered by ${turn.servedBy}.`
+              : `Answered by ${turn.servedBy}, which the API keeps using for a while after a decline.`}
           </p>
         ) : null}
       </div>
