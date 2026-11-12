@@ -48,12 +48,12 @@ describe("people removed from Heimdall", () => {
       mkdirSync(join(state, "users", name, "characters"), { recursive: true });
       writeFileSync(join(state, "users", name, "characters", "c.json"), "{}");
     }
-    expect(await removeUnknownOwners(new Set(["odin", "freya"]), state)).toEqual(["loki"]);
+    expect(await removeUnknownOwners(new Set(["odin", "freya"]), state)).toEqual({ removed: ["loki"], failed: [] });
     expect(existsSync(join(state, "users", "loki"))).toBe(false);
     expect(existsSync(join(state, "users", "odin", "characters", "c.json"))).toBe(true);
   });
 
   it("is a no-op before anyone has a folder", async () => {
-    expect(await removeUnknownOwners(new Set(["odin"]), state)).toEqual([]);
+    expect(await removeUnknownOwners(new Set(["odin"]), state)).toEqual({ removed: [], failed: [] });
   });
 });

@@ -22,8 +22,10 @@ console.log(`Claude API key: ${keySource()}`);
 // not installed yet) nothing is deleted.
 const known = knownUsers();
 if (known) {
-  for (const name of await removeUnknownOwners(known)) {
-    console.log(`Deleted the folder of ${name}, who is no longer in Heimdall`);
+  const { removed, failed } = await removeUnknownOwners(known);
+  for (const name of removed) console.log(`Deleted the folder of ${name}, who is no longer in Heimdall`);
+  for (const { name, error } of failed) {
+    console.error(`Could not delete the folder of ${name}, who is no longer in Heimdall: ${error}`);
   }
 }
 

@@ -27,21 +27,31 @@ export function rootOf(username: string, state: string = STATE_DIR): string {
 }
 
 /**
- * Deletes the folder of everyone no longer in Heimdall, and says whose went.
- * Called at startup with knownUsers(); never called when the list is unknown.
+ * Deletes the folder of everyone no longer in Heimdall, and says whose went and whose could not.
+ * Called at startup with knownUsers(); never called when the list is unknown. A folder that can't
+ * be deleted (one put there by hand, as root) is left and reported: it must not keep Valhalla down.
  */
-export async function removeUnknownOwners(known: ReadonlySet<string>, state: string = STATE_DIR): Promise<string[]> {
+export async function removeUnknownOwners(
+  known: ReadonlySet<string>,
+  state: string = STATE_DIR,
+): Promise<{ removed: string[]; failed: { name: string; error: string }[] }> {
   const usersDir = join(state, "users");
   let names: string[];
   try {
     names = (await readdir(usersDir, { withFileTypes: true })).filter((e) => e.isDirectory()).map((e) => e.name);
   } catch (err) {
-    if ((err as NodeJS.ErrnoException).code === "ENOENT") return [];
+    if ((err as NodeJS.ErrnoException).code === "ENOENT") return { removed: [], failed: [] };
     throw err;
   }
-  const removed = names.filter((name) => !known.has(name)).sort();
-  for (const name of removed) {
-    await rm(join(usersDir, name), { recursive: true, force: true, maxRetries: 6, retryDelay: 50 });
+  const removed: string[] = [];
+  const failed: { name: string; error: string }[] = [];
+  for (const name of names.filter((n) => !known.has(n)).sort()) {
+    try {
+      await rm(join(usersDir, name), { recursive: true, force: true, maxRetries: 6, retryDelay: 50 });
+      removed.push(name);
+    } catch (err) {
+      failed.push({ name, error: (err as Error).message });
+    }
   }
-  return removed;
+  return { removed, failed };
 }
