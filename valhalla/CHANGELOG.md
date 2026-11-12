@@ -4,6 +4,8 @@ What changed in Valhalla, newest first. Each version is tagged in git as `valhal
 
 ## Unreleased
 
+## 0.0.6 — 2026-11-12
+
 - A turn the API declines no longer breaks the conversation. It stays on the page and in the
   file, but neither it nor your message before it is sent again, so you can say it another way.
 - When another model answers a declined turn, the note under it names the model that declined
