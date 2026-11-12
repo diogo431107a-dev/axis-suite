@@ -3,7 +3,7 @@
 // There is no temperature here, and that is not an omission: the current models reject
 // `temperature`, `top_p` and `top_k` outright. Effort is the dial they left.
 import { useState } from "react";
-import { CACHE_TTLS, EFFORTS, LIMITS, MODELS, type Settings } from "../../shared/protocol.ts";
+import { CACHE_TTLS, EFFORTS, hasFallback, LIMITS, MODELS, type Settings } from "../../shared/protocol.ts";
 import { Field, inputStyle } from "../ui/bits.tsx";
 
 const known = (model: string) => MODELS.some((entry) => entry.id === model);
@@ -120,18 +120,20 @@ export function SettingsForm({
         />
       </Field>
 
-      <label className="flex items-start gap-2 text-sm">
+      <label className={`flex items-start gap-2 text-sm ${hasFallback(settings.model) ? "" : "opacity-60"}`}>
         <input
           type="checkbox"
           className="mt-1"
           checked={settings.fallbacks}
+          disabled={!hasFallback(settings.model)}
           onChange={(e) => set("fallbacks", e.target.checked)}
         />
         <span>
           Let another model answer if this one declines
           <span className="mt-0.5 block text-xs text-faint">
-            Valhalla adds no filter of its own either way. This only decides whether a turn the API declines gets a
-            second chance on another model before it comes back to you.
+            {hasFallback(settings.model)
+              ? "Valhalla adds no filter of its own either way. This only decides whether a turn the API declines gets a second chance on another model before it comes back to you."
+              : "The API has no other model to hand a declined Haiku turn to, so this does nothing here."}
           </span>
         </span>
       </label>

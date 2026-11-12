@@ -6,7 +6,7 @@
 // declines to give comes back as a turn that says so, with the category it names.
 import Anthropic from "@anthropic-ai/sdk";
 import { randomUUID } from "node:crypto";
-import type { ContentBlock, Settings, StreamEvent, Turn } from "../shared/protocol.ts";
+import type { Attempt, ContentBlock, Settings, StreamEvent, Turn, TurnUsage } from "../shared/protocol.ts";
 import { StoreError } from "./errors.ts";
 import { loadApiKey } from "./key.ts";
 import type { SystemBlock } from "./prompt.ts";
@@ -30,9 +30,27 @@ export const keySource = (): string =>
  */
 export const hasApiKey = (): boolean => key !== null || Boolean(process.env.ANTHROPIC_AUTH_TOKEN);
 
+/**
+ * The turns that go back to the API: all of them except a declined exchange. A refused reply is
+ * empty or cut short, and the API takes no empty reply in the middle of a conversation — sending
+ * it would break every later turn. Your message that was declined is left out with it, so you can
+ * say it another way. Both stay in the log and on the page.
+ */
+export function turnsToSend(turns: Turn[]): Turn[] {
+  const kept: Turn[] = [];
+  for (const turn of turns) {
+    if (turn.role === "assistant" && turn.stopReason === "refusal") {
+      if (kept.at(-1)?.role === "user") kept.pop();
+      continue;
+    }
+    kept.push(turn);
+  }
+  return kept;
+}
+
 /** Turns stored turns into what the Messages API expects. The content blocks go back untouched. */
 const asMessages = (turns: Turn[]): Anthropic.Beta.BetaMessageParam[] =>
-  turns.map((turn) => ({
+  turnsToSend(turns).map((turn) => ({
     role: turn.role,
     // Stored verbatim when the reply arrived, and sent back verbatim: thinking blocks are only
     // valid in the conversation and on the model that produced them.
@@ -66,14 +84,37 @@ export function requestFor(system: SystemBlock[], turns: Turn[], settings: Setti
   return request;
 }
 
-/** The model that answered after an earlier one declined, if that happened. */
-function servedByFallback(content: Anthropic.Beta.BetaContentBlock[]): string | null {
-  const switched = content.filter((block) => block.type === "fallback");
-  return switched.at(-1)?.to.model ?? null;
-}
+const usageOf = (usage: {
+  input_tokens: number;
+  output_tokens: number;
+  cache_read_input_tokens: number | null;
+  cache_creation_input_tokens: number | null;
+  cache_creation: Anthropic.Beta.BetaCacheCreation | null;
+}): TurnUsage => ({
+  input_tokens: usage.input_tokens,
+  output_tokens: usage.output_tokens,
+  cache_read_input_tokens: usage.cache_read_input_tokens,
+  cache_creation_input_tokens: usage.cache_creation_input_tokens,
+  cache_creation_1h_input_tokens: usage.cache_creation?.ephemeral_1h_input_tokens ?? null,
+});
 
-/** Builds the turn to store from a finished reply. */
-export function turnOf(message: Anthropic.Beta.BetaMessage): Turn {
+/**
+ * Builds the turn to store from a finished reply. `asked` is the model the request named.
+ *
+ * Who answered: `message.model` is always the model that wrote the reply. A `fallback` block
+ * marks a switch made during this turn, naming the model that declined; a turn the API sent
+ * straight to the fallback model (it does for about an hour after one) carries no block, and only
+ * its `fallback_message` usage entry says so.
+ */
+export function turnOf(message: Anthropic.Beta.BetaMessage, asked?: string): Turn {
+  const switched = message.content.filter((block) => block.type === "fallback");
+  const iterations = message.usage.iterations ?? [];
+  const fellBack = switched.length > 0 || iterations.some((entry) => entry.type === "fallback_message");
+  const attempts = iterations.flatMap((entry): Attempt[] =>
+    entry.type === "message" || entry.type === "fallback_message"
+      ? [{ ...usageOf(entry), model: entry.model ?? asked ?? null }]
+      : [],
+  );
   return {
     id: randomUUID(),
     at: new Date().toISOString(),
@@ -84,13 +125,10 @@ export function turnOf(message: Anthropic.Beta.BetaMessage): Turn {
     stopDetails: message.stop_details
       ? { category: message.stop_details.category, explanation: message.stop_details.explanation }
       : null,
-    usage: {
-      input_tokens: message.usage.input_tokens,
-      output_tokens: message.usage.output_tokens,
-      cache_read_input_tokens: message.usage.cache_read_input_tokens,
-      cache_creation_input_tokens: message.usage.cache_creation_input_tokens,
-    },
-    servedBy: servedByFallback(message.content),
+    usage: usageOf(message.usage),
+    servedBy: fellBack ? message.model : null,
+    declinedBy: switched[0]?.from.model ?? null,
+    attempts: attempts.length > 1 ? attempts : null,
   };
 }
 
@@ -121,7 +159,7 @@ export async function streamReply(
     const told = eventOf(event);
     if (told) onEvent(told);
   }
-  return turnOf(await stream.finalMessage());
+  return turnOf(await stream.finalMessage(), settings.model);
 }
 
 /**
@@ -131,7 +169,7 @@ export async function streamReply(
  * It costs a token or two of accuracy and nothing else.
  */
 export const messagesToCount = (turns: Turn[]): Anthropic.Beta.BetaMessageParam[] =>
-  turns.length > 0 ? asMessages(turns) : [{ role: "user", content: "." }];
+  turnsToSend(turns).length > 0 ? asMessages(turns) : [{ role: "user", content: "." }];
 
 /** How many input tokens this conversation would send as it stands. */
 export async function countTokens(system: SystemBlock[], turns: Turn[], settings: Settings): Promise<number> {

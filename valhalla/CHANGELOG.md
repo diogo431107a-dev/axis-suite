@@ -4,6 +4,17 @@ What changed in Valhalla, newest first. Each version is tagged in git as `valhal
 
 ## Unreleased
 
+- A turn the API declines no longer breaks the conversation. It stays on the page and in the
+  file, but neither it nor your message before it is sent again, so you can say it another way.
+- When another model answers a declined turn, the note under it names the model that declined
+  and the one that answered (it used to name the same one twice). Turns the API keeps sending to
+  that model for a while afterwards are marked too.
+- The cost under the composer is closer to the bill: the one-hour cache is charged at its real
+  write price, Haiku's dearer rate for prompts over 100K tokens is used, and a declined turn adds
+  up every model that tried it, including the older ones a fallback can go to.
+- On Haiku, the "let another model answer" checkbox is greyed out, since the API has no fallback
+  for Haiku.
+
 ## 0.0.4 — 2026-11-12
 
 - Valhalla's first version in the Axis Suite. Write characters and write who you are when you speak

@@ -38,8 +38,58 @@ In practice that means:
   reply length, stop sequences, cache lifetime.
 
 The one thing Valhalla does on your behalf is ask the API for a fallback model when a turn is
-declined, so a scene need not dead-end. It is a checkbox, it is off whenever you want, and either
-way Valhalla itself filters nothing.
+declined (below). It is a checkbox, on by default, off whenever you want, and either way Valhalla
+itself filters nothing.
+
+## When the API declines a turn
+
+The current models run **Anthropic's safety classifiers** on every request. They are part of the
+API, not of Valhalla, and they are separate from the model's own judgement. When one of them
+flags a request, the API still answers with success, but with no reply (or a reply cut short) and a
+**category** saying which area it flagged:
+
+| Category               | What the classifier looks for                                       |
+| ---------------------- | ------------------------------------------------------------------- |
+| `cyber`                | help with cyber harm, such as malware or exploits                   |
+| `bio`                  | help with biological harm, such as dangerous lab methods            |
+| `frontier_llm`         | help building a competing AI model                                  |
+| `reasoning_extraction` | asking the model to write out its hidden reasoning in the reply     |
+| `general_harms`        | another area of Anthropic's Usage Policy (Sonnet 5.5 and Haiku 5.5) |
+
+These are areas of the Usage Policy, but a decline is not a ruling that you broke it. A classifier
+is a quick automatic check, and it also flags harmless text: a thriller villain's hacking scene, a
+plague in a fantasy kingdom. Those mistakes are what the fallback is for. When the model itself
+declines, rather than a classifier, the turn is shown the same way.
+
+**What the checkbox does.** With _Let another model answer if this one declines_ ticked, Valhalla
+asks for the API's `fallbacks: "default"` (beta `server-side-fallback-2026-07-01`). When a
+classifier declines, the API runs the same request again, in the same call, on an older model that
+Anthropic picks for that category and whose classifiers are set differently. If that model answers,
+the answer is stored as the turn and marked as served by it. If it declines too, you get the
+refusal as usual. It is not a way around the Usage Policy: the fallback model follows the same
+policy and has safeguards of its own.
+
+**It depends on the model you chose:**
+
+| Model      | What the fallback does                                                                                                  |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Haiku 5.5  | **Nothing.** The API has no fallback for Haiku: a declined turn stays declined.                                         |
+| Sonnet 5.5 | Retries `cyber` and `frontier_llm` on Sonnet 5. `bio`, `general_harms` and `reasoning_extraction` stay declined.        |
+| Opus 5.5   | Retries on the model Anthropic recommends for the category (Opus 5 or Opus 4.8). `reasoning_extraction` stays declined. |
+| Fable 5.2  | Retries on Opus 5 or Opus 4.8.                                                                                          |
+
+So in a Haiku conversation the checkbox changes nothing; a declined turn there can only be written
+differently and sent again.
+
+**What it costs and changes**, when it does run:
+
+- The answer is billed at the fallback model's prices. A decline that came part-way through a reply
+  is billed as normal too; whether one before any reply is billed depends on its category.
+- For about an hour afterwards, the API sends the same conversation straight to the fallback model,
+  without trying yours first. Each turn records the model that wrote it, and says so under it.
+- The fallback model cannot read the earlier turns' thinking, only what was said, so the
+  character's voice can shift a little. Nothing is lost: the thinking is kept, and is read again
+  when the conversation is back on your model.
 
 ## Running it
 
@@ -100,7 +150,9 @@ them produces errors.
 - **You speak first.** The first message in a conversation must be yours, so a character has no
   opening line. Faking one would mean instructing the model in the system prompt — exactly the
   interference Valhalla avoids.
-- **A refusal is an answer**, delivered successfully with a category attached, not an error.
+- **A refusal is an answer**, delivered successfully with a category attached, not an error. It is
+  kept, but it is not sent back: the API takes no empty reply mid-conversation. Your message
+  before it is left out too, so the model never sees the exchange.
 - **The prompt cache needs 512 tokens.** A two-line character will silently never cache. Watch
   `cached` under the composer: it should climb turn after turn. If it stays at zero on a long
   conversation, something in the prompt is changing between requests.
@@ -110,7 +162,9 @@ them produces errors.
 Each turn re-sends the whole conversation. The prompt cache is what makes that affordable: on
 Claude Opus 5.5 input is $4.00 per million tokens and a cache read is $0.20 — everything already
 said costs a twentieth to send again. Valhalla puts a breakpoint at the end of the system prompt
-and another that follows the conversation as it grows, and shows you what each turn actually cost.
+and another that follows the conversation as it grows, and shows what each turn cost at the
+published prices: a cache write at 1.25 times the input price for 5 minutes and twice for an hour,
+every model that tried a declined turn added up. It is an estimate; the Claude Console has the bill.
 
 The cache keeps a conversation for 5 minutes or an hour, your choice per conversation. An hour is
 the default because people pause, and a cold cache costs twenty times a warm one.
