@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.167 — 2026-11-12
+
+Valhalla 0.0.4 joins the suite: companions you write yourself, in conversations with Claude that stream in as they are written. Everyone signed in to Heimdall has their own, kept as plain files. The other modules are unchanged.
+
+| Module    | Version |
+| --------- | ------- |
+| Heimdall  | 0.0.21  |
+| Loggbok   | 0.0.16  |
+| Yggdrasil | 1.1.0   |
+| Janus     | 0.0.7   |
+| Papyrus   | 0.0.7   |
+| Vinr      | 0.0.6   |
+| Chronos   | 0.0.7   |
+| Valkyrie  | 0.0.6   |
+| Althing   | 0.0.4   |
+| Mimir     | 0.0.6   |
+| Urd       | 2.1.0   |
+| Saga      | 1.0.0   |
+| Star      | 0.0.4   |
+| Fafnir    | 2.0.0   |
+| Tyr       | 0.0.8   |
+| Valhalla  | 0.0.4   |
+
 ## 0.0.160 — 2026-11-10
 
 Yggdrasil 1.1.0: Alt+M duplicates a bullet with everything under it, and on a phone the ⋯ menu is always shown and has Zoom in. Also one request fewer after some saves. The other modules are unchanged.

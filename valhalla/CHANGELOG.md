@@ -4,6 +4,8 @@ What changed in Valhalla, newest first. Each version is tagged in git as `valhal
 
 ## Unreleased
 
+## 0.0.4 — 2026-11-12
+
 - Valhalla's first version in the Axis Suite. Write characters and write who you are when you speak
   to them, then hold a conversation that streams in as it is written.
 - Sign in through Heimdall, like every module. Each person has their own characters, personas and
