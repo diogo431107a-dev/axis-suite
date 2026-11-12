@@ -1,0 +1,71 @@
+@import "tailwindcss";
+
+/* Parchment by day, hall by night. One set of names, defined twice. */
+:root {
+  --paper: #f6f2ea;
+  --sheet: #fffdf8;
+  --ink: #241f1a;
+  --faint: #6d6459;
+  --rule: #ddd4c4;
+  --accent: #8a6a1f;
+  --accent-soft: #f0e6cd;
+  --warn: #8c3a2b;
+  --f-display: "Spectral", Georgia, serif;
+  --f-body: "Public Sans", system-ui, sans-serif;
+  --f-mono: ui-monospace, "Cascadia Mono", Menlo, monospace;
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --paper: #14110f;
+    --sheet: #1d1a17;
+    --ink: #ece5da;
+    --faint: #9b9183;
+    --rule: #332e28;
+    --accent: #c8a24a;
+    --accent-soft: #2a241a;
+    --warn: #e0876f;
+    color-scheme: dark;
+  }
+}
+
+/* Named for Tailwind, so bg-paper and text-faint follow the scheme above. */
+@theme inline {
+  --color-paper: var(--paper);
+  --color-sheet: var(--sheet);
+  --color-ink: var(--ink);
+  --color-faint: var(--faint);
+  --color-rule: var(--rule);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-warn: var(--warn);
+  --font-display: var(--f-display);
+  --font-body: var(--f-body);
+  --font-mono: var(--f-mono);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--f-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+/* A text box that grows with what is typed, without a script to measure it. */
+.composer {
+  field-sizing: content;
+}
+
+/* Spoken text keeps the line breaks you typed. */
+.spoken {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
