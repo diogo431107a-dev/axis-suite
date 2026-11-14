@@ -87,7 +87,7 @@ What this means in practice:
 
 - **The game's words belong to the story.** Labels speak in the voice of the [lore](lore.md). They don't explain anything that someone who has read the manual would already know.
 - **The numbers of a fight stay on screen.** Damage, HP, MP, gold and levels are what make a battle readable, and a game needs them.
-- **The reasoning behind them does not.** How XP is shared out, what the odds of escape are and how a vice's heat grows are left to be discovered.
+- **The reasoning behind them does not.** How XP is shared out, what the odds of escape are and how fast a vice's appetite grows are left to be discovered.
 - **Warnings stay.** Before anything irreversible, such as deleting a companion or a vice, or logging a vice, the game says what is about to happen. Mystery belongs to the game, and it never costs a player their progress by surprise.
 
 The [manual](manual.md) sits outside the game for anyone who wants answers, with the workings in a separate part marked as spoilers. A small [in-game help](help.md) gives just enough to get going.

@@ -4,6 +4,13 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- **Minor:** Dates. Each companion's card says when you last did its habit ("Last done yesterday · 13 Nov"), and each vice's card says when you last paid it. A new **History** button on both shows the last 7 days, the last 30 days and all time, then every day it happened. Dates are kept from this version on, so older check-ins and tithes have none.
+- **Minor:** The Chronicle shows the date of each line, and **Show all** opens up to its last 200 lines.
+- **Minor:** A vice now costs more the more often you pay it: each tithe in the last 7 days raises the next one. After 7 days without one it is back to its first price. Victories no longer cool vices, so any extra cost your vices carry now goes away.
+- **Minor:** A vice's price is chosen only when you name it. The sliders have left its card.
+- **Minor:** Beaten foes sometimes leave a chest of shop items, a few of each, and a boss always does. The battle report lists what was inside.
+- **Minor:** The attribute list no longer shows what vices have taken in purple. The numbers already count it.
+
 ## 1.0.0 — 2026-10-30
 
 Saga's development map is complete: the first version numbered as finished. From here on, each change is classified as Major, Minor or Fix.

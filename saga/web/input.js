@@ -27,7 +27,6 @@ import {
   buyItem,
   chooseAngel,
   defeatEnemy,
-  findVice,
   gameOver,
   isWiped,
   joinParty,
@@ -168,6 +167,14 @@ export const ACTIONS = {
     state.ui.skillsOpen[d.id] = !state.ui.skillsOpen[d.id];
     render();
   },
+  toggleHistory: (d) => {
+    state.ui.historyOpen[d.id] = !state.ui.historyOpen[d.id];
+    render();
+  },
+  toggleChronicle: () => {
+    state.ui.chronicleAll = !state.ui.chronicleAll;
+    render();
+  },
   editNote: (d) => {
     state.ui.noteFor = d.id;
     render();
@@ -305,10 +312,6 @@ document.addEventListener("click", (e) => {
 });
 app.addEventListener("input", (e) => {
   const el = e.target;
-  if (el.dataset.field && el.dataset.id) {
-    const v = findVice(state, el.dataset.id);
-    if (v) v[el.dataset.field] = +el.value;
-  }
   if (el.id === "volume") setVolume(el.value);
   if (el.dataset.out) {
     const out = document.getElementById(el.dataset.out);

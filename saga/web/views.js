@@ -5,6 +5,8 @@ import {
   atFront,
   canAct,
   canUse,
+  countSince,
+  dayKey,
   enemyDef,
   enemyName,
   findHabit,
@@ -12,9 +14,11 @@ import {
   frontPreview,
   hasStatus,
   heroInfo,
+  historyDays,
   innCost,
   innNeeded,
   isKO,
+  itemCount,
   lvOf,
   masteryOf,
   maxHpOf,
@@ -58,6 +62,41 @@ export const hpColor = (hp, max) => (hp / max > 0.5 ? "#5fbf6a" : hp / max > 0.2
 export const hpBar = (u, cls = "thin") => bar(pct(u.hp, maxHpOf(u)), hpColor(u.hp, maxHpOf(u)), cls);
 export const mpBar = (u, cls = "thin") => bar(pct(u.mp, maxMpOf(u)), "var(--mp)", cls);
 export const coin = '<span class="coin" aria-hidden="true"></span>';
+
+/* ---------- dates, in the player's own way of writing them ---------- */
+const DAY_FMT = { weekday: "short", day: "numeric", month: "short" };
+const keyDate = (key) => {
+  const [y, m, d] = key.split("-").map(Number);
+  return new Date(y, m - 1, d);
+};
+// "14 Nov", with the year only when it isn't this one.
+export function shortDate(ms, opts = { day: "numeric", month: "short" }) {
+  const d = new Date(ms);
+  const year = d.getFullYear() === new Date().getFullYear() ? {} : { year: "numeric" };
+  return d.toLocaleDateString(undefined, { ...opts, ...year });
+}
+// "today · 14 Nov", "yesterday · 13 Nov", "3 days ago · 11 Nov".
+export function ago(ms, now = Date.now()) {
+  const days = Math.round((keyDate(dayKey(now)) - keyDate(dayKey(ms))) / 86400000);
+  return `${days <= 0 ? "today" : days === 1 ? "yesterday" : `${days} days ago`} · ${shortDate(ms)}`;
+}
+// A companion's check-ins or a vice's tithes by day: totals first, then each day, newest first.
+export function historyBox(src, total) {
+  const now = Date.now(),
+    days = historyDays(src);
+  return `<div class="history">
+    <div class="skills">
+      <div class="skill"><span class="k">7 days</span><span class="v">${countSince(src, 7, now)}</span></div>
+      <div class="skill"><span class="k">30 days</span><span class="v">${countSince(src, 30, now)}</span></div>
+      <div class="skill"><span class="k">All time</span><span class="v">${total}</span></div>
+    </div>
+    ${
+      days.length
+        ? `<ol class="days">${days.map((d) => `<li><span>${shortDate(keyDate(d.day), DAY_FMT)}</span><span class="num">×${d.n}</span></li>`).join("")}</ol>`
+        : '<p class="foot-note">No dates yet. They are kept from now on.</p>'
+    }
+  </div>`;
+}
 export const signed = (n) => (n < 0 ? "−" : "+") + Math.abs(n);
 export const inBattle = () => state.ui.view === "battle";
 export const busyInBattle = () => inBattle() && BT.busy;
@@ -180,15 +219,14 @@ export function heroSheet(s) {
     </div>
     <h2 class="sect">Attributes</h2>
     <ul class="attrs">
-      ${ATTRS.map((a, i) => {
-        const pen = s.vicePenalty[a.id] || 0;
-        return `<li class="attr">
+      ${ATTRS.map(
+        (a, i) => `<li class="attr">
         <span class="ico" aria-hidden="true">${a.icon}</span>
         <span class="nm" style="color:${a.color}">${a.name}</span>
-        <span class="lv">${vals[i]}${pen ? ` <span class="pen">(−${pen})</span>` : ""}</span>
+        <span class="lv">${vals[i]}</span>
         ${bar(pct(vals[i], top), a.color, "thin")}
-      </li>`;
-      }).join("")}
+      </li>`,
+      ).join("")}
     </ul>
   </section>`;
 }
@@ -204,6 +242,7 @@ export function angelPlace(s) {
   return `<div class="angel-place" style="--c:${def.color}"><span>The Angel's place</span>${bar(pct(a.bar, TUNE.angel.bar), def.color, "thin")}</div>`;
 }
 
+const CHRONICLE_SHORT = 6;
 export function campView() {
   const s = state,
     e = s.enemy,
@@ -282,10 +321,19 @@ export function campView() {
         </div>
       </section>
       <section class="win" aria-label="Chronicle">
-        <h2 class="sect">Chronicle</h2>
-        <ol class="log">${s.log
-          .slice(0, 6)
-          .map((l) => `<li><span class="d">T${l.turn}</span><span>${esc(l.text)}</span></li>`)
+        <h2 class="sect">Chronicle${
+          s.log.length > CHRONICLE_SHORT
+            ? `<button class="linkish" data-action="toggleChronicle" aria-expanded="${s.ui.chronicleAll}">${s.ui.chronicleAll ? "Show less" : `Show all ${s.log.length}`}</button>`
+            : ""
+        }</h2>
+        <ol class="log ${s.ui.chronicleAll ? "all" : ""}">${(s.ui.chronicleAll
+          ? s.log
+          : s.log.slice(0, CHRONICLE_SHORT)
+        )
+          .map(
+            (l) =>
+              `<li><span class="d">${l.at ? `<span class="dt">${shortDate(l.at)}</span>` : ""}T${l.turn}</span><span>${esc(l.text)}</span></li>`,
+          )
           .join("")}</ol>
       </section>
     </div>
@@ -298,13 +346,6 @@ export function swapBox(s, id) {
     <p>The party is full. Who should step out?</p>
     <div class="swap-list">${s.party.map((pid) => `<button class="btn small" data-action="swap" data-out="${pid}">${esc(findHabit(s, pid).name)}</button>`).join("")}
     <button class="btn small" data-action="cancelSwap">Cancel</button></div>
-  </div>`;
-}
-export function rangeField(obj, key, label, min, max, step) {
-  const id = `${key}-${obj.id}`;
-  return `<div class="slider">
-    <label for="${id}">${label} <output id="${id}-v">${obj[key]}</output></label>
-    <input type="range" id="${id}" min="${min}" max="${max}" step="${step}" value="${obj[key]}" data-field="${key}" data-id="${obj.id}" data-out="${id}-v">
   </div>`;
 }
 export function statusNote(s, u) {
@@ -333,6 +374,7 @@ export function compCard(h) {
         ${statusChips(h)}
       </div>
     </div>
+    <p class="foot-note last">${h.lastAt ? `Last done ${ago(h.lastAt)}` : h.checkins ? "Not done since dates were kept" : "Not done yet"}</p>
     ${h.note && s.ui.noteFor !== h.id ? `<p class="comp-note">${esc(h.note)}</p>` : ""}
     ${s.ui.noteFor === h.id ? noteForm(h) : ""}
     ${
@@ -344,7 +386,8 @@ export function compCard(h) {
     </div>`
         : ""
     }
-    <div class="comp-foot"><span class="foot-note">${statusNote(s, h)}</span><button class="btn small" data-action="editNote" data-id="${h.id}">Note</button><button class="btn small" data-action="toggleSkills" data-id="${h.id}" aria-expanded="${!!s.ui.skillsOpen[h.id]}">Skills</button>${
+    ${s.ui.historyOpen[h.id] ? historyBox(h.days, h.checkins) : ""}
+    <div class="comp-foot"><span class="foot-note">${statusNote(s, h)}</span><button class="btn small" data-action="editNote" data-id="${h.id}">Note</button><button class="btn small" data-action="toggleSkills" data-id="${h.id}" aria-expanded="${!!s.ui.skillsOpen[h.id]}">Skills</button><button class="btn small" data-action="toggleHistory" data-id="${h.id}" aria-expanded="${!!s.ui.historyOpen[h.id]}">History</button>${
       inParty
         ? `<button class="btn small" data-action="bench" data-id="${h.id}">Bench</button>`
         : `<button class="btn small primary" data-action="join" data-id="${h.id}">Join party</button>`
@@ -373,10 +416,10 @@ export function viceCard(v) {
       <h3 class="comp-name">${esc(v.name)}</h3>
       <div class="comp-meta"><span class="attr-chip">${a.icon} drains ${a.name}</span><span>paid ${v.count}×</span></div>
       <p class="foot-note">Next tithe: −${now.drain} ${a.name} and −${now.cost} gold.</p>
+      <p class="foot-note last">${v.times.length ? `Last paid ${ago(v.times[v.times.length - 1])}` : v.count ? "Not paid since dates were kept" : "Never paid"}</p>
     </div>
-    ${rangeField(v, "drain", `${a.name} points taken`, 1, 10, 1)}
-    ${rangeField(v, "cost", "Gold it costs", 0, 50, 1)}
-    <div class="comp-foot"><span class="acts"><button class="btn small danger" data-action="askDelete" data-kind="vice" data-id="${v.id}">Delete</button><button class="btn small vice" data-action="logVice" data-id="${v.id}">Pay the tithe</button></span></div>
+    ${state.ui.historyOpen[v.id] ? historyBox(v.times, v.count) : ""}
+    <div class="comp-foot"><span class="acts"><button class="btn small" data-action="toggleHistory" data-id="${v.id}" aria-expanded="${!!state.ui.historyOpen[v.id]}">History</button><button class="btn small danger" data-action="askDelete" data-kind="vice" data-id="${v.id}">Delete</button><button class="btn small vice" data-action="logVice" data-id="${v.id}">Pay the tithe</button></span></div>
     ${viceConfirm(state, v)}
     ${confirmBox(state, "vice", v.id, `Stop tracking ${esc(v.name)}? The points it already took stay taken.`)}
   </article>`;
@@ -684,6 +727,15 @@ export function rewardsView() {
       ${r.dropped ? `<div class="r-banner bad"><b>Coins scattered</b>A failed escape dropped ${r.dropped} gold.</div>` : ""}
       ${r.title1 !== r.title0 ? `<div class="r-banner"><b>New title</b>${esc(state.hero.name)} is now known as “${esc(r.title1)}”.</div>` : ""}
       ${r.hero1 !== r.hero0 ? `<div class="r-banner ${r.hero1 < r.hero0 ? "bad" : ""}"><b>Hero level ${r.hero1 > r.hero0 ? "up" : "down"}</b>The hero is now level ${r.hero1}.</div>` : ""}
+      ${
+        pay && pay.chest
+          ? `<div class="r-banner"><b>A chest</b>${esc(
+              Object.entries(pay.chest)
+                .map(([k, n]) => itemCount(k, n))
+                .join(", "),
+            )}</div>`
+          : ""
+      }
       ${r.vices.length ? `<div class="r-banner bad"><b>Tithes paid</b>${esc(r.vices.join(", "))}</div>` : ""}
       <div class="r-stats">
         <div class="r-stat"><span class="r-label">XP shared</span><span class="r-num">${pay ? "+" + pay.xp : "0"}</span><span class="r-note">${pay ? "shared" : "no spoils"}</span></div>

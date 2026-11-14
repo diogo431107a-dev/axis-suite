@@ -11,10 +11,14 @@ import {
   castSpell,
   chooseAngel,
   closeTurn,
+  countSince,
+  dayKey,
   defeatEnemy,
   endTurn,
   gameOver,
+  historyDays,
   isWiped,
+  itemCount,
   joinParty,
   logVice,
   maxHpOf,
@@ -23,10 +27,13 @@ import {
   removeHabit,
   removeVice,
   seed,
+  spawnEnemy,
   setHabitNote,
   sheetAttr,
   strike,
   summaryOf,
+  upgradeToDated,
+  viceNow,
   vicePreview,
 } from "./rules.js";
 
@@ -118,6 +125,86 @@ describe("logging a vice", () => {
     const r = logVice(s, v.id, () => 0);
     expect(r.drained).toBe(2);
     expect(r.paid).toBe(0);
+  });
+});
+
+describe("dated history", () => {
+  const T = new Date(2026, 10, 14, 20, 0).getTime();
+  it("keeps the day of every check-in, and the Angel's extra attack is not one", () => {
+    const s = seed();
+    const h = addHabit(s, { name: "Pilates", attr: "body" });
+    joinParty(s, h.id);
+    h.days["2020-01-01"] = 3;
+    attack(s, h.id, () => 0.5, T);
+    expect(h.days).toEqual({ [dayKey(T)]: 1 });
+    expect(h.lastAt).toBe(T);
+    endTurn(s, () => 0.5);
+    Object.assign(s.angel, { who: "lunaria", left: 3 });
+    attack(s, h.id, () => 0.5, T + 60000);
+    expect(h.days[dayKey(T)]).toBe(2);
+    expect(historyDays(h.days)).toEqual([{ day: dayKey(T), n: 2 }]);
+    expect(countSince(h.days, 7, T + 6 * 86400000)).toBe(2);
+    expect(countSince(h.days, 7, T + 7 * 86400000)).toBe(0);
+  });
+
+  it("brings older saves up to date without inventing dates", () => {
+    const s = seed();
+    const h = addHabit(s, { name: "Pilates", attr: "body" });
+    const v = addVice(s, { name: "Smoking", attr: "body", cost: 10, drain: 2 });
+    delete h.days;
+    delete h.lastAt;
+    delete v.times;
+    v.heat = 3;
+    upgradeToDated(s);
+    expect(h).toMatchObject({ days: {}, lastAt: null });
+    expect(v.times).toEqual([]);
+    expect(v).not.toHaveProperty("heat");
+  });
+});
+
+describe("a vice repeated", () => {
+  const T = new Date(2026, 10, 14, 20, 0).getTime(),
+    D = 86400000;
+  it("costs more for each tithe in the last 7 days, and only time cools it", () => {
+    const s = seed();
+    s.hero.gold = 1000;
+    addHabit(s, { name: "Pilates", attr: "body" }).xp = 2000;
+    const v = addVice(s, { name: "Smoking", attr: "body", cost: 10, drain: 2 });
+    expect(viceNow(v, T)).toEqual({ cost: 10, drain: 2 });
+    logVice(s, v.id, () => 0.5, T);
+    expect(viceNow(v, T)).toEqual({ cost: 13, drain: 3 });
+    const r = logVice(s, v.id, () => 0.5, T + D);
+    expect(r.paid).toBe(13);
+    expect(viceNow(v, T + D).cost).toBe(16);
+    defeatEnemy(s, () => 0.5);
+    expect(viceNow(v, T + D).cost).toBe(16);
+    expect(viceNow(v, T + 7 * D).cost).toBe(13);
+    expect(viceNow(v, T + 8 * D)).toEqual({ cost: 10, drain: 2 });
+    expect(v.count).toBe(2);
+  });
+});
+
+describe("a chest after victory", () => {
+  it("always comes after a boss, and its items land in the bag", () => {
+    const s = seed();
+    s.enemy = spawnEnemy(5);
+    const before = { ...s.bag };
+    const chest = defeatEnemy(s, () => 0.99).pay.chest;
+    expect(Object.keys(chest)).toHaveLength(3);
+    for (const [k, n] of Object.entries(chest)) {
+      expect(n).toBeGreaterThanOrEqual(1);
+      expect(n).toBeLessThanOrEqual(3);
+      expect(s.bag[k]).toBe(before[k] + n);
+    }
+    expect(s.log.some((l) => l.text.includes("leaves a chest"))).toBe(true);
+  });
+
+  it("comes after an ordinary foe one time in four", () => {
+    const s = seed();
+    expect(defeatEnemy(s, () => TUNE.chest.chance).pay.chest).toBeNull();
+    expect(defeatEnemy(s, () => TUNE.chest.chance - 0.01).pay.chest).not.toBeNull();
+    expect(itemCount("remedy", 2)).toBe("2 Remedies");
+    expect(itemCount("ether", 1)).toBe("1 Ether");
   });
 });
 

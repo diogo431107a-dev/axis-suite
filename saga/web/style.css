@@ -438,9 +438,6 @@ button {
 .attr .bar {
   grid-column: 2 / 4;
 }
-.attr .pen {
-  color: var(--vice);
-}
 
 .report {
   border-color: var(--hp);
@@ -634,7 +631,35 @@ button {
   color: var(--muted);
   padding-top: 4px;
   flex: none;
-  width: 38px;
+  width: 52px;
+}
+.log .dt {
+  display: block;
+  margin-bottom: 3px;
+}
+.log.all {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.history {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.history .days {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: 14px;
+}
+.history .days li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 6px;
+  border-bottom: 1px solid var(--edge-dim);
 }
 
 .example-note {

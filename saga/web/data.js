@@ -23,7 +23,16 @@ export const TUNE = {
   innPerTier: 15, // inn price × tier of the region the party is in
   ko: { first: 0.1, step: 0.05, cap: 0.3 }, // XP lost on knockout, as a share of the level's requirement
   status: { poison: 0.08, burn: 0.05, blindMiss: 0.5, wholeParty: 1 / 3 },
-  vice: { cost: 10, drain: 2, heatGrowth: 1.25 }, // each log adds heat; each victory cools every vice by 1
+  vice: { cost: 10, drain: 2, growth: 1.25, window: 7 }, // price × growth for each tithe paid in the last `window` days
+  history: { days: 366, log: 200 }, // days of dated history each companion and vice keeps; lines in the chronicle
+  // A beaten foe may leave a chest of shop items (a boss always does): 1–3 kinds, 1–3 of each, picked by weight.
+  chest: {
+    chance: 0.25,
+    boss: 1,
+    kinds: [1, 3],
+    qty: [1, 3],
+    weights: { potion: 6, ether: 5, antidote: 5, remedy: 3, feather: 2, eliteFeather: 0.5 },
+  },
   flee: {
     base: 0.85,
     perTier: 0.1,

@@ -89,7 +89,7 @@ Class: Envoy. School: Charm.
 
 ### Camp
 
-Between battles you are at camp. Here you see the hero's sheet, the foe that blocks the road, your party, the inn and the chronicle of what has happened.
+Between battles you are at camp. Here you see the hero's sheet, the foe that blocks the road, your party, the inn and the chronicle of what has happened. The chronicle shows its last few lines, each with its date and turn. **Show all** opens the rest.
 
 The hero has no powers of their own. The sheet sums up your companions: every level a companion gains adds points to its attribute, and the total sets the hero's level.
 
@@ -97,7 +97,7 @@ The hero has no powers of their own. The sheet sums up your companions: every le
 
 Call a companion on the Roster, and your habit becomes one. Up to five fight in the party at once, and the rest wait on the bench. A new companion joins the party if there is room, and waits on the bench if not. Only the party can act, and only those who fight share in the rewards.
 
-Each companion's card has two small buttons. **Note** keeps your own words on the habit: why you keep it, what counts as doing it, what the goal is now. **Skills** shows its mastery, spell and flee levels.
+Each companion's card says when you last did its habit, and has three small buttons. **Note** keeps your own words on the habit: why you keep it, what counts as doing it, what the goal is now. **Skills** shows its mastery, spell and flee levels. **History** shows how many times you did it in the last 7 and 30 days and in all, and each day you did it, newest first.
 
 Choose your five according to what you are working on now, not what you wish you were. Swap them whenever your focus changes.
 
@@ -118,7 +118,7 @@ Once a battle starts, the only ways out are winning or running.
 
 ### Winning, falling and running
 
-- **Victory** pays XP, gold and fame, and moves the road on to the next foe.
+- **Victory** pays XP, gold and fame, and moves the road on to the next foe. Sometimes the foe leaves a chest of things from the shop, and a boss always does.
 - **Knocked out:** a companion at 0 HP can't act and loses some XP. Only a Phoenix Feather brings them back.
 - **The party falls:** when everyone is down, they all wake at camp with 1 HP. The foe stands whole again. You lose no gold.
 - **Running** may fail. If it does, the party loses its turn and may drop some gold. A foe you escape keeps its wounds until you come back.
@@ -139,9 +139,9 @@ If you have a task and no companion of its school, you'll need to recruit one or
 
 A vice is a bad habit you name on the Roster. Each time it gets the better of you, **pay the tithe**, honestly, in or out of battle. Paying never uses a turn. It takes points from one attribute on the hero's sheet and costs gold. If you can't pay, an ailment strikes the party instead. The game always says what a tithe will cost before you confirm.
 
-Points taken by a vice stay taken. Repeating a vice makes it cost more for a while, and victories cool it down.
+Points taken by a vice stay taken. Repeating a vice makes it cost more. Only time cools it down: leave it alone for a while and it returns to its first price.
 
-You choose how much each vice costs when you create it. Be honest about that too.
+You choose how much each vice costs when you name it, and that price can't be changed afterwards. Be honest about that too. A vice's card says when you last paid it, and its **History** shows each day you did.
 
 ### The shop and the inn
 
@@ -279,6 +279,19 @@ She stays for 6 turns, and they carry over between battles. The bar doesn't fill
 - **Lunaria:** after any action (attack, spell, item or guard), the companion strikes again at half power. This records nothing, raises no mastery and draws no counter. It can win the battle. The party takes 25% less damage and recovers 10% of max HP and MP at the end of each turn.
 - **Alecta:** the foe takes 30% more damage and deals 20% less. The chance of a critical attack rises from 10% to 40%.
 
+### Chests
+
+After a victory there is a 25% chance of a chest, and a boss always leaves one. A chest holds 1 to 3 different items from the shop, 1 to 3 of each, picked by weight:
+
+| Item                  | Weight |
+| --------------------- | ------ |
+| Health Potion         | 6      |
+| Ether                 | 5      |
+| Antidote              | 5      |
+| Remedy                | 3      |
+| Phoenix Feather       | 2      |
+| Elite Phoenix Feather | 0.5    |
+
 ### Fleeing
 
 `chance = 85% − 10% per tier above I − 10% against a boss − 5% per star + 4% per flee level above 1`, kept between 5% and 95%. The party uses its best flee level among those standing. That companion leads the escape, and only a successful escape trains the skill.
@@ -287,7 +300,9 @@ A failed escape costs the party its turn. It may also drop gold, with a chance o
 
 ### Vices and ailments
 
-A vice's cost and drain grow by ×1.25 per point of **heat**. Each tithe paid adds 1 heat, and each victory cools every vice by 1. New vices default to 2 points and 10 gold.
+A vice's cost and drain grow by ×1.25 for each tithe paid in the last 7 days, today included: ×1.25 after one, ×1.95 after three, ×4.8 after seven. After 7 days with none, it is back to the price it was named with. Victories don't cool it. New vices default to 2 points and 10 gold, and the price is set only when the vice is named.
+
+Companions and vices keep a year of dates. Older days leave the history, and the all-time totals stay.
 
 If the purse can't pay, one random ailment strikes one random standing member, or the whole party one time in three. **Ailments come only from unpaid vices.** Foes never inflict them.
 

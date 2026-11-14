@@ -72,7 +72,7 @@ Then **the Ember Peaks**, and the dragons, and the oldest one at the top. It rem
 
 Everything you do on the road has a price, and the road keeps accounts.
 
-**Vices** are tithes paid to the Dragon. They take strength from you, and it does not come back. Whatever you've given them, they will ask for more the next time. Their appetite only eases with victory. If you can't pay, the debt falls on those who walk with you, as sickness: poison, burn, frost, a blindness that passes. The Mystics can draw it out.
+**Vices** are tithes paid to the Dragon. They take strength from you, and it does not come back. Whatever you've given them, they will ask for more the next time. Their appetite only eases with time. If you can't pay, the debt falls on those who walk with you, as sickness: poison, burn, frost, a blindness that passes. The Mystics can draw it out.
 
 **The fallen** can't get up alone. Phoenix feathers are shed, it is said, by things that have died and thought better of it. They aren't cheap, and the inn won't help. An innkeeper can do many things, but raising the dead has never been on the bill.
 
