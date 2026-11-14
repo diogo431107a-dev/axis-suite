@@ -25,7 +25,8 @@ signed in there sees their own companions and chats and nobody else's.
 Like Valhalla and Fafnir, Valhalla 2 calls outside the suite: every message goes to
 `api.anthropic.com`, on the server's API key, which whoever runs the suite pays for. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
-pays in Buzz.
+pays in Buzz. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
+the server's Azure key.
 
 ## Minimum interference
 
@@ -156,6 +157,31 @@ Pictures are files on the server's disk, read from there each time they are show
 leaves its pictures in the gallery; a deleted companion takes its pictures with it. Without a
 CivitAI key Valhalla 2 works as before and offers no new pictures.
 
+## Reading aloud
+
+A companion's replies can be read aloud, by Azure AI Speech's neural voices. For now every
+companion is read by the same voice, Ava (`en-US-AvaMultilingualNeural`), which is multilingual: it
+reads Portuguese, Spanish and most other languages too, telling them from the text.
+
+- **As replies arrive.** The speaker switch in a chat's header (**Aloud** / **Silent**) says whether
+  each new reply, version or greeting is read as soon as it is written. It is remembered by the
+  browser, not the companion — on at home, off on the phone in public — and starts on.
+- **On demand.** The speaker button under any reply reads it; while it plays it becomes a stop
+  button. Starting one reply stops the other, and leaving the chat stops it.
+
+The whole reply is read in one voice, actions too: the asterisks around them are dropped, not
+spoken. A phone's browser may refuse to start sound the page didn't get a tap for; the speaker
+button under the reply always works.
+
+**Each reply is read once.** The first time it is asked for, Azure reads it and the MP3 is kept on
+the server, about 0.4 MB a minute; playing it again is instant and costs nothing. An edited reply is
+read again, and the old audio deleted. Under the composer, after the first reading in a visit, is how
+many characters Azure has read this month for the whole server. Azure's free tier (F0) includes
+500,000 characters a month; the paid tier (S0) bills per million characters. Everyone who can sign in
+to Heimdall reads on the server's key.
+
+Without an Azure key Valhalla 2 works as before and reads nothing aloud.
+
 ## When the API declines a turn
 
 The current models run **Anthropic's safety classifiers** on every request. They are part of the
@@ -231,6 +257,12 @@ For pictures, add the CivitAI key on a line of its own in the same file:
 echo 'CIVITAI_API_KEY=<your key>' >> valhalla2/data/secret.env
 ```
 
+To read aloud, add the Azure Speech key the same way (its region is `SPEECH_REGION` in `dev.env`):
+
+```bash
+echo 'SPEECH_KEY=<your key>' >> valhalla2/data/secret.env
+```
+
 If you have signed in with `ant auth login` instead, leave it out: the SDK finds that profile by
 itself. The key is read by the server process and never reaches the browser.
 
@@ -262,6 +294,8 @@ default.
 | `PICTURE_MODEL`              | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                 |
 | `PICTURE_PROMPT_MODEL`       | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                         |
 | `VALHALLA_PICTURE_MESSAGES`  | `20`                                             | How many messages it reads, up to the one being pictured.         |
+| `SPEECH_REGION`              | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.       |
+| `SPEECH_VOICE`               | `en-US-AvaMultilingualNeural`                    | The voice that reads replies aloud.                               |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 
@@ -277,8 +311,9 @@ every version of them, every run of the memory model and every command it made a
 file, and go with the companion when it is deleted.
 
 Pictures are files beside it, in `pictures/` (`/var/lib/private/valhalla2/pictures` on a server),
-one per picture; the database says whose each one is and how it was made. Files nothing refers to
-any more are deleted when Valhalla 2 starts.
+one per picture; the database says whose each one is and how it was made. Replies read aloud are MP3
+files in `speech/` beside them, one per reply. Files nothing refers to any more are deleted when
+Valhalla 2 starts.
 
 ## Things the current API decides, not Valhalla 2
 
@@ -337,6 +372,7 @@ One module holding both halves, like the rest of the suite.
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
+| `server/speech/`       | reading aloud: the only file that talks to Azure (`azure.ts`), what is read (`text.ts`), its key (`key.ts`), and the kept audio (`store.ts`)                                                                                                                             |
 | `server/civitai.ts`    | the only file that talks to CivitAI; `civitaiKey.ts` finds its key                                                                                                                                                                                                       |
 | `server/pictures/`     | pictures: what Claude reads to picture a scene (`scene.ts`), the rows (`store.ts`), the files (`files.ts`), and making them in the background (`painter.ts`)                                                                                                             |
 | `server/claude.ts`     | the only file that talks to the Claude API                                                                                                                                                                                                                               |
@@ -371,6 +407,14 @@ if it is empty (an empty file means no pictures):
 read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-civitai.key && unset KEY
 ```
 
+**So does the Azure Speech key**, which reads replies aloud; again an empty file means none. Its
+region is `SPEECH_REGION` in `deploy/valhalla2.service` (`brazilsouth`): a key from a resource in
+another region needs that line changed too.
+
+```
+read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-speech.key && unset KEY
+```
+
 Everyone who can sign in to Heimdall can talk to companions on this key, so give the suite a key of
 its own and set a monthly spend limit for it in the Claude Console.
 
@@ -388,7 +432,8 @@ can read them:
 sudo install -m 600 -o "$USER" /var/lib/private/valhalla2/backups/valhalla2-$(date +%F).db ~/
 ```
 
-**The daily backups don't hold the pictures**, only the database that lists them. To keep them,
+**The daily backups don't hold the pictures** (nor the audio, which is simply read again when it is
+missing), only the database that lists them. To keep them,
 copy the folder elsewhere now and then:
 
 ```

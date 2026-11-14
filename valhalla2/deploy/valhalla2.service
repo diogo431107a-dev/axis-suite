@@ -29,6 +29,12 @@ LoadCredential=anthropic-api-key:/etc/axis-suite/valhalla2-anthropic.key
 # The CivitAI API key, which makes pictures, put there by hand the same way. It may be an empty
 # file: Valhalla 2 then offers no new pictures. systemd still refuses to start while it is missing.
 LoadCredential=civitai-api-key:/etc/axis-suite/valhalla2-civitai.key
+# The Azure Speech key, which reads replies aloud, put there by hand the same way. It may be an
+# empty file: Valhalla 2 then reads nothing aloud. systemd still refuses to start while it is missing.
+LoadCredential=speech-api-key:/etc/axis-suite/valhalla2-speech.key
+# The region of the Azure Speech resource that key belongs to, and the voice that reads.
+Environment=SPEECH_REGION=brazilsouth
+Environment=SPEECH_VOICE=en-US-AvaMultilingualNeural
 ExecStart=/usr/bin/node /opt/valhalla2/dist/server/index.js
 Restart=on-failure
 RestartSec=2
