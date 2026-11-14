@@ -32,6 +32,13 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 - **The Memory page** shows a companion's files, lets you edit or delete them, shows each file's
   history as a diff and puts back any earlier version, and lists every run of the memory model with
   what it changed and what it cost.
+- **Tidy-ups:** every ten updates (or weekly), the memory model merges duplicates, settles
+  contradictions and condenses the files; a real clash in the character's canon is listed rather
+  than rewritten. **Tidy up now** does it at once.
+- **Rebuild from every chat** writes the memory again from scratch, replaying every chat's selected
+  path in order — for a better memory model, or new instructions. Nothing changes unless it all
+  succeeds, and the old files stay in the history.
+- **Daily backups** of the database, kept for 14 days beside it, and **Back up now**.
 - Long chats send only their newest part (about 20,000 tokens); a dashed line marks where that
   begins.
 - Everything is kept in one database file, `/var/lib/valhalla2/valhalla2.db`.

@@ -1,6 +1,13 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from "express";
 import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
-import { LIMITS, type ApiError, type Health, type StreamEvent } from "../shared/protocol.ts";
+import {
+  LIMITS,
+  type ApiError,
+  type Companion,
+  type Health,
+  type MemoryPage,
+  type StreamEvent,
+} from "../shared/protocol.ts";
 import { frame } from "../shared/sse.ts";
 import { createBusy } from "./busy.ts";
 import { createChats } from "./chat/chats.ts";
@@ -17,7 +24,9 @@ import {
 import { id as checkId, messageId, object, required, text } from "./check.ts";
 import { createCompanions } from "./companions.ts";
 import { config } from "./config.ts";
-import { DB_FILE, openDatabase, removeUnknownOwners } from "./db.ts";
+import { join } from "node:path";
+import { backUp, backups, startDailyBackups } from "./backup.ts";
+import { DB_FILE, openDatabase, removeUnknownOwners, STATE_DIR } from "./db.ts";
 import { invalid, StoreError } from "./errors.ts";
 import { memoryBusy, withMemoryLock } from "./memory/lock.ts";
 import { createScheduler } from "./memory/scheduler.ts";
@@ -36,8 +45,9 @@ console.log(`Claude API key: ${keySource()}`);
 // on a scratch copy); clear the copy away and say so on the run.
 {
   const leftover = db.prepare("SELECT id FROM memory_runs WHERE ok IS NULL").all() as { id: number }[];
-  db.prepare("DELETE FROM memory_files WHERE space LIKE 'scratch:%'").run();
-  db.prepare("DELETE FROM memory_versions WHERE space LIKE 'scratch:%'").run();
+  for (const table of ["memory_files", "memory_versions"]) {
+    db.prepare(`DELETE FROM ${table} WHERE space LIKE 'scratch:%' OR space LIKE 'rebuild:%'`).run();
+  }
   db.prepare(
     "UPDATE memory_runs SET ok = 0, error = 'The server stopped before this run finished; nothing was changed.', finished_at = ? WHERE ok IS NULL",
   ).run(new Date().toISOString());
@@ -54,8 +64,13 @@ const scheduler = createScheduler({
   run: runMemoryModel,
   maxIterations: config.memoryIterations,
   idleMinutes: config.idleMinutes,
+  cleanup: config.cleanup,
+  partTokens: config.windowTokens,
 });
 scheduler.start();
+
+const BACKUP_DIR = join(STATE_DIR, "backups");
+const stopBackups = startDailyBackups(db, BACKUP_DIR, config.backupsKept);
 
 // Someone removed from Heimdall leaves nothing behind. Without the list (development, or Heimdall
 // not installed yet) nothing is deleted.
@@ -321,8 +336,40 @@ const versionId = (raw: unknown): number => {
   return Number.isSafeInteger(n) && n > 0 ? n : invalid("That version id isn't valid");
 };
 
+const memoryPage = (companion: Companion): MemoryPage => ({
+  ...memoryService.page(companion),
+  rebuilding: scheduler.rebuilding(companion.id),
+  backups: backups(BACKUP_DIR).map(({ day, bytes }) => ({ day, bytes })),
+});
+
 app.get("/api/companions/:id/memory", (req: Request, res: Response) => {
-  res.json(memoryService.page(companionOf(req)));
+  res.json(memoryPage(companionOf(req)));
+});
+/** Tidies the companion's memory now, and says how that went. */
+app.post("/api/companions/:id/memory/tidy", async (req: Request, res: Response) => {
+  const companion = companionOf(req);
+  const outcome = await scheduler.tidy(companion.id);
+  res.json({ outcome, page: memoryPage(companion) });
+});
+/**
+ * Starts rebuilding the companion's memory from every chat. It can take minutes, so this answers
+ * at once; the page watches the runs come in.
+ */
+app.post("/api/companions/:id/memory/rebuild", (req: Request, res: Response) => {
+  const companion = companionOf(req);
+  scheduler.rebuild(companion.id).then(
+    (outcome) => {
+      if (outcome.kind === "failed") console.error(`Rebuilding the memory of ${companion.id} failed: ${outcome.error}`);
+    },
+    (err: unknown) => console.error(`Rebuilding the memory of ${companion.id} failed:`, err),
+  );
+  res.status(202).json(memoryPage(companion));
+});
+/** Backs the whole database up now, as today's backup. */
+app.post("/api/companions/:id/memory/backup", (req: Request, res: Response) => {
+  const companion = companionOf(req);
+  backUp(db, BACKUP_DIR, config.backupsKept);
+  res.json(memoryPage(companion));
 });
 app.get("/api/companions/:id/memory/file", (req: Request, res: Response) => {
   res.json(memoryService.file(companionOf(req), req.query.path));
@@ -379,6 +426,7 @@ const server = app.listen(PORT, HOST, (err) => {
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
     scheduler.stop();
+    stopBackups();
     server.close(() => {
       db.close();
       process.exit(0);

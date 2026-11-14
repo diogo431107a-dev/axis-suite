@@ -241,6 +241,27 @@ export function createMemory(db: DatabaseSync, limits: MemoryLimits) {
       db.prepare("UPDATE memory_ops SET space = ? WHERE space = ?").run(space, scratch);
     },
 
+    /**
+     * Replaces a companion's files with another space's, recording each file that changed as one
+     * version with `change` (and each that went as a deletion). The other space's own step-by-step
+     * versions are dropped; its log of commands is kept under the companion. For a rebuild.
+     */
+    replaceWith(from: string, space: string, change: Change): void {
+      const at = change.at ?? new Date().toISOString();
+      transaction(db, () => {
+        const before = new Map(files(space).map((file) => [file.path, file.content]));
+        const after = new Map(files(from).map((file) => [file.path, file.content]));
+        for (const path of new Set([...before.keys(), ...after.keys()])) {
+          const content = after.get(path) ?? null;
+          if (content !== (before.get(path) ?? null)) version(space, path, content, change, at);
+        }
+        db.prepare("DELETE FROM memory_files WHERE space = ?").run(space);
+        db.prepare("UPDATE memory_files SET space = ?, updated_at = ? WHERE space = ?").run(space, at, from);
+        db.prepare("DELETE FROM memory_versions WHERE space = ?").run(from);
+        db.prepare("UPDATE memory_ops SET space = ? WHERE space = ?").run(space, from);
+      });
+    },
+
     /** Throws a scratch space away, with every version it wrote. Its log of commands stays. */
     drop(scratch: string, keepOpsAs: string): void {
       db.prepare("DELETE FROM memory_files WHERE space = ?").run(scratch);

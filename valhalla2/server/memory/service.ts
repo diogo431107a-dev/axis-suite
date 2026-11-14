@@ -89,7 +89,8 @@ export function createMemoryService(db: DatabaseSync, memory: Memory, limits: Me
   });
 
   return {
-    page(companion: Companion): MemoryPage {
+    /** The Memory page, but for what only the server's other parts know (rebuilding, backups). */
+    page(companion: Companion): Omit<MemoryPage, "rebuilding" | "backups"> {
       return {
         companionId: companion.id,
         files: memory
@@ -104,6 +105,8 @@ export function createMemoryService(db: DatabaseSync, memory: Memory, limits: Me
         maxFiles: limits.files,
         runs: runs(companion),
         busy: memoryBusy(companion.id),
+        chats: (db.prepare("SELECT count(*) AS n FROM chats WHERE companion_id = ?").get(companion.id) as { n: number })
+          .n,
       };
     },
 

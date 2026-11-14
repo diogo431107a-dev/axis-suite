@@ -113,7 +113,7 @@ export interface Settings {
  * The texts Valhalla 2 itself adds to what the model reads. Each companion can rewrite any of them;
  * one left out uses the default in shared/prompts.ts.
  */
-export const PROMPT_KEYS = ["memoryPolicy", "greeting", "rejection", "consolidation"] as const;
+export const PROMPT_KEYS = ["memoryPolicy", "greeting", "rejection", "consolidation", "cleanup"] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
 export type Prompts = Partial<Record<PromptKey, string>>;
 
@@ -267,6 +267,12 @@ export interface MemoryPage {
   runs: MemoryRunInfo[];
   /** Whether the memory model is working on this companion right now. */
   busy: boolean;
+  /** Whether that work is a rebuild from every chat. */
+  rebuilding: boolean;
+  /** How many chats a rebuild would read. */
+  chats: number;
+  /** The database's daily backups, newest first. */
+  backups: { day: string; bytes: number }[];
 }
 
 export interface MemoryFileView {

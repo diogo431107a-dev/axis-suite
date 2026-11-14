@@ -116,6 +116,20 @@ Every change to every file is kept, with where it came from (a chat, your edit, 
 Memory page shows a file's history as a line-by-line diff, and **puts back** any earlier version as
 one more change.
 
+**Tidy-ups.** Filed a chat at a time, the files slowly gather near-duplicates and facts later chats
+contradicted. After every ten consolidations — or after a week, if memory changed at all — the
+memory model reads all the files at once and tidies them: merges duplicates, lets the most recent
+fact win, and condenses each file toward about 70% of its limit. It never silently rewrites
+`character_canon.md`: a real conflict there is listed under `## Conflicts` at the end of the file.
+It may not add, rename or delete files; a tidy-up that tries is not kept. **Tidy up now** on the
+Memory page runs one at once.
+
+**Rebuilding.** **Rebuild from every chat** on the Memory page starts the files over from their
+seeds and replays every chat's selected path through the memory model, in the order the chats were
+held, a window's worth at a time — for when memory went wrong, a better memory model is out, or
+you rewrote its instructions. The current files stay in place until it finishes and stay in each
+file's history after; if any step fails, nothing changes.
+
 ## When the API declines a turn
 
 The current models run **Anthropic's safety classifiers** on every request. They are part of the
@@ -210,6 +224,9 @@ default.
 | `VALHALLA_MEMORY_STORY_KB`   | `16`                | The largest `story/recent.md` and `story/arcs.md` may be.         |
 | `VALHALLA_MEMORY_FILES`      | `20`                | How many memory files a companion may have.                       |
 | `VALHALLA_MEMORY_ITERATIONS` | `16`                | The most requests one run of the memory model may make.           |
+| `VALHALLA_CLEANUP_EVERY`     | `10`                | Consolidations between two tidy-ups of a companion's memory.      |
+| `VALHALLA_CLEANUP_DAYS`      | `7`                 | …or days, if memory changed at all in that time.                  |
+| `VALHALLA_BACKUPS_KEPT`      | `14`                | How many daily backups of the database are kept.                  |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 
@@ -263,8 +280,6 @@ because people pause, and a cold cache costs twenty times a warm one.
 
 ## Not here yet
 
-- **Memory upkeep** — a periodic tidy-up of the memory files (merging duplicates, flagging
-  contradictions), rebuilding memory from every chat with a better model, and daily backups.
 - **Scenes** — the frame a chat sits in, reusable across companions.
 - **Images** — appearance is text that feeds the prompt.
 
@@ -272,22 +287,23 @@ because people pause, and a cold cache costs twenty times a warm one.
 
 One module holding both halves, like the rest of the suite.
 
-|                        |                                                                                                                                                                                                           |
-| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `shared/protocol.ts`   | the wire format, the limits, the models and their prices                                                                                                                                                  |
-| `shared/prompts.ts`    | Valhalla 2's own words and their defaults                                                                                                                                                                 |
-| `shared/sse.ts`        | how a reply travels while it is being written, and how it is read                                                                                                                                         |
-| `server/db.ts`         | the database, its migrations, transactions, removed users                                                                                                                                                 |
-| `server/companions.ts` | companions                                                                                                                                                                                                |
-| `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`)                                                                                                                          |
-| `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation and when it runs (`consolidate.ts`, `scheduler.ts`) |
-| `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                |
-| `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                          |
-| `server/claude.ts`     | the only file that talks to the Claude API                                                                                                                                                                |
-| `server/busy.ts`       | one reply at a time per chat                                                                                                                                                                              |
-| `server/index.ts`      | the routes and sign-in                                                                                                                                                                                    |
-| `web/`                 | React, Vite and Tailwind; `useState` and one context, no router                                                                                                                                           |
-| `deploy/`              | the systemd unit (sandboxed, with the key) and the Caddy site                                                                                                                                             |
+|                        |                                                                                                                                                                                                                                                                          |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `shared/protocol.ts`   | the wire format, the limits, the models and their prices                                                                                                                                                                                                                 |
+| `shared/prompts.ts`    | Valhalla 2's own words and their defaults                                                                                                                                                                                                                                |
+| `shared/sse.ts`        | how a reply travels while it is being written, and how it is read                                                                                                                                                                                                        |
+| `server/db.ts`         | the database, its migrations, transactions, removed users                                                                                                                                                                                                                |
+| `server/companions.ts` | companions                                                                                                                                                                                                                                                               |
+| `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`)                                                                                                                                                                                         |
+| `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation, tidy-ups and rebuilds (`consolidate.ts`, `cleanup.ts`, `rebuild.ts`, `run.ts`) and when they run (`scheduler.ts`) |
+| `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
+| `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
+| `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
+| `server/claude.ts`     | the only file that talks to the Claude API                                                                                                                                                                                                                               |
+| `server/busy.ts`       | one reply at a time per chat                                                                                                                                                                                                                                             |
+| `server/index.ts`      | the routes and sign-in                                                                                                                                                                                                                                                   |
+| `web/`                 | React, Vite and Tailwind; `useState` and one context, no router                                                                                                                                                                                                          |
+| `deploy/`              | the systemd unit (sandboxed, with the key) and the Caddy site                                                                                                                                                                                                            |
 
 Tests sit beside the code as `<name>.test.ts` and none of them calls the real API — replies come
 from a scripted writer, and the refusal and fallback paths are driven through synthetic replies.
@@ -311,15 +327,26 @@ To change the key, run the first line again, then `sudo systemctl restart valhal
 Everyone who can sign in to Heimdall can talk to companions on this key, so give the suite a key of
 its own and set a monthly spend limit for it in the Claude Console.
 
-A backup is the database file. It holds everyone's private chats, so keep backups where only you
-can read them, taken with the service stopped (`/var/lib/private/valhalla2` is where systemd really
-keeps it):
+Valhalla 2 backs its database up by itself once a day, while it runs, into
+`/var/lib/private/valhalla2/backups/valhalla2-YYYY-MM-DD.db` (systemd keeps `/var/lib/valhalla2`
+there), and keeps the newest 14. **Back up now** on any Memory page makes today's at once. They are
+made with SQLite's `VACUUM INTO`, which writes a consistent copy without stopping anything; never
+copy the live `.db` file itself.
+
+Those copies sit on the same disk as the database: they guard against a bad change or a broken
+memory, not a lost disk. They hold everyone's private chats, so copy them elsewhere where only you
+can read them:
+
+```
+sudo install -m 600 -o "$USER" /var/lib/private/valhalla2/backups/valhalla2-$(date +%F).db ~/
+```
+
+To go back to one: stop the service, put the copy in place of `valhalla2.db`, start it again.
 
 ```
 sudo systemctl stop valhalla2
-sudo cp /var/lib/private/valhalla2/valhalla2.db ~/valhalla2-backup-$(date +%Y%m%d).db
+sudo install -m 600 /var/lib/private/valhalla2/backups/valhalla2-<day>.db /var/lib/private/valhalla2/valhalla2.db
 sudo systemctl start valhalla2
-sudo chown "$USER": ~/valhalla2-backup-*.db && chmod 600 ~/valhalla2-backup-*.db
 ```
 
 ## Where this differs from the memory brief
@@ -344,5 +371,9 @@ Valhalla 2's memory was built from a written brief. Where it does something else
 - **Stop sequences apply to chats only.** The memory model writes Markdown, which may well contain
   one.
 - **Several people can use it**, each with their own companions, as everything in the suite does.
-- **Not built yet:** the periodic tidy-up, rebuilding memory from every chat, and daily backups (the
-  brief's last part).
+- **A tidy-up keeps the files as they are** and is thrown away if it adds, renames or deletes one,
+  so "keep the file structure" is checked, not only asked for.
+- **A rebuild reads long chats a window at a time**, and its intermediate steps aren't kept as
+  versions: the history shows one `rebuild` change per file, beside everything before it.
+- **Backups are checked for once an hour** rather than at a set time of day, so a server that was
+  off at that time still gets its daily copy; "Installing and data" says how to go back to one.

@@ -280,6 +280,8 @@ describe("the scheduler", () => {
       run: failing.run,
       maxIterations: 8,
       idleMinutes: 30,
+      cleanup: { every: 10, days: 7 },
+      partTokens: 20_000,
     });
     expect(scheduler.sweep()).toEqual(["chat-0001"]);
     await scheduler.now("chat-0001");

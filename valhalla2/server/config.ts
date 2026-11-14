@@ -33,6 +33,10 @@ export const config = {
   idleMinutes: count("VALHALLA_IDLE_MINUTES", 30),
   /** The most requests one consolidation may make. */
   memoryIterations: count("VALHALLA_MEMORY_ITERATIONS", 16),
+  /** When a companion's memory is tidied: after this many consolidations, or this many days. */
+  cleanup: { every: count("VALHALLA_CLEANUP_EVERY", 10), days: count("VALHALLA_CLEANUP_DAYS", 7) },
+  /** How many daily backups of the database are kept. */
+  backupsKept: count("VALHALLA_BACKUPS_KEPT", 14),
 };
 
 /** The size limits of a companion's memory. */

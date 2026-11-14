@@ -16,22 +16,14 @@
 import type { DatabaseSync } from "node:sqlite";
 import { blockText, type ChatMode, type Companion, type Message, type RunOutcome } from "../../shared/protocol.ts";
 import { CONSOLIDATION_MODES, promptOf } from "../../shared/prompts.ts";
-import type { MemoryRunner } from "../claude.ts";
-import type { MemoryLimits } from "../config.ts";
 import { transaction } from "../db.ts";
 import { createTree } from "../chat/tree.ts";
 import { renderFiles } from "./render.ts";
 import { withMemoryLock } from "./lock.ts";
 import type { Memory } from "./store.ts";
-import { memoryTool } from "./tool.ts";
+import { finishRun, runStep, type RunDeps } from "./run.ts";
 
-export interface ConsolidateDeps {
-  db: DatabaseSync;
-  memory: Memory;
-  limits: MemoryLimits;
-  run: MemoryRunner;
-  maxIterations: number;
-}
+export type ConsolidateDeps = RunDeps;
 
 export type { RunOutcome };
 
@@ -178,7 +170,7 @@ export function promptFor(
  */
 export function consolidate(deps: ConsolidateDeps, chatId: string, companion: Companion): Promise<RunOutcome> {
   return withMemoryLock(companion.id, async (): Promise<RunOutcome> => {
-    const { db, memory, limits, run } = deps;
+    const { db, memory } = deps;
     const pending = pendingFor(db, chatId);
     if (!pending) return { kind: "nothing", reason: "No such chat" };
     const now = () => new Date().toISOString();
@@ -190,61 +182,23 @@ export function consolidate(deps: ConsolidateDeps, chatId: string, companion: Co
       return { kind: "nothing", reason: "Memory already has everything in this chat" };
     }
 
-    const { lastInsertRowid } = db
-      .prepare("INSERT INTO memory_runs (space, chat_id, kind, model, started_at) VALUES (?, ?, 'consolidate', ?, ?)")
-      .run(companion.id, chatId, companion.settings.memoryModel, now());
-    const runId = Number(lastInsertRowid);
-    const scratch = `scratch:${runId}`;
+    const scratch = `scratch:${companion.id}:${Date.now()}`;
     memory.copy(companion.id, scratch);
+    const step = await runStep(deps, {
+      companion,
+      kind: "consolidate",
+      chatId,
+      work: scratch,
+      source: `consolidate:${chatId}`,
+      mode: pending.chat.mode,
+      system: `${promptOf(companion, "consolidation")}
 
-    const fail = (error: string, attempts: unknown = null): RunOutcome => {
-      transaction(db, () => {
-        memory.drop(scratch, companion.id);
-        db.prepare("UPDATE memory_runs SET ok = 0, error = ?, attempts = ?, finished_at = ? WHERE id = ?").run(
-          error,
-          attempts === null ? null : JSON.stringify(attempts),
-          now(),
-          runId,
-        );
-      });
-      return { kind: "failed", runId, error };
-    };
-
-    let result;
-    try {
-      result = await run({
-        system: `${promptOf(companion, "consolidation")}\n\n${CONSOLIDATION_MODES[pending.chat.mode]}`,
-        prompt: promptFor(companion, memory.files(companion.id), pending),
-        tool: memoryTool({
-          db,
-          memory,
-          limits,
-          space: scratch,
-          source: `consolidate:${chatId}`,
-          runId,
-          chatId,
-          mode: pending.chat.mode,
-        }),
-        settings: companion.settings,
-        maxIterations: deps.maxIterations,
-      });
-    } catch (err) {
-      return fail(err instanceof Error ? err.message : String(err));
-    }
-    if (result.stopReason === "refusal") {
-      const category = result.stopDetails?.category ? ` (${result.stopDetails.category})` : "";
-      return fail(
-        `The API declined to update memory${category}. ${result.stopDetails?.explanation ?? ""}`.trim(),
-        result.attempts,
-      );
-    }
-    if (result.stopReason !== "end_turn" && result.stopReason !== "stop_sequence") {
-      return fail(
-        result.stopReason === "tool_use"
-          ? `The memory model used all ${deps.maxIterations} of its steps before finishing.`
-          : `The memory model stopped early (${result.stopReason}).`,
-        result.attempts,
-      );
+${CONSOLIDATION_MODES[pending.chat.mode]}`,
+      prompt: promptFor(companion, memory.files(companion.id), pending),
+    });
+    if (!step.ok) {
+      memory.drop(scratch, companion.id);
+      return { kind: "failed", runId: step.runId, error: step.error };
     }
 
     transaction(db, () => {
@@ -262,13 +216,8 @@ export function consolidate(deps: ConsolidateDeps, chatId: string, companion: Co
         db.prepare("UPDATE swipe_feedback SET consolidated_at = ? WHERE id = ?").run(at, row.id);
       }
       db.prepare("UPDATE chats SET consolidated_mode = mode WHERE id = ?").run(chatId);
-      db.prepare("UPDATE memory_runs SET ok = 1, summary = ?, attempts = ?, finished_at = ? WHERE id = ?").run(
-        result.text || null,
-        JSON.stringify(result.attempts),
-        at,
-        runId,
-      );
+      finishRun(db, step, at);
     });
-    return { kind: "done", runId, summary: result.text };
+    return { kind: "done", runId: step.runId, summary: step.text };
   });
 }

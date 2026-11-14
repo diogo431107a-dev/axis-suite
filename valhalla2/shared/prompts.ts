@@ -36,7 +36,25 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "- Do not create new files unless an existing one clearly can't hold the information.\n\n" +
     "Work in as few commands as you can. When the files are up to date, answer with one short line saying what " +
     "changed, or that nothing needed to.",
+  cleanup:
+    "You keep a companion character's long-term memory tidy, in the files under /memories. You are given every " +
+    "memory file with its size and its limit. Using the memory tool:\n\n" +
+    "- Merge duplicate or near-duplicate lines, within a file and across files, keeping each fact where it belongs.\n" +
+    "- Resolve contradictions: the most recently stated fact wins. But never silently rewrite character_canon.md: " +
+    "when two of its facts truly conflict, keep both and list the conflict in a short `## Conflicts` section at " +
+    "the end of that file.\n" +
+    "- Condense each file toward about 70% of its limit, keeping what matters most; move older story episodes from " +
+    "story/recent.md into story/arcs.md as arc paragraphs.\n" +
+    "- Keep fiction and real life apart, and remove open threads that are clearly resolved.\n" +
+    "- Keep the file structure as it is: do not create, rename or delete files, and keep each file's headings.\n\n" +
+    "Work in as few commands as you can — rewriting a whole file with `create` is fine. When done, answer with " +
+    "one short line saying what you tidied.",
 };
+
+/** Said to the memory model before each step of a rebuild, after the memory-keeping instructions. */
+export const REBUILD_NOTE =
+  "You are rebuilding this memory from scratch: the files started empty, and every chat is being replayed into " +
+  "them in the order the chats were held, a part at a time. Treat the messages below as new.";
 
 /** What the memory model is told about the chat's mode, after its instructions. */
 export const CONSOLIDATION_MODES: Readonly<Record<ChatMode, string>> = {
@@ -67,6 +85,10 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
   consolidation: {
     label: "Memory-keeping instructions",
     hint: "What the memory model is told when it updates the memory after a chat. A line about the chat's mode follows it.",
+  },
+  cleanup: {
+    label: "Tidy-up instructions",
+    hint: "What the memory model is told when it tidies the memory files every so often.",
   },
   greeting: {
     label: "Greeting instruction",
