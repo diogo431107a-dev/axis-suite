@@ -1,4 +1,4 @@
-import { GAME_VERSION, addLog, freshAngel, freshUi, seed, summaryOf } from "./rules.js";
+import { GAME_VERSION, addLog, freshAngel, freshUi, seed, summaryOf, upgradeToDated } from "./rules.js";
 import { render, setState, state } from "./views.js";
 
 /* =====================================================================
@@ -22,6 +22,8 @@ const MIGRATIONS = {
   5: (s) => {
     s.angel = freshAngel();
   },
+  // Companions and vices start keeping dates, and a vice's price now cools with time, not victories.
+  6: upgradeToDated,
 };
 
 /** Calls the API. Never throws: a network failure is { status: 0 } with an error to show. */

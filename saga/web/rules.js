@@ -54,9 +54,52 @@ export const atFront = (s) => s.enemy.index === s.frontIndex;
 export const randInt = ([a, b], rng) => a + Math.floor(rng() * (b - a + 1));
 export const openTasks = (s, school) => s.tasks.filter((t) => !t.done && (!school || t.school === school));
 
-export function addLog(s, text) {
-  s.log.unshift({ turn: s.turn, text });
-  if (s.log.length > 80) s.log.length = 80;
+export function addLog(s, text, now = Date.now()) {
+  s.log.unshift({ turn: s.turn, at: now, text });
+  if (s.log.length > TUNE.history.log) s.log.length = TUNE.history.log;
+}
+
+/* ---------- dated history ---------- */
+const DAY = 86400000;
+// The local calendar day of a moment, as YYYY-MM-DD.
+export function dayKey(ms) {
+  const d = new Date(ms);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+const oldest = (now) => dayKey(now - TUNE.history.days * DAY);
+// A companion's check-in: counted under today's date. Days older than the history keeps are dropped.
+export function recordDay(u, now) {
+  const k = dayKey(now),
+    cut = oldest(now);
+  u.days[k] = (u.days[k] || 0) + 1;
+  u.lastAt = now;
+  for (const d of Object.keys(u.days)) if (d < cut) delete u.days[d];
+}
+// Days with something in them, newest first: [{ day: "2026-11-14", n: 2 }]. Takes a companion's
+// day counts or a vice's list of moments.
+export function historyDays(src) {
+  const days = {};
+  if (Array.isArray(src)) for (const t of src) days[dayKey(t)] = (days[dayKey(t)] || 0) + 1;
+  else Object.assign(days, src);
+  return Object.entries(days)
+    .map(([day, n]) => ({ day, n }))
+    .sort((a, b) => (a.day < b.day ? 1 : -1));
+}
+// How many times in the last `days` calendar days, today included.
+export function countSince(src, days, now) {
+  const cut = dayKey(now - (days - 1) * DAY);
+  return historyDays(src).reduce((t, d) => t + (d.day >= cut ? d.n : 0), 0);
+}
+// Saves before version 7 kept no dates: history starts empty, and vices lose the old heat.
+export function upgradeToDated(s) {
+  s.habits.forEach((h) => {
+    h.days = {};
+    h.lastAt = null;
+  });
+  s.vices.forEach((v) => {
+    v.times = [];
+    delete v.heat;
+  });
 }
 
 /* ---------- the hero: a summary sheet of the companions ---------- */
@@ -386,7 +429,7 @@ export function hitFoe(s, u, dmg, rng, { counters = true } = {}) {
     over = false;
   if (e.hp === 0) {
     credit(s, u.id, Math.round(e.maxHp * TUNE.share.lastHit));
-    kill = defeatEnemy(s);
+    kill = defeatEnemy(s, rng);
     over = closeTurn(s).over; // victory ends the battle and the turn
   } else {
     if (counters) counter = enemyCounter(s, u, rng);
@@ -395,8 +438,9 @@ export function hitFoe(s, u, dmg, rng, { counters = true } = {}) {
   }
   return { dmg: dealt, hpBefore, hpAfter: hpBefore - dealt, kill, counter, gameOver: over };
 }
-// Attack = "I just did this habit once". It pays nothing now, but sharpens the companion's mastery.
-export function attack(s, id, rng = Math.random) {
+// Attack = "I just did this habit once". It pays nothing now, but sharpens the companion's mastery,
+// and the day is kept in the companion's history.
+export function attack(s, id, rng = Math.random, now = Date.now()) {
   const u = findHabit(s, id);
   if (!u || !s.party.includes(id) || !canAct(s, u)) return null;
   const m0 = masteryOf(u).level;
@@ -407,6 +451,7 @@ export function attack(s, id, rng = Math.random) {
   const miss = hasStatus(u, "blind") && rng() < TUNE.status.blindMiss;
   const target = enemyName(s.enemy);
   u.checkins++;
+  recordDay(u, now);
   s.angel.deeds++;
   const masteryUp = masteryOf(u).level > m0;
   const burn = spendAction(s, u);
@@ -545,17 +590,40 @@ export function payout(s, e) {
   s.hero.gold += gold;
   return { xp, gold, gains };
 }
-export function defeatEnemy(s) {
+// "1 Ether", "2 Remedies".
+export const itemCount = (key, n) => {
+  const name = ITEMS[key].name;
+  return `${n} ${n === 1 ? name : name.endsWith("y") ? name.slice(0, -1) + "ies" : name + "s"}`;
+};
+// Sometimes a beaten foe leaves a chest of things from the shop, and a boss always does. A few
+// different items, a few of each, the cheap ones far more often than feathers.
+export function rollChest(s, def, rng = Math.random) {
+  const C = TUNE.chest;
+  if (rng() >= (def.idx === 5 ? C.boss : C.chance)) return null;
+  const pool = Object.entries(C.weights);
+  const kinds = Math.min(pool.length, randInt(C.kinds, rng));
+  const chest = {};
+  for (let i = 0; i < kinds; i++) {
+    let r = rng() * pool.reduce((t, [, w]) => t + w, 0),
+      j = 0;
+    while (j < pool.length - 1 && (r -= pool[j][1]) >= 0) j++;
+    const [key] = pool.splice(j, 1)[0];
+    chest[key] = randInt(C.qty, rng);
+    s.bag[key] = (s.bag[key] || 0) + chest[key];
+  }
+  const list = Object.entries(chest).map(([k, n]) => itemCount(k, n));
+  addLog(s, `${def.name} leaves a chest: ${list.join(", ")}.`);
+  return chest;
+}
+export function defeatEnemy(s, rng = Math.random) {
   const killed = { ...s.enemy, hp: 0 },
     def = enemyDef(killed);
   const pay = payout(s, killed);
   s.defeated[killed.key] = (s.defeated[killed.key] || 0) + 1;
   s.fame += def.tier * (1 + killed.star);
   if (def.tier === 8) s.dragonKills++;
-  s.vices.forEach((v) => {
-    v.heat = Math.max(0, v.heat - 1);
-  });
   addLog(s, `${enemyName(killed)} is defeated. +${pay.xp} XP shared, +${pay.gold} gold.`);
+  pay.chest = rollChest(s, def, rng);
   if (s.session) {
     s.session.kills.push(killed.key);
     s.session.payout = pay;
@@ -750,13 +818,15 @@ export function restAtInn(s) {
 }
 
 /* ---------- vices ---------- */
-// Heat makes repeats hurt more: cost and drain grow by heatGrowth per heat. Each victory cools every vice by 1.
-export function viceNow(v) {
-  const m = Math.pow(TUNE.vice.heatGrowth, v.heat);
+// Repeats hurt more: cost and drain grow by `growth` for each tithe paid in the last `window` days.
+// Only time cools a vice: after `window` days without one, it is back to the price it was named with.
+export const viceRecent = (v, now = Date.now()) => countSince(v.times, TUNE.vice.window, now);
+export function viceNow(v, now = Date.now()) {
+  const m = Math.pow(TUNE.vice.growth, viceRecent(v, now));
   return { cost: Math.round(v.cost * m), drain: Math.max(1, Math.round(v.drain * m)) };
 }
 export function addVice(s, { name, attr, cost, drain }) {
-  const v = { id: "v" + s.nextVid++, name, attr, cost, drain, heat: 0, count: 0 };
+  const v = { id: "v" + s.nextVid++, name, attr, cost, drain, count: 0, times: [] };
   s.vices.push(v);
   addLog(s, `${name} is named a vice.`);
   return v;
@@ -770,37 +840,39 @@ export function removeVice(s, id) {
   return v;
 }
 // What logging a vice would do now, for asking before it is logged.
-export function vicePreview(s, v) {
-  const now = viceNow(v);
-  return { drain: Math.min(now.drain, sheetAttr(s, v.attr)), cost: now.cost, canPay: s.hero.gold >= now.cost };
+export function vicePreview(s, v, now = Date.now()) {
+  const price = viceNow(v, now);
+  return { drain: Math.min(price.drain, sheetAttr(s, v.attr)), cost: price.cost, canPay: s.hero.gold >= price.cost };
 }
 // Logging a vice is never blocked and never uses a turn. It takes points from the hero's sheet,
-// charges gold, and if the purse can't cover it, an ailment strikes.
-export function logVice(s, id, rng = Math.random) {
+// charges gold, and if the purse can't cover it, an ailment strikes. The moment is kept in its history.
+export function logVice(s, id, rng = Math.random, now = Date.now()) {
   const v = findVice(s, id);
   if (!v) return null;
-  const now = viceNow(v);
+  const price = viceNow(v, now);
   const hero0 = heroInfo(s).level;
-  const drained = Math.min(now.drain, sheetAttr(s, v.attr));
+  const drained = Math.min(price.drain, sheetAttr(s, v.attr));
   s.vicePenalty[v.attr] = (s.vicePenalty[v.attr] || 0) + drained;
   v.count++;
-  v.heat++;
+  v.times.push(now);
+  const cut = now - TUNE.history.days * DAY;
+  v.times = v.times.filter((t) => t >= cut);
   let paid = 0,
     ailment = null;
-  if (s.hero.gold >= now.cost) {
-    s.hero.gold -= now.cost;
-    paid = now.cost;
+  if (s.hero.gold >= price.cost) {
+    s.hero.gold -= price.cost;
+    paid = price.cost;
   } else ailment = randomAilment(s, rng);
   const hero1 = heroInfo(s).level;
   const a = ATTR[v.attr];
   let text = `${v.name}: ${a.name} −${drained}${hero1 < hero0 ? ` (hero drops to LV ${hero1})` : ""}`;
   text +=
-    paid || !now.cost
+    paid || !price.cost
       ? `, −${paid} gold.`
       : ailment
         ? `. No gold to pay, so ${STATUSES[ailment.id].name} strikes ${ailment.whole ? "the whole party" : ailment.names[0]}.`
         : ". No gold to pay.";
-  addLog(s, text);
+  addLog(s, text, now);
   if (s.session) s.session.vices.push(v.name);
   return { v, drained, paid, ailment, hero0, hero1, text };
 }
@@ -845,6 +917,8 @@ export function newHabit(id, name, attr, xp = 0, checkins = 0) {
     koCount: 0,
     statuses: [],
     note: "",
+    days: {}, // check-ins by local day, YYYY-MM-DD → count
+    lastAt: null, // the moment of the last check-in
   };
   h.hp = maxHpOf(h);
   h.mp = maxMpOf(h);
@@ -951,7 +1025,7 @@ export function finishSession(s) {
 
 // The version of the state object. A change that reshapes it raises this and adds a step to
 // MIGRATIONS in web/net.js, which brings older saves up to date when they are loaded.
-export const GAME_VERSION = 6;
+export const GAME_VERSION = 7;
 
 // What only this page needs: the view, open forms and pickers. Never saved.
 export function freshUi(view = "camp") {
@@ -964,6 +1038,8 @@ export function freshUi(view = "camp") {
     swapFor: null,
     noteFor: null,
     skillsOpen: {},
+    historyOpen: {},
+    chronicleAll: false,
     confirmReset: false,
     confirmDelete: null,
     confirmVice: null,
