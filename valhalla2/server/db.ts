@@ -203,6 +203,26 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       );
     `);
   },
+  // v5: pinned moments. Lines you chose to keep word for word, sent in every chat with the
+  // companion beside its memory, and never touched by the memory model. The speaker and the chat's
+  // title are copied in, so renaming or deleting the chat later leaves the prompt as it was.
+  (db) => {
+    db.exec(`
+      CREATE TABLE pins (
+        id           INTEGER PRIMARY KEY,
+        companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+        chat_id      TEXT REFERENCES chats(id) ON DELETE SET NULL,
+        message_id   INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+        speaker      TEXT NOT NULL,
+        chat_title   TEXT NOT NULL,
+        text         TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX pins_companion ON pins (companion_id, id);
+      CREATE INDEX pins_chat ON pins (chat_id);
+      CREATE INDEX pins_message ON pins (message_id);
+    `);
+  },
 ];
 
 /**

@@ -47,6 +47,7 @@ import { createPictureFiles, PICTURES_DIR } from "./pictures/files.ts";
 import { createPainter } from "./pictures/painter.ts";
 import { sceneRequest, type Scene } from "./pictures/scene.ts";
 import { createPictures, knownFiles } from "./pictures/store.ts";
+import { createPins, pinsOf } from "./pins.ts";
 import { asParams, promptView } from "./prompt.ts";
 import { createAzureSpeech } from "./speech/azure.ts";
 import { loadSpeechKey } from "./speech/key.ts";
@@ -154,11 +155,13 @@ const auth = heimdallAuth();
 function ownedBy(req: Request) {
   const { username } = auth.user(req);
   const companions = createCompanions(db, username, config.defaults);
+  const chats = createChats(db, username, companions, config.swipeAsk);
   return {
     username,
     companions,
-    chats: createChats(db, username, companions, config.swipeAsk),
+    chats,
     pictures: createPictures(db, username),
+    pins: createPins(db, username, chats),
   };
 }
 
@@ -417,6 +420,14 @@ app.post("/api/chats/:id/feedback", (req: Request, res: Response) => {
   res.json(my.chats.page(id));
 });
 
+/** Pins words from a message: `{ messageId, speaker, text }`. This chat sees it on its next turn. */
+app.post("/api/chats/:id/pins", (req: Request, res: Response) => {
+  const my = ownedBy(req);
+  const id = checkId(req.params.id);
+  my.pins.add(id, req.body);
+  res.json(my.chats.page(id));
+});
+
 // A companion's memory: its files, their history, and the runs of the memory model.
 function companionOf(req: Request) {
   return ownedBy(req).companions.get(checkId(req.params.id));
@@ -430,6 +441,7 @@ const memoryPage = (companion: Companion): MemoryPage => ({
   ...memoryService.page(companion),
   rebuilding: scheduler.rebuilding(companion.id),
   backups: backups(BACKUP_DIR).map(({ day, bytes }) => ({ day, bytes })),
+  pins: pinsOf(db, companion.id),
 });
 
 app.get("/api/companions/:id/memory", (req: Request, res: Response) => {
@@ -482,6 +494,15 @@ app.get("/api/companions/:id/memory/versions/:versionId", (req: Request, res: Re
 app.post("/api/companions/:id/memory/versions/:versionId/revert", async (req: Request, res: Response) => {
   await memoryService.revert(companionOf(req), versionId(req.params.versionId));
   res.status(204).end();
+});
+/** Unpins a moment. The chat it came from stops sending it on its next turn. */
+app.delete("/api/companions/:id/pins/:pinId", (req: Request, res: Response) => {
+  const my = ownedBy(req);
+  const companion = my.companions.get(checkId(req.params.id));
+  const raw = req.params.pinId;
+  const pinId = typeof raw === "string" && /^[0-9]{1,15}$/.test(raw) ? Number(raw) : invalid("That pin isn't valid");
+  my.pins.remove(companion.id, pinId);
+  res.json(memoryPage(companion));
 });
 
 // Pictures of a companion: a profile picture from its page, a chat picture from a message. Claude
