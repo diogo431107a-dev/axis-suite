@@ -34,9 +34,10 @@ In practice that means:
 
 - **The prompt is yours.** The system prompt is your companion's profile, exactly as you wrote it.
 - **Valhalla 2's own words are few, and yours to rewrite.** A chat needs a little text you didn't
-  write: the instruction that has the companion open the chat, and the note that passes on why you
-  rejected a reply. Each companion has its own copy of every one of them, which you can rewrite or
-  leave on the default. The **Inspect** panel in a chat shows the exact request that goes out, built
+  write: the memory policy that comes with the companion's memory, the instruction that has it open
+  the chat, the note that passes on why you rejected a reply, and the instructions the memory model
+  works by. Each companion has its own copy of every one of them, which you can rewrite or leave on
+  the default. The **Inspect** panel in a chat shows the exact request that goes out, built
   by the same code that sends it, with every hidden part marked.
 - **Nothing is softened on the way back.** If the API declines a turn, that turn is stored and
   shown as a refusal, with the category and the explanation it gave, word for word.
@@ -60,8 +61,60 @@ question can be skipped; an answer goes, hidden, with every later version of tha
 used straight away. (The number is `VALHALLA_SWIPE_ASK`, below.)
 
 Each chat is **canon** (part of your story together) or a **one-shot** (a standalone scenario). You
-choose when you open it, and can change it later. Today the mode is a label; the companion's memory,
-which is being built, is what will treat the two differently.
+choose when you open it, and can change it later; memory treats the two differently (below).
+
+## Memory
+
+Every chat with a companion feeds one memory, so the companion stays the same person with a growing
+history, without the old chats being sent again. It is a handful of Markdown files, which you can
+read, edit and put back on the companion's **Memory** page:
+
+| File                 | What it holds                                                                                         |
+| -------------------- | ----------------------------------------------------------------------------------------------------- |
+| `character_canon.md` | what the character has established about herself beyond the profile: backstory, tastes, habits, scars |
+| `relationship.md`    | how the bond has changed, nicknames, inside jokes, rituals, promises, where things stand              |
+| `user.md`            | the real person behind the persona: real-life facts only                                              |
+| `feedback.md`        | standing requests about how the character writes or behaves, and patterns in rejected replies         |
+| `open_threads.md`    | unresolved plot hooks, and real-life things to ask about later                                        |
+| `world.md`           | places, recurring characters, owned items, lore                                                       |
+| `story/recent.md`    | 3–6 line summaries of the latest canon chats                                                          |
+| `story/arcs.md`      | older history, condensed into arcs                                                                    |
+
+**Only the memory model writes it**, never a chat. A reply can be swiped away, edited, deleted or
+left behind on another branch, so if replies wrote memory, a rejected one could leave invented
+"facts" behind. Instead, a second model (each companion's _Memory model_, Sonnet 5.5 by default)
+reads the chat's **selected path** afterwards and updates the files with the memory tool. It runs:
+
+- when a chat has been quiet for 30 minutes (checked every minute, and once at startup);
+- when you press **Remember now** in a chat;
+- when a long chat's oldest turns slide out of what is sent (below);
+- when you open a new chat with the companion, for its other chats: the greeting waits for it, so
+  it is written knowing everything.
+
+It gets what is new on the path, what was **edited, deleted or left on another branch** since it
+last ran (with what replaced it, so it can take back what came only from that), and your reasons for
+rejecting replies; it folds a reason into `feedback.md` only when it is a lasting preference. A
+**one-shot** chat may not touch `world.md` or `story/`: its events aren't part of the story, but what
+it shows about the two of you is kept. It works on a copy of the files, swapped in whole when it
+finishes; a run that is declined, fails or runs out of steps changes nothing and is tried again
+later. Each run is listed on the Memory page with what it changed and what it cost — a few cents on
+Sonnet.
+
+**Every chat reads all of it**, in its system prompt after the profile, so the companion never has
+to look anything up mid-reply. The files are capped (8 KB each, 16 KB for the story files, 20
+files), so that is a few thousand tokens, cached like the profile. A chat keeps the memory it
+started with and looks again only when its prompt changes anyway — when its oldest turns slide out,
+when its mode changes, or after it has sat longer than the cache lasts — because changing the
+system prompt mid-chat would cost the cache and the companion's earlier thinking.
+
+**Long chats slide.** Only about the last 20,000 tokens of the selected path are sent. When a chat
+outgrows that, its oldest ten exchanges slide out at once — not one per turn, which would change the
+start of the request, and so miss the cache, every turn. They are folded into memory first. A dashed
+line in the chat marks where what is sent begins.
+
+Every change to every file is kept, with where it came from (a chat, your edit, a revert). The
+Memory page shows a file's history as a line-by-line diff, and **puts back** any earlier version as
+one more change.
 
 ## When the API declines a turn
 
@@ -137,7 +190,7 @@ itself. The key is read by the server process and never reaches the browser.
 
 ```bash
 pnpm --filter valhalla2 test    # none of the tests calls the real API
-pnpm --filter valhalla2 smoke   # one real chat against the API. Spends a fraction of a cent.
+pnpm --filter valhalla2 smoke   # one real chat, then its memory, against the API. A few cents.
 ```
 
 ## Settings
@@ -145,11 +198,18 @@ pnpm --filter valhalla2 smoke   # one real chat against the API. Spends a fracti
 Set in `dev.env` for development and in `deploy/valhalla2.service` on a server. Every one has a
 default.
 
-| Variable             | Default             | What it does                                                      |
-| -------------------- | ------------------- | ----------------------------------------------------------------- |
-| `CHAT_MODEL`         | `claude-opus-5-5`   | The model a new companion answers with. Each can change it.       |
-| `MEMORY_MODEL`       | `claude-sonnet-5-5` | The model a new companion keeps its memory with. Each can change. |
-| `VALHALLA_SWIPE_ASK` | `5`                 | Swipes on one reply before asking why they aren't working.        |
+| Variable                     | Default             | What it does                                                      |
+| ---------------------------- | ------------------- | ----------------------------------------------------------------- |
+| `CHAT_MODEL`                 | `claude-opus-5-5`   | The model a new companion answers with. Each can change it.       |
+| `MEMORY_MODEL`               | `claude-sonnet-5-5` | The model a new companion keeps its memory with. Each can change. |
+| `VALHALLA_SWIPE_ASK`         | `5`                 | Swipes on one reply before asking why they aren't working.        |
+| `VALHALLA_WINDOW_TOKENS`     | `20000`             | About how many tokens of a chat are sent each turn.               |
+| `VALHALLA_WINDOW_CHUNK`      | `10`                | How many exchanges slide out at once when a chat outgrows that.   |
+| `VALHALLA_IDLE_MINUTES`      | `30`                | How long a chat is quiet before it is folded into memory.         |
+| `VALHALLA_MEMORY_FILE_KB`    | `8`                 | The largest a memory file may be.                                 |
+| `VALHALLA_MEMORY_STORY_KB`   | `16`                | The largest `story/recent.md` and `story/arcs.md` may be.         |
+| `VALHALLA_MEMORY_FILES`      | `20`                | How many memory files a companion may have.                       |
+| `VALHALLA_MEMORY_ITERATIONS` | `16`                | The most requests one run of the memory model may make.           |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 
@@ -160,7 +220,9 @@ companion belongs to a Heimdall username, and a chat and its messages belong to 
 someone is removed from Heimdall, everything of theirs is deleted the next time Valhalla 2 starts.
 
 A message is stored exactly as the API returned it, thinking blocks included. A delete only marks
-it deleted, and an edit keeps the earlier words beside the new ones.
+it deleted, and an edit keeps the earlier words beside the new ones. A companion's memory files,
+every version of them, every run of the memory model and every command it made are in the same
+file, and go with the companion when it is deleted.
 
 ## Things the current API decides, not Valhalla 2
 
@@ -189,7 +251,7 @@ them produces errors.
 
 ## Cost
 
-Each turn re-sends the whole selected path. The prompt cache is what makes that affordable: on
+Each turn re-sends the selected path, up to the window. The prompt cache is what makes that affordable: on
 Claude Opus 5.5 input is $4.00 per million tokens and a cache read is $0.20 — everything already
 said costs a twentieth to send again. Valhalla 2 puts a breakpoint at the end of the system prompt
 and another that follows the chat as it grows, and shows what each reply cost at the published
@@ -201,7 +263,8 @@ because people pause, and a cold cache costs twenty times a warm one.
 
 ## Not here yet
 
-- **Long-term memory** — every chat feeding one organized memory per companion. Being built.
+- **Memory upkeep** — a periodic tidy-up of the memory files (merging duplicates, flagging
+  contradictions), rebuilding memory from every chat with a better model, and daily backups.
 - **Scenes** — the frame a chat sits in, reusable across companions.
 - **Images** — appearance is text that feeds the prompt.
 
@@ -209,21 +272,22 @@ because people pause, and a cold cache costs twenty times a warm one.
 
 One module holding both halves, like the rest of the suite.
 
-|                        |                                                                                  |
-| ---------------------- | -------------------------------------------------------------------------------- |
-| `shared/protocol.ts`   | the wire format, the limits, the models and their prices                         |
-| `shared/prompts.ts`    | Valhalla 2's own words and their defaults                                        |
-| `shared/sse.ts`        | how a reply travels while it is being written, and how it is read                |
-| `server/db.ts`         | the database, its migrations, transactions, removed users                        |
-| `server/companions.ts` | companions                                                                       |
-| `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`) |
-| `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits       |
-| `server/key.ts`        | where the API key comes from: the systemd credential, or the env                 |
-| `server/claude.ts`     | the only file that talks to the Claude API                                       |
-| `server/busy.ts`       | one reply at a time per chat                                                     |
-| `server/index.ts`      | the routes and sign-in                                                           |
-| `web/`                 | React, Vite and Tailwind; `useState` and one context, no router                  |
-| `deploy/`              | the systemd unit (sandboxed, with the key) and the Caddy site                    |
+|                        |                                                                                                                                                                                                           |
+| ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `shared/protocol.ts`   | the wire format, the limits, the models and their prices                                                                                                                                                  |
+| `shared/prompts.ts`    | Valhalla 2's own words and their defaults                                                                                                                                                                 |
+| `shared/sse.ts`        | how a reply travels while it is being written, and how it is read                                                                                                                                         |
+| `server/db.ts`         | the database, its migrations, transactions, removed users                                                                                                                                                 |
+| `server/companions.ts` | companions                                                                                                                                                                                                |
+| `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`)                                                                                                                          |
+| `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation and when it runs (`consolidate.ts`, `scheduler.ts`) |
+| `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                |
+| `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                          |
+| `server/claude.ts`     | the only file that talks to the Claude API                                                                                                                                                                |
+| `server/busy.ts`       | one reply at a time per chat                                                                                                                                                                              |
+| `server/index.ts`      | the routes and sign-in                                                                                                                                                                                    |
+| `web/`                 | React, Vite and Tailwind; `useState` and one context, no router                                                                                                                                           |
+| `deploy/`              | the systemd unit (sandboxed, with the key) and the Caddy site                                                                                                                                             |
 
 Tests sit beside the code as `<name>.test.ts` and none of them calls the real API — replies come
 from a scripted writer, and the refusal and fallback paths are driven through synthetic replies.
@@ -257,3 +321,28 @@ sudo cp /var/lib/private/valhalla2/valhalla2.db ~/valhalla2-backup-$(date +%Y%m%
 sudo systemctl start valhalla2
 sudo chown "$USER": ~/valhalla2-backup-*.db && chmod 600 ~/valhalla2-backup-*.db
 ```
+
+## Where this differs from the memory brief
+
+Valhalla 2's memory was built from a written brief. Where it does something else, this is why:
+
+- **Chats don't get the memory tool; they get all of memory in the prompt.** The brief had chats
+  look up `world.md` and `story/` with the tool. A tool loop inside a streamed reply mixes with
+  declined turns, fallback models and the companion's thinking, every tool call would have to be
+  stored and replayed exactly, and a low-effort Haiku may simply not look. The caps keep the whole
+  memory to a few thousand cached tokens, so it is all sent. The memory tool is used where it
+  matters: by the memory model.
+- **Memory is frozen per chat** instead of rebuilt every turn, so the cache and the companion's
+  thinking survive (see Memory).
+- **A run works on a copy** that is swapped in whole, instead of committing each command, so a run
+  cut short leaves nothing half-done. Each command still writes one version, kept when the run
+  succeeds.
+- **TypeScript, `node:sqlite`, Vitest and the default journal**, like the rest of the suite, instead
+  of plain JavaScript, `better-sqlite3`, `node:test` and WAL.
+- **Settings are per companion**, as before, with the two models in them; the environment only
+  gives a new companion its defaults.
+- **Stop sequences apply to chats only.** The memory model writes Markdown, which may well contain
+  one.
+- **Several people can use it**, each with their own companions, as everything in the suite does.
+- **Not built yet:** the periodic tidy-up, rebuilding memory from every chat, and daily backups (the
+  brief's last part).

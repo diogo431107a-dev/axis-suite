@@ -19,7 +19,8 @@ export type Selection =
   | { kind: "none" }
   /** `greet`: the chat was just opened, so ask for its greeting straight away. */
   | { kind: "chat"; id: string; greet?: boolean }
-  | { kind: "companion"; id: string | null };
+  | { kind: "companion"; id: string | null }
+  | { kind: "memory"; companionId: string };
 
 const context = createContext<Page | null>(null);
 

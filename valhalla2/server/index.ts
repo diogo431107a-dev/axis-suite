@@ -4,21 +4,58 @@ import { LIMITS, type ApiError, type Health, type StreamEvent } from "../shared/
 import { frame } from "../shared/sse.ts";
 import { createBusy } from "./busy.ts";
 import { createChats } from "./chat/chats.ts";
-import { generate, send, type TurnContext } from "./chat/turn.ts";
-import { asStoreError, contextWindow, countTokens, hasApiKey, keySource, streamReply } from "./claude.ts";
+import { generate, prepare, send, type TurnContext } from "./chat/turn.ts";
+import {
+  asStoreError,
+  contextWindow,
+  countTokens,
+  hasApiKey,
+  keySource,
+  runMemoryModel,
+  streamReply,
+} from "./claude.ts";
 import { id as checkId, messageId, object, required, text } from "./check.ts";
 import { createCompanions } from "./companions.ts";
 import { config } from "./config.ts";
 import { DB_FILE, openDatabase, removeUnknownOwners } from "./db.ts";
-import { StoreError } from "./errors.ts";
-import { asParams, buildSystem, outgoing, promptView } from "./prompt.ts";
+import { invalid, StoreError } from "./errors.ts";
+import { memoryBusy, withMemoryLock } from "./memory/lock.ts";
+import { createScheduler } from "./memory/scheduler.ts";
+import { createMemoryService } from "./memory/service.ts";
+import { createMemory } from "./memory/store.ts";
+import { asParams, promptView } from "./prompt.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3016);
 
 const db = openDatabase(DB_FILE);
-console.log(`Everyone's companions and chats: ${DB_FILE}`);
+console.log(`Everyone's companions, chats and memory: ${DB_FILE}`);
 console.log(`Claude API key: ${keySource()}`);
+
+// A run of the memory model the server was stopped in the middle of changed nothing (it worked
+// on a scratch copy); clear the copy away and say so on the run.
+{
+  const leftover = db.prepare("SELECT id FROM memory_runs WHERE ok IS NULL").all() as { id: number }[];
+  db.prepare("DELETE FROM memory_files WHERE space LIKE 'scratch:%'").run();
+  db.prepare("DELETE FROM memory_versions WHERE space LIKE 'scratch:%'").run();
+  db.prepare(
+    "UPDATE memory_runs SET ok = 0, error = 'The server stopped before this run finished; nothing was changed.', finished_at = ? WHERE ok IS NULL",
+  ).run(new Date().toISOString());
+  if (leftover.length > 0)
+    console.log(`${leftover.length} memory run(s) cut short by the last stop; nothing was changed`);
+}
+
+const memory = createMemory(db, config.memory);
+const memoryService = createMemoryService(db, memory, config.memory);
+const scheduler = createScheduler({
+  db,
+  memory,
+  limits: config.memory,
+  run: runMemoryModel,
+  maxIterations: config.memoryIterations,
+  idleMinutes: config.idleMinutes,
+});
+scheduler.start();
 
 // Someone removed from Heimdall leaves nothing behind. Without the list (development, or Heimdall
 // not installed yet) nothing is deleted.
@@ -121,7 +158,10 @@ app.get("/api/chats", (req: Request, res: Response) => {
   res.json(ownedBy(req).chats.list());
 });
 app.post("/api/chats", (req: Request, res: Response) => {
-  res.status(201).json(ownedBy(req).chats.create(req.body));
+  const chat = ownedBy(req).chats.create(req.body);
+  // The greeting should know everything: fold the companion's other chats in first.
+  scheduler.othersOf(chat.companionId, chat.id);
+  res.status(201).json(chat);
 });
 app.get("/api/chats/:id", (req: Request, res: Response) => {
   res.json(ownedBy(req).chats.page(checkId(req.params.id)));
@@ -134,23 +174,37 @@ app.delete("/api/chats/:id", (req: Request, res: Response) => {
   res.status(204).end();
 });
 
-// The request exactly as it will be sent. Nothing is assembled out of sight.
-app.get("/api/chats/:id/prompt", (req: Request, res: Response) => {
+/** The parts of a request that don't stream: the chat, its companion, its tree, and how to prepare it. */
+function chatParts(req: Request) {
   const my = ownedBy(req);
   const chat = my.chats.get(checkId(req.params.id));
   const companion = my.companions.get(chat.companionId);
-  res.json(promptView(companion, my.chats.tree(chat.id).activePath()));
+  const tree = my.chats.tree(chat.id);
+  const base = {
+    db,
+    chatId: chat.id,
+    companion,
+    memory,
+    window: { tokens: config.windowTokens, chunk: config.windowChunk },
+    onSlide: () => scheduler.soon(chat.id),
+  };
+  return { my, chat, companion, tree, base };
+}
+
+// The request exactly as it will be sent. Nothing is assembled out of sight.
+app.get("/api/chats/:id/prompt", (req: Request, res: Response) => {
+  const { companion, tree, base } = chatParts(req);
+  const { system, messages } = prepare(base, tree.activePath(), undefined, false);
+  res.json(promptView(companion, system, messages));
 });
 
 // What this chat would send, against the model's context window.
 app.get("/api/chats/:id/tokens", async (req: Request, res: Response) => {
-  const my = ownedBy(req);
-  const chat = my.chats.get(checkId(req.params.id));
-  const companion = my.companions.get(chat.companionId);
-  const messages = asParams(outgoing(my.chats.tree(chat.id).activePath()));
+  const { companion, tree, base } = chatParts(req);
+  const { system, messages } = prepare(base, tree.activePath(), undefined, false);
   try {
     const [inputTokens, window] = await Promise.all([
-      countTokens(buildSystem(companion), messages, companion.settings),
+      countTokens(system, asParams(messages), companion.settings),
       contextWindow(companion.settings.model),
     ]);
     res.json({ inputTokens, contextWindow: window });
@@ -161,19 +215,15 @@ app.get("/api/chats/:id/tokens", async (req: Request, res: Response) => {
 
 /** What a streamed reply needs, checked and claimed before the stream starts. */
 function turnFor(req: Request) {
-  const my = ownedBy(req);
-  const chat = my.chats.get(checkId(req.params.id));
-  const companion = my.companions.get(chat.companionId);
-  const tree = my.chats.tree(chat.id);
+  const { my, chat, companion, tree, base } = chatParts(req);
   const release = busy.claim(my.username, chat.id);
   const context = (onEvent: (event: StreamEvent) => void): TurnContext => ({
-    db,
+    ...base,
     tree,
-    companion,
     write: streamReply,
     onEvent,
   });
-  return { tree, release, context };
+  return { tree, companion, release, context };
 }
 
 /** Says something at the end of the selected path and streams the answer. */
@@ -193,7 +243,7 @@ app.post("/api/chats/:id/send", async (req: Request, res: Response) => {
 app.post("/api/chats/:id/generate", async (req: Request, res: Response) => {
   const body = object(req.body);
   const parentId = body.parentId === null || body.parentId === undefined ? null : messageId(body.parentId);
-  const { tree, release, context } = turnFor(req);
+  const { tree, companion, release, context } = turnFor(req);
   try {
     if (parentId !== null) tree.get(parentId);
   } catch (err) {
@@ -201,9 +251,21 @@ app.post("/api/chats/:id/generate", async (req: Request, res: Response) => {
     throw err;
   }
   await stream(res, release, async (tell) => {
+    if (parentId === null && memoryBusy(companion.id)) {
+      // A greeting is written knowing everything: it waits for memory to catch up first.
+      tell({ type: "remembering" });
+      await withMemoryLock(companion.id, () => undefined);
+    }
     const answered = await generate(context(tell), parentId);
     tell({ type: "done", message: answered });
   });
+});
+
+/** Folds the chat into the companion's memory now, and says how that went. */
+app.post("/api/chats/:id/consolidate", async (req: Request, res: Response) => {
+  const { my, chat } = chatParts(req);
+  const outcome = await scheduler.now(chat.id);
+  res.json({ outcome, page: my.chats.page(chat.id) });
 });
 
 /** Selects a message: the path now runs through it, down to the newest line below it. */
@@ -250,6 +312,41 @@ app.post("/api/chats/:id/feedback", (req: Request, res: Response) => {
   res.json(my.chats.page(id));
 });
 
+// A companion's memory: its files, their history, and the runs of the memory model.
+function companionOf(req: Request) {
+  return ownedBy(req).companions.get(checkId(req.params.id));
+}
+const versionId = (raw: unknown): number => {
+  const n = typeof raw === "string" && /^[0-9]{1,15}$/.test(raw) ? Number(raw) : NaN;
+  return Number.isSafeInteger(n) && n > 0 ? n : invalid("That version id isn't valid");
+};
+
+app.get("/api/companions/:id/memory", (req: Request, res: Response) => {
+  res.json(memoryService.page(companionOf(req)));
+});
+app.get("/api/companions/:id/memory/file", (req: Request, res: Response) => {
+  res.json(memoryService.file(companionOf(req), req.query.path));
+});
+app.put("/api/companions/:id/memory/file", async (req: Request, res: Response) => {
+  const body = object(req.body);
+  if (typeof body.content !== "string") invalid("The file's text isn't valid");
+  res.json(await memoryService.save(companionOf(req), body.path, body.content));
+});
+app.delete("/api/companions/:id/memory/file", async (req: Request, res: Response) => {
+  await memoryService.remove(companionOf(req), req.query.path);
+  res.status(204).end();
+});
+app.get("/api/companions/:id/memory/versions", (req: Request, res: Response) => {
+  res.json(memoryService.versions(companionOf(req), req.query.path));
+});
+app.get("/api/companions/:id/memory/versions/:versionId", (req: Request, res: Response) => {
+  res.json(memoryService.version(companionOf(req), versionId(req.params.versionId)));
+});
+app.post("/api/companions/:id/memory/versions/:versionId/revert", async (req: Request, res: Response) => {
+  await memoryService.revert(companionOf(req), versionId(req.params.versionId));
+  res.status(204).end();
+});
+
 app.use("/api", (_req, res) => {
   res.status(404).json({ error: "No such API" } satisfies ApiError);
 });
@@ -281,6 +378,7 @@ const server = app.listen(PORT, HOST, (err) => {
 
 for (const signal of ["SIGINT", "SIGTERM"] as const) {
   process.on(signal, () => {
+    scheduler.stop();
     server.close(() => {
       db.close();
       process.exit(0);

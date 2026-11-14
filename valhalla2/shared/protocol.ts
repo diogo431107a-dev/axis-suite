@@ -113,7 +113,7 @@ export interface Settings {
  * The texts Valhalla 2 itself adds to what the model reads. Each companion can rewrite any of them;
  * one left out uses the default in shared/prompts.ts.
  */
-export const PROMPT_KEYS = ["greeting", "rejection"] as const;
+export const PROMPT_KEYS = ["memoryPolicy", "greeting", "rejection", "consolidation"] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
 export type Prompts = Partial<Record<PromptKey, string>>;
 
@@ -225,6 +225,79 @@ export interface ChatPage {
   chat: Chat;
   companion: Companion;
   path: PathEntry[];
+  /** The first message still sent to the model; those before it have slid out (into memory). */
+  windowStart: number | null;
+  /** Whether the chat has anything the companion's memory doesn't have yet. */
+  memoryPending: boolean;
+}
+
+/** One of a companion's memory files, as the list shows it. */
+export interface MemoryFileInfo {
+  /** Relative to /memories: "story/recent.md". */
+  path: string;
+  /** In bytes. */
+  size: number;
+  /** The largest the file may grow, in bytes. */
+  cap: number;
+  updatedAt: string;
+}
+
+/** One run of the memory model. */
+export interface MemoryRunInfo {
+  id: number;
+  kind: string;
+  chatId: string | null;
+  chatTitle: string | null;
+  model: string;
+  /** Null while it runs. */
+  ok: boolean | null;
+  error: string | null;
+  /** What the model said it changed. */
+  summary: string | null;
+  /** In dollars, at the published prices; null when a price is unknown. */
+  cost: number | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface MemoryPage {
+  companionId: string;
+  files: MemoryFileInfo[];
+  maxFiles: number;
+  runs: MemoryRunInfo[];
+  /** Whether the memory model is working on this companion right now. */
+  busy: boolean;
+}
+
+export interface MemoryFileView {
+  path: string;
+  content: string;
+  cap: number;
+}
+
+/** One change to a memory file. */
+export interface MemoryVersionInfo {
+  id: number;
+  op: string;
+  source: string;
+  at: string;
+  /** In bytes; null when the change deleted the file. */
+  size: number | null;
+}
+
+export type DiffLine = { kind: "same" | "added" | "removed"; text: string };
+
+/** How a run of the memory model for one chat ended. */
+export type RunOutcome =
+  | { kind: "nothing"; reason: string }
+  | { kind: "done"; runId: number; summary: string }
+  | { kind: "failed"; runId: number; error: string };
+
+/** A version of a file, and what it changed from the one before. */
+export interface MemoryVersionView {
+  version: MemoryVersionInfo;
+  content: string | null;
+  diff: DiffLine[];
 }
 
 /** A chat as the list shows it: enough to name it without reading its messages. */
@@ -268,6 +341,8 @@ export interface Health {
 /** The events the server sends while a reply is being written. */
 export type StreamEvent =
   | { type: "start" }
+  /** The companion's memory is being updated first; the reply waits for it. */
+  | { type: "remembering" }
   | { type: "thinking" }
   | { type: "delta"; text: string }
   | { type: "done"; message: Message }

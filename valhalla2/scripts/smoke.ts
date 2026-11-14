@@ -6,14 +6,18 @@
 // It runs on a throwaway database in memory and goes through the same code the server uses: a
 // greeting after the hidden opener, two turns, another version of the last reply, and an edit
 // of the greeting before one more turn. The edit changes what the earlier thinking was bound to,
-// so that last turn shows the API dropping that thinking instead of refusing the request.
+// so that last turn shows the API dropping that thinking instead of refusing the request. Then
+// the memory model folds the chat into memory, and the memory files are printed.
 //
 // The profile is deliberately wordy, since the prompt cache ignores any prefix under 512 tokens
 // and a two-line profile would never cache at all.
 import { DEFAULT_SETTINGS, blockText, type Message } from "../shared/protocol.ts";
 import { createChats } from "../server/chat/chats.ts";
 import { generate, send, type TurnContext } from "../server/chat/turn.ts";
-import { streamReply } from "../server/claude.ts";
+import { runMemoryModel, streamReply } from "../server/claude.ts";
+import { config } from "../server/config.ts";
+import { consolidate } from "../server/memory/consolidate.ts";
+import { createMemory } from "../server/memory/store.ts";
 import { createCompanions } from "../server/companions.ts";
 import { openDatabase } from "../server/db.ts";
 
@@ -49,10 +53,14 @@ const chats = createChats(db, "smoke", companions, 5);
 chats.create({ id: "smoke-chat-0001", companionId: companion.id });
 const tree = chats.tree("smoke-chat-0001");
 
+const memory = createMemory(db, config.memory);
 const context: TurnContext = {
   db,
   tree,
+  chatId: "smoke-chat-0001",
   companion,
+  memory,
+  window: { tokens: config.windowTokens, chunk: config.windowChunk },
   write: streamReply,
   onEvent: (event) => {
     if (event.type === "delta") process.stdout.write(event.text);
@@ -88,4 +96,13 @@ report(await send(context, "Shall I bring the cup?"));
 
 console.log("If `cached` stays 0 after the first turns, the prompt cache is not working — look at");
 console.log("server/prompt.ts for anything that differs between two requests. After the edit, a");
-console.log("smaller `cached` is expected: everything after the greeting is new to the cache.");
+console.log("smaller `cached` is expected: everything after the greeting is new to the cache.\n");
+
+console.log(`Folding the chat into memory with ${settings.memoryModel}…`);
+const outcome = await consolidate(
+  { db, memory, limits: config.memory, run: runMemoryModel, maxIterations: config.memoryIterations },
+  "smoke-chat-0001",
+  companion,
+);
+console.log(outcome, "\n");
+for (const file of memory.files(companion.id)) console.log(`── /memories/${file.path}\n${file.content}`);

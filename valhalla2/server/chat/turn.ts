@@ -10,15 +10,30 @@ import { promptOf, rejectionNote } from "../../shared/prompts.ts";
 import type { Writer } from "../claude.ts";
 import { transaction } from "../db.ts";
 import { invalid } from "../errors.ts";
-import { asParams, buildSystem, outgoing } from "../prompt.ts";
+import { windowFor } from "../memory/history.ts";
+import { peekSnapshot, refreshSnapshot, snapshotFor } from "../memory/inject.ts";
+import type { Memory } from "../memory/store.ts";
+import { asParams, buildSystem, outgoing, type Outgoing, type SystemBlock } from "../prompt.ts";
 import type { Tree } from "./tree.ts";
+
+export interface WindowSize {
+  /** About how many tokens of the chat are sent. */
+  tokens: number;
+  /** How many exchanges slide out at once. */
+  chunk: number;
+}
 
 export interface TurnContext {
   db: DatabaseSync;
   tree: Tree;
+  chatId: string;
   companion: Companion;
+  memory: Memory;
+  window: WindowSize;
   write: Writer;
   onEvent: (event: StreamEvent) => void;
+  /** Told when the oldest turns slide out of the window, so they can be folded into memory. */
+  onSlide?: () => void;
 }
 
 /**
@@ -33,12 +48,46 @@ export function instructionFor(tree: Tree, companion: Companion, parentId: numbe
   return parts.length > 0 ? parts.join("\n\n") : null;
 }
 
+export interface Prepared {
+  system: SystemBlock[];
+  messages: Outgoing[];
+}
+
+/**
+ * The request for `path`: the system prompt with the chat's memory, and the part of the path the
+ * window holds. With `keep`, a slide of the window is kept, memory is looked at afresh with it,
+ * and `onSlide` is told; without, nothing is changed (for Inspect and the token count).
+ */
+export function prepare(
+  context: Pick<TurnContext, "db" | "chatId" | "companion" | "memory" | "window" | "onSlide">,
+  path: Message[],
+  next: { instruction: string | null } | undefined,
+  keep: boolean,
+): Prepared {
+  const { db, chatId, companion, memory, window } = context;
+  const { window_start: stored } = db.prepare("SELECT window_start FROM chats WHERE id = ?").get(chatId) as {
+    window_start: number | null;
+  };
+  const at = windowFor(path, stored, window.tokens, window.chunk);
+  let snapshot: string;
+  if (!keep) {
+    snapshot = peekSnapshot(db, memory, chatId, companion);
+  } else {
+    if (at.slid) {
+      db.prepare("UPDATE chats SET window_start = ? WHERE id = ?").run(at.startId, chatId);
+      refreshSnapshot(db, memory, chatId, companion);
+      if (at.startId !== null) context.onSlide?.();
+    }
+    snapshot = snapshotFor(db, memory, chatId, companion);
+  }
+  return { system: buildSystem(companion, snapshot), messages: outgoing(path.slice(at.from), next) };
+}
+
 /** Writes a reply to `path` and returns what to store, reporting it as it is written. */
 async function reply(context: TurnContext, path: Message[], instruction: string | null) {
   const { companion, write, onEvent } = context;
-  const system = buildSystem(companion);
-  const messages = asParams(outgoing(path, { instruction }));
-  return write(system, messages, companion.settings, onEvent);
+  const { system, messages } = prepare(context, path, { instruction }, true);
+  return write(system, asParams(messages), companion.settings, onEvent);
 }
 
 /** Says something at the end of the selected path, and gets the companion's answer. */

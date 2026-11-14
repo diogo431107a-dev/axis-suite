@@ -5,6 +5,9 @@ import { DEFAULT_PROMPTS, OPENER } from "../../shared/prompts.ts";
 import type { Reply, Writer } from "../claude.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
+import { createMemory } from "../memory/store.ts";
+
+const LIMITS = { fileBytes: 8192, storyBytes: 16384, files: 20, viewChars: 16_000 };
 import { createChats } from "./chats.ts";
 import { generate, send, type TurnContext } from "./turn.ts";
 
@@ -43,7 +46,10 @@ function setup(write: Writer) {
   const context: TurnContext = {
     db,
     tree,
+    chatId: "chat-0001",
     companion: companions.get("comp-0001"),
+    memory: createMemory(db, LIMITS),
+    window: { tokens: 100_000, chunk: 10 },
     write,
     onEvent: (event) => events.push(event),
   };
@@ -157,5 +163,22 @@ describe("deleted messages", () => {
     await send(context, "Who goes there?");
     expect(transcript(asked[2]!)).not.toContain("user: My lord.");
     expect(transcript(asked[2]!)).not.toContain("assistant: Sit.");
+  });
+});
+
+describe("a long chat", () => {
+  it("lets its oldest exchanges slide out in a chunk, and asks for them to be filed in memory", async () => {
+    const lines = Array.from({ length: 30 }, (_, n) => `Reply ${n} ${"y".repeat(400)}`);
+    const { write, asked } = scripted(...lines);
+    const { context } = setup(write);
+    let slides = 0;
+    const small = { ...context, window: { tokens: 1_500, chunk: 3 }, onSlide: () => slides++ };
+    await generate(small, null);
+    for (let n = 0; n < 12; n++) await send(small, `Message ${n} ${"x".repeat(400)}`);
+    expect(slides).toBeGreaterThan(0);
+    const last = transcript(asked.at(-1)!);
+    expect(last[0]).toMatch(/^user: Message \d+/);
+    expect(last.join("\n")).not.toContain("Message 0 ");
+    expect(last.at(-1)).toMatch(/^user: Message 11 /);
   });
 });

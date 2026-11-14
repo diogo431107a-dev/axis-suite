@@ -3,9 +3,15 @@
 // Each companion can rewrite every one of them (its `prompts`); these are what a companion uses
 // for the ones it leaves alone, so a better default here reaches every companion that never
 // changed it. Inspect shows them in place, exactly as they go out.
-import type { Companion, PromptKey } from "./protocol.ts";
+import type { ChatMode, Companion, PromptKey } from "./protocol.ts";
 
 export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
+  memoryPolicy:
+    "You have a long-term memory of your past conversations with the user: the files below. They are updated " +
+    "automatically after each chat, so you never need to save anything. Use what you remember naturally, the way " +
+    "a person would: let it shape what you say and notice, without reciting it. Stay consistent with your " +
+    "established canon and with the user's feedback. Never mention memory, files, notes or saving in your " +
+    "replies; stay in character.",
   greeting:
     "This is the start of a new chat, and you speak first. Open it in character with a greeting that sets the " +
     "tone for what follows. If something you remember fits naturally (an open thread, where things stand " +
@@ -13,10 +19,55 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
   rejection:
     "Earlier versions of this reply were rejected. The user's reason: {reason}\n" +
     "Write a new version that takes this into account. Never mention this note.",
+  consolidation:
+    "You maintain a companion character's long-term memory, in the files under /memories. You are given the " +
+    "current memory files; new messages from the selected path of one chat; messages that were edited, deleted or " +
+    "abandoned on another branch after an earlier update, with what replaced them; the user's reasons for " +
+    "rejecting replies; and the chat's mode. Using the memory tool, bring the files up to date.\n\n" +
+    "- Add new durable facts, correct ones that changed, and delete open threads that were resolved.\n" +
+    "- Remove facts that came only from edited, deleted or abandoned content; keep those still supported by the " +
+    "selected path or by other chats.\n" +
+    "- Record only what the selected path shows was said or established, not guesses about the user.\n" +
+    "- Keep fiction and real life apart: story events never go into user.md, and real-life facts never go into " +
+    "world.md or story/.\n" +
+    "- Fold a rejection reason into feedback.md only when it shows a lasting preference, not a one-off complaint.\n" +
+    "- Keep each file concise and organized under its existing headings. Update lines in place instead of adding " +
+    "near-duplicates.\n" +
+    "- Do not create new files unless an existing one clearly can't hold the information.\n\n" +
+    "Work in as few commands as you can. When the files are up to date, answer with one short line saying what " +
+    "changed, or that nothing needed to.",
+};
+
+/** What the memory model is told about the chat's mode, after its instructions. */
+export const CONSOLIDATION_MODES: Readonly<Record<ChatMode, string>> = {
+  canon:
+    "This chat is canon. Also add a 3–6 line summary of what happened in it to story/recent.md, newest last (or " +
+    "extend this chat's summary if it is already there). When story/recent.md nears its size limit, condense its " +
+    "oldest entries into story/arcs.md.",
+  "one-shot":
+    "This chat is a standalone one-shot scenario: its events are not part of the shared story. Do not touch " +
+    "world.md or story/. Update only character_canon.md, relationship.md, user.md, feedback.md and the real-life " +
+    "items in open_threads.md.",
+};
+
+/** What the companion is told about the chat's mode, after its memory. */
+export const CHAT_MODE_LINES: Readonly<Record<ChatMode, string>> = {
+  canon: "This chat is canon: what happens in it is part of your story together.",
+  "one-shot":
+    "This chat is a standalone one-shot scenario. What happens in it is not part of your shared story, though " +
+    "you are still yourself and still know the user.",
 };
 
 /** What a field of the companion form is called, and what it is for. */
 export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: string }>> = {
+  memoryPolicy: {
+    label: "Memory policy",
+    hint: "Sent with the memory in every chat, right after the profile: how the companion should use what it remembers.",
+  },
+  consolidation: {
+    label: "Memory-keeping instructions",
+    hint: "What the memory model is told when it updates the memory after a chat. A line about the chat's mode follows it.",
+  },
   greeting: {
     label: "Greeting instruction",
     hint: "Hidden from you. Sent once at the start of every chat, so the companion opens it.",

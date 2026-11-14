@@ -3,6 +3,8 @@
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   ChevronLeft,
+  BookmarkCheck,
+  Brain,
   ChevronRight,
   Eye,
   GitBranch,
@@ -22,6 +24,7 @@ import {
   type ChatPage,
   type Message,
   type PathEntry,
+  type RunOutcome,
   type StreamEvent,
   type TokenView,
 } from "../../shared/protocol.ts";
@@ -182,6 +185,9 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const [editing, setEditing] = useState<{ id: number; text: string } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
   const [acting, setActing] = useState(false);
+  const [remembering, setRemembering] = useState(false);
+  const [filing, setFiling] = useState(false);
+  const [filed, setFiled] = useState("");
 
   const [showSettings, setShowSettings] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -214,11 +220,17 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       setError("");
       setIncoming("");
       setThinking(false);
+      setRemembering(false);
       let failed = false;
       try {
         await streamReply(path, body, (event: StreamEvent) => {
-          if (event.type === "thinking") setThinking(true);
+          if (event.type === "remembering") setRemembering(true);
+          if (event.type === "thinking") {
+            setRemembering(false);
+            setThinking(true);
+          }
           if (event.type === "delta") {
+            setRemembering(false);
             setThinking(false);
             setIncoming((so_far) => so_far + event.text);
           }
@@ -239,6 +251,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       setWriting(null);
       setIncoming("");
       setThinking(false);
+      setRemembering(false);
       void reload();
       return !failed;
     },
@@ -290,6 +303,28 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
     const ok = await write({ kind: "send", text }, `/api/chats/${id}/send`, { text });
     // Nothing was saved, so the words come back.
     if (!ok) setDraft((current) => current || text);
+  };
+
+  /** Folds this chat into the companion's memory now, and says how it went. */
+  const rememberNow = async () => {
+    setFiling(true);
+    setFiled("");
+    setError("");
+    try {
+      const { outcome, page: next } = await api<{ outcome: RunOutcome; page: ChatPage }>(
+        `/api/chats/${id}/consolidate`,
+        { method: "POST" },
+      );
+      setPage(next);
+      if (outcome.kind === "failed") setError(`Memory was not updated: ${outcome.error}`);
+      else if (outcome.kind === "done")
+        setFiled(outcome.summary ? `Memory updated. ${outcome.summary}` : "Memory updated.");
+      else setFiled(outcome.reason);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setFiling(false);
+    }
   };
 
   if (loadError) {
@@ -463,6 +498,28 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             {companion.name} · {MODE_LABELS[chat.mode].label.toLowerCase()} · {companion.settings.model}
           </p>
         </div>
+        <Button
+          kind="plain"
+          onClick={() => void rememberNow()}
+          disabled={filing || busy || !page.memoryPending}
+          title={
+            page.memoryPending
+              ? "Update the companion's memory from this chat now, instead of when it goes quiet"
+              : "Memory already has everything in this chat"
+          }
+        >
+          <BookmarkCheck size={15} />{" "}
+          <span className="hidden sm:inline">
+            {filing ? "Remembering…" : page.memoryPending ? "Remember now" : "Remembered"}
+          </span>
+        </Button>
+        <Button
+          kind="plain"
+          onClick={() => open({ kind: "memory", companionId: companion.id })}
+          title={`What ${companion.name} remembers`}
+        >
+          <Brain size={15} /> <span className="hidden sm:inline">Memory</span>
+        </Button>
         <Button kind="plain" onClick={() => setShowPrompt(true)} title="What gets sent">
           <Eye size={15} /> <span className="hidden sm:inline">Inspect</span>
         </Button>
@@ -481,7 +538,17 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
               </Button>
             </div>
           ) : null}
-          {shown.map(entryView)}
+          {shown.map((entry, index) => (
+            <Fragment key={entry.message.id}>
+              {entry.message.id === page.windowStart ? (
+                <p className="border-t border-dashed border-rule pt-2 text-center text-xs text-faint">
+                  Everything above has slid out of what is sent each turn. What mattered in it is in {companion.name}'s
+                  memory.
+                </p>
+              ) : null}
+              {entryView(entry, index)}
+            </Fragment>
+          ))}
           {writing?.kind === "send" ? (
             <article className="pl-6 sm:pl-16">
               <h3 className="mb-1 text-right font-display text-sm text-faint">You</h3>
@@ -501,7 +568,12 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
               </Bubble>
             </article>
           ) : null}
-          {writing && !thinking && !incoming ? (
+          {writing && remembering ? (
+            <p className="pr-6 text-sm text-faint sm:pr-16">
+              {companion.name} is catching up on your other chats first…
+            </p>
+          ) : null}
+          {writing && !remembering && !thinking && !incoming ? (
             <p className="pr-6 text-sm text-faint sm:pr-16">Asking {companion.name}…</p>
           ) : null}
           <div ref={bottom} />
@@ -511,6 +583,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       <footer className="border-t border-rule px-4 py-3">
         <div className="mx-auto max-w-3xl space-y-2">
           <Notice>{error}</Notice>
+          <Notice kind="quiet">{filed}</Notice>
           <div className="flex items-end gap-2">
             <textarea
               className={`${inputStyle} composer max-h-56 min-h-11 resize-none leading-relaxed`}

@@ -105,7 +105,11 @@ describe("the messages", () => {
 
 describe("what Inspect shows", () => {
   it("is the system prompt and every message, the hidden ones marked", () => {
-    const view = promptView(companion, [message("assistant", "Hail.", { instruction: "Open." })]);
+    const view = promptView(
+      companion,
+      buildSystem(companion),
+      outgoing([message("assistant", "Hail.", { instruction: "Open." })]),
+    );
     expect(view.system).toEqual(buildSystem(companion));
     expect(view.messages).toEqual([
       { role: "user", text: OPENER, hidden: true },

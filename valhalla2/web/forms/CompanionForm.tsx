@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Brain } from "lucide-react";
 import { LIMITS, PROMPT_KEYS, type Companion, type Prompts, type Settings } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
@@ -58,7 +59,16 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
 
   return (
     <div className="mx-auto max-w-3xl space-y-5 p-5">
-      <h1 className="font-display text-2xl">{companion ? companion.name : "A new companion"}</h1>
+      <div className="flex flex-wrap items-center gap-3">
+        <h1 className="font-display text-2xl">{companion ? companion.name : "A new companion"}</h1>
+        {companion ? (
+          <span className="ml-auto">
+            <Button kind="plain" onClick={() => open({ kind: "memory", companionId: companion.id })}>
+              <Brain size={15} /> Memory
+            </Button>
+          </span>
+        ) : null}
+      </div>
 
       <Field label="Name" hint="For the list. The model reads the profile, not this.">
         <input

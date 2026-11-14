@@ -7,7 +7,7 @@
 // (the opener, an instruction a reply was written under) are stored with the reply and sent again
 // in the same place every time, so the history only ever grows at its end.
 import type Anthropic from "@anthropic-ai/sdk";
-import type { CacheTtl, Companion, ContentBlock, Message, PromptView, SentMessage } from "../shared/protocol.ts";
+import type { CacheTtl, Companion, ContentBlock, Message, PromptView } from "../shared/protocol.ts";
 import { blockText } from "../shared/protocol.ts";
 import { OPENER } from "../shared/prompts.ts";
 
@@ -17,16 +17,18 @@ export interface SystemBlock {
   cache_control?: { type: "ephemeral"; ttl: CacheTtl };
 }
 
-/** The system prompt: the companion's profile as written, with the cache breakpoint after it. */
-export function buildSystem(companion: Companion): SystemBlock[] {
-  if (!companion.profile) return [];
-  return [
-    {
-      type: "text",
-      text: companion.profile,
-      cache_control: { type: "ephemeral", ttl: companion.settings.cacheTtl },
-    },
-  ];
+/**
+ * The system prompt: the companion's profile as written, then its memory (inject.ts) when there
+ * is any, with the cache breakpoint after the last block. Both change only when you edit the
+ * profile or the chat takes a fresh look at memory, so the cache holds between turns.
+ */
+export function buildSystem(companion: Companion, memory: string | null = null): SystemBlock[] {
+  const blocks: SystemBlock[] = [];
+  if (companion.profile) blocks.push({ type: "text", text: companion.profile });
+  if (memory) blocks.push({ type: "text", text: memory });
+  const last = blocks.at(-1);
+  if (last) last.cache_control = { type: "ephemeral", ttl: companion.settings.cacheTtl };
+  return blocks;
 }
 
 /** One message as it goes out. `hidden` marks the ones Valhalla 2 wrote rather than you or the companion. */
@@ -94,11 +96,14 @@ const textOf = (content: ContentBlock[] | string): string =>
   typeof content === "string" ? content : content.map(blockText).join("");
 
 /** The request as it will be sent, for the Inspect panel. Nothing is assembled out of your sight. */
-export function promptView(companion: Companion, path: Message[]): PromptView {
-  const messages: SentMessage[] = outgoing(path).map((message) => ({
-    role: message.role,
-    text: textOf(message.content),
-    hidden: message.hidden,
-  }));
-  return { system: buildSystem(companion), messages, settings: companion.settings };
+export function promptView(companion: Companion, system: SystemBlock[], messages: Outgoing[]): PromptView {
+  return {
+    system,
+    messages: messages.map((message) => ({
+      role: message.role,
+      text: textOf(message.content),
+      hidden: message.hidden,
+    })),
+    settings: companion.settings,
+  };
 }

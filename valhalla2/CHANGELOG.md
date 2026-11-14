@@ -19,8 +19,21 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
   you open it and can change it later.
 - Settings belong to the companion, so all its chats use the same, and each companion has a second
   model for its memory. New companions start on Haiku 5.5, with Sonnet 5.5 for memory.
-- **Valhalla 2's own words** — the greeting instruction and the rejection note — can be rewritten
-  per companion. Inspect shows every hidden part of what is sent.
+- **Valhalla 2's own words** — the memory policy, the greeting instruction, the rejection note and
+  the memory model's instructions — can be rewritten per companion. Inspect shows every hidden part
+  of what is sent.
+- **Memory.** Every chat feeds one memory per companion: what the character has established about
+  herself, your relationship, real-life facts about you, your feedback, open threads, the world and
+  the story so far. A second model (Sonnet 5.5 unless you choose another) updates it from the path
+  you selected after a chat goes quiet, when you press **Remember now**, when a long chat's oldest
+  turns slide out, and before a new chat's greeting. Edited, deleted and abandoned messages are
+  taken back out; one-shot chats stay out of the story. A run that fails changes nothing.
+- Every chat reads the whole memory, so the companion knows it without looking anything up.
+- **The Memory page** shows a companion's files, lets you edit or delete them, shows each file's
+  history as a diff and puts back any earlier version, and lists every run of the memory model with
+  what it changed and what it cost.
+- Long chats send only their newest part (about 20,000 tokens); a dashed line marks where that
+  begins.
 - Everything is kept in one database file, `/var/lib/valhalla2/valhalla2.db`.
 
 **By hand:** before the first install, put the Claude API key in

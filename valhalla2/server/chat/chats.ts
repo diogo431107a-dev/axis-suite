@@ -11,6 +11,7 @@ import {
 import { id as checkId, object, oneOf, text } from "../check.ts";
 import type { Companions } from "../companions.ts";
 import { conflict, notFound, tooMany } from "../errors.ts";
+import { hasPending } from "../memory/consolidate.ts";
 import { createTree } from "./tree.ts";
 
 interface Row {
@@ -111,6 +112,8 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
         fields.title === undefined ? chat.title : text(fields.title, LIMITS.title, "The title") || chat.title;
       const mode = fields.mode === undefined ? chat.mode : oneOf<ChatMode>(fields.mode, CHAT_MODES, "The mode");
       db.prepare("UPDATE chats SET title = ?, mode = ? WHERE id = ?").run(title, mode, id);
+      // The companion is told which mode the chat is in, with its memory: take a fresh look.
+      if (mode !== chat.mode) db.prepare("UPDATE chats SET memory_snapshot = NULL WHERE id = ?").run(id);
       if (mode !== chat.mode) {
         db.prepare("UPDATE messages SET needs_correction = 1 WHERE chat_id = ? AND consolidated_at IS NOT NULL").run(
           id,
@@ -131,6 +134,10 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
         chat,
         companion: companions.get(chat.companionId),
         path: createTree(db, id).entries(swipeAsk),
+        windowStart: (
+          db.prepare("SELECT window_start FROM chats WHERE id = ?").get(id) as { window_start: number | null }
+        ).window_start,
+        memoryPending: hasPending(db, id),
       };
     },
 

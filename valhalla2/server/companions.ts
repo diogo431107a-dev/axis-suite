@@ -5,7 +5,9 @@
 import type { DatabaseSync } from "node:sqlite";
 import { LIMITS, type Companion, type Settings } from "../shared/protocol.ts";
 import { object, prompts as checkPrompts, required, settings as checkSettings, text } from "./check.ts";
+import { config } from "./config.ts";
 import { notFound, tooMany } from "./errors.ts";
+import { createMemory } from "./memory/store.ts";
 
 interface Row {
   id: string;
@@ -77,6 +79,8 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
           now,
           owner,
         );
+        // A new companion starts with its memory files laid out, empty but for what goes where.
+        createMemory(db, config.memory).seed(id, now);
       }
       return get(id);
     },
