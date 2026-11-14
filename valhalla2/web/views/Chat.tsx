@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Eye,
   GitBranch,
+  ImagePlus,
   MessageSquareReply,
   Pencil,
   RefreshCw,
@@ -24,6 +25,8 @@ import {
   type ChatPage,
   type Message,
   type PathEntry,
+  type Picture,
+  type PictureDraft,
   type RunOutcome,
   type StreamEvent,
   type TokenView,
@@ -36,6 +39,9 @@ import { useSave } from "../ui/useSave.ts";
 import { Usage } from "../ui/Usage.tsx";
 import { Inspect } from "./Inspect.tsx";
 import { MODE_LABELS } from "../ui/modes.ts";
+import { PictureView, Thumb } from "../ui/pictures.tsx";
+import { useWatched } from "../ui/watch.ts";
+import { PictureDialog } from "./PictureDialog.tsx";
 
 const textOf = (message: Message): string => message.content.map(blockText).join("");
 
@@ -172,7 +178,7 @@ function AskWhy({
 }
 
 export function Chat({ id, greet }: { id: string; greet: boolean }) {
-  const { reload, open } = usePage();
+  const { reload, open, health } = usePage();
   const [page, setPage] = useState<ChatPage | null>(null);
   const [loadError, setLoadError] = useState("");
   const [tokens, setTokens] = useState<TokenView | null>(null);
@@ -188,6 +194,10 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const [remembering, setRemembering] = useState(false);
   const [filing, setFiling] = useState(false);
   const [filed, setFiled] = useState("");
+
+  /** The message a picture is being asked for, and the prompt to start from when making one again. */
+  const [picturing, setPicturing] = useState<{ messageId: number; start?: PictureDraft } | null>(null);
+  const [viewing, setViewing] = useState<string | null>(null);
 
   const [showSettings, setShowSettings] = useState(false);
   const [showPrompt, setShowPrompt] = useState(false);
@@ -276,6 +286,12 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       .catch((err: unknown) => setLoadError(describeError(err)));
   }, [load, greet, generate]);
 
+  useWatched(page?.pictures ?? [], (changed) =>
+    setPage((at) =>
+      at ? { ...at, pictures: at.pictures.map((picture) => (picture.id === changed.id ? changed : picture)) } : at,
+    ),
+  );
+
   useEffect(() => {
     bottom.current?.scrollIntoView({ block: "end" });
   }, [page?.path.length, incoming, thinking, writing]);
@@ -346,6 +362,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
     shown = page.path.slice(0, at + 1);
   }
   const last = [...page.path].reverse().find((entry) => entry.message.role === "assistant")?.message ?? null;
+  const shownPicture = page.pictures.find((picture) => picture.id === viewing) ?? null;
 
   const entryView = (entry: PathEntry, index: number) => {
     const { message, siblings } = entry;
@@ -354,6 +371,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
     const isLast = index === shown.length - 1;
     const text = textOf(message);
     const refused = message.reply?.stopReason === "refusal";
+    const pictures = page.pictures.filter((picture) => picture.messageId === message.id);
 
     return (
       <article key={message.id} className={mine ? "pl-6 sm:pl-16" : "pr-6 sm:pr-16"}>
@@ -446,6 +464,15 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
               <GitBranch size={14} />
             </IconButton>
           ) : null}
+          {health.pictures && text ? (
+            <IconButton
+              label="Picture this moment"
+              disabled={busy}
+              onClick={() => setPicturing({ messageId: message.id })}
+            >
+              <ImagePlus size={14} />
+            </IconButton>
+          ) : null}
           {deleting === message.id ? (
             <span className="flex items-center gap-1 text-xs">
               <span className="text-warn">
@@ -471,6 +498,14 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             </IconButton>
           )}
         </div>
+
+        {pictures.length > 0 ? (
+          <div className={`mt-2 flex flex-wrap gap-2 ${mine ? "justify-end" : ""}`}>
+            {pictures.map((picture) => (
+              <Thumb key={picture.id} picture={picture} onOpen={() => setViewing(picture.id)} className="h-44" />
+            ))}
+          </div>
+        ) : null}
 
         {entry.ask && !busy ? (
           <AskWhy
@@ -610,6 +645,54 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       </footer>
 
       <Inspect id={id} open={showPrompt} onClose={() => setShowPrompt(false)} />
+      {picturing ? (
+        <PictureDialog
+          companion={companion}
+          target={{ kind: "chat", chatId: chat.id, messageId: picturing.messageId }}
+          start={picturing.start}
+          onClose={() => setPicturing(null)}
+          onMade={(picture: Picture) => setPage((at) => (at ? { ...at, pictures: [...at.pictures, picture] } : at))}
+        />
+      ) : null}
+      {shownPicture ? (
+        <PictureView
+          picture={shownPicture}
+          onClose={() => setViewing(null)}
+          onAgain={
+            health.pictures && shownPicture.messageId !== null
+              ? () => {
+                  setPicturing({
+                    messageId: shownPicture.messageId!,
+                    start: {
+                      prompt: shownPicture.prompt,
+                      negativePrompt: shownPicture.negativePrompt,
+                      orientation: shownPicture.orientation,
+                      caption: shownPicture.caption,
+                    },
+                  });
+                  setViewing(null);
+                }
+              : undefined
+          }
+          onDelete={async () => {
+            try {
+              await api(`/api/pictures/${shownPicture.id}`, { method: "DELETE" });
+              setViewing(null);
+              setPage((at) =>
+                at ? { ...at, pictures: at.pictures.filter((picture) => picture.id !== shownPicture.id) } : at,
+              );
+            } catch (err) {
+              setError(describeError(err));
+              setViewing(null);
+            }
+          }}
+          extra={
+            <Button kind="plain" onClick={() => open({ kind: "gallery", companionId: companion.id })}>
+              All pictures
+            </Button>
+          }
+        />
+      ) : null}
       <ChatDialog
         open={showSettings}
         onClose={() => setShowSettings(false)}

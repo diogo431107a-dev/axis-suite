@@ -4,6 +4,17 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Pictures.** Under any message, a new picture button asks Claude (Sonnet 5.5) to read the scene
+  and write a prompt for it; you can change the prompt, or add a note and have it written again,
+  before CivitAI makes the picture. It appears under its message when it is done. Each companion
+  has a **Pictures** page, with its profile pictures (made there, from the profile) and its chat
+  pictures, each of which can be opened, made again or deleted. Pictures are saved as files on the
+  server, not in the database, so the daily backups don't include them. How Claude writes the
+  prompts is a new text in each companion's own words, **Picture instructions**.
+- **By hand:** before running the installer, put the CivitAI API key in
+  `/etc/axis-suite/valhalla2-civitai.key`. Valhalla 2 won't start while that file is missing; an
+  empty file just means no pictures. The README's "Installing and data" has the command.
+
 ## 0.0.4 — 2026-11-13
 
 - Valhalla 2's first version: a fork of Valhalla, installed beside it with its own address, data

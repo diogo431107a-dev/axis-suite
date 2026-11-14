@@ -6,6 +6,7 @@ import { api, describeError } from "./api.ts";
 import { PageContext, usePage, type Page, type Selection } from "./page.ts";
 import { CompanionForm } from "./forms/CompanionForm.tsx";
 import { Chat } from "./views/Chat.tsx";
+import { Gallery } from "./views/Gallery.tsx";
 import { Memory } from "./views/Memory.tsx";
 import { Start } from "./views/Start.tsx";
 import { About } from "./ui/About.tsx";
@@ -152,6 +153,10 @@ function Shown({ selection, lists }: { selection: Selection; lists: Lists }) {
     case "memory": {
       const companion = lists.companions.find((one) => one.id === selection.companionId);
       return companion ? <Memory key={companion.id} companion={companion} /> : <Start />;
+    }
+    case "gallery": {
+      const companion = lists.companions.find((one) => one.id === selection.companionId);
+      return companion ? <Gallery key={companion.id} companion={companion} /> : <Start />;
     }
     case "none":
       return <Start />;

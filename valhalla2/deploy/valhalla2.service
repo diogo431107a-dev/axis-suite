@@ -26,6 +26,9 @@ Environment=MEMORY_MODEL=claude-sonnet-5-5
 # Deliberately not named valhalla2.key: for /etc/axis-suite/<module>.key the installer writes
 # 32 random bytes, which would be no use as an API key.
 LoadCredential=anthropic-api-key:/etc/axis-suite/valhalla2-anthropic.key
+# The CivitAI API key, which makes pictures, put there by hand the same way. It may be an empty
+# file: Valhalla 2 then offers no new pictures. systemd still refuses to start while it is missing.
+LoadCredential=civitai-api-key:/etc/axis-suite/valhalla2-civitai.key
 ExecStart=/usr/bin/node /opt/valhalla2/dist/server/index.js
 Restart=on-failure
 RestartSec=2

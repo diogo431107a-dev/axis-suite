@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Brain } from "lucide-react";
+import { Brain, Images } from "lucide-react";
 import { LIMITS, PROMPT_KEYS, type Companion, type Prompts, type Settings } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
@@ -62,7 +62,10 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="font-display text-2xl">{companion ? companion.name : "A new companion"}</h1>
         {companion ? (
-          <span className="ml-auto">
+          <span className="ml-auto flex gap-2">
+            <Button kind="plain" onClick={() => open({ kind: "gallery", companionId: companion.id })}>
+              <Images size={15} /> Pictures
+            </Button>
             <Button kind="plain" onClick={() => open({ kind: "memory", companionId: companion.id })}>
               <Brain size={15} /> Memory
             </Button>
