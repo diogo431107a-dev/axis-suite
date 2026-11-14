@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.8 — 2026-11-14
+
 - **Replies read aloud.** Under every reply, a speaker button reads it aloud with Azure's voice
   Ava, who also speaks Portuguese; while it plays it becomes a stop button. A switch in the chat's
   header (**Aloud** / **Silent**) reads each new reply as it arrives; this browser remembers it,
