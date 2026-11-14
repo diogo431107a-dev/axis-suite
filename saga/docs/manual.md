@@ -183,7 +183,7 @@ After the Elder Dragon, the road starts again, one star stronger.
 
 ## Part 2: Behind the scenes
 
-**Spoilers.** The game means you to discover this by playing. These are the numbers in version 1.0.0, and they will change.
+**Spoilers.** The game means you to discover this by playing. These are the numbers in version 1.1.0, and they will change.
 
 ### Levels
 
