@@ -2,24 +2,25 @@
 
 Small self-hosted web apps ("modules") that share one sign-in (all but Saga, which has its own players). Everything runs on a single Debian 13 server behind Caddy.
 
-| Module                           | What it is                                                                                               | Port | Local port |
-| -------------------------------- | -------------------------------------------------------------------------------------------------------- | ---- | ---------- |
-| [Heimdall](heimdall/README.md)   | The sign-in service. It holds the user accounts and sessions; the other modules ask it who is signed in. | 3000 | 443        |
-| [Loggbok](loggbok/README.md)     | A notes manager. Each signed-in user sees only their own notes.                                          | 3001 | 8443       |
-| [Yggdrasil](yggdrasil/README.md) | An outliner like Workflowy and Dynalist: one tree of bullets per user, with OPML in and out.             | 3002 | 8444       |
-| [Janus](janus/README.md)         | A password manager like KeePass, with TOTP codes: one encrypted vault per user.                          | 3003 | 8445       |
-| [Papyrus](papyrus/README.md)     | A journal: a page for every day in each of a user's journals, with moods, #tags and "On this day".       | 3004 | 8446       |
-| [Vinr](vinr/README.md)           | A contacts manager: phones, emails, addresses, birthdays and groups, with vCard in and out.              | 3005 | 8447       |
-| [Chronos](chronos/README.md)     | A calendar: several calendars to show or hide, ISO dates and weeks, and .ics files in and out.           | 3006 | 8448       |
-| [Valkyrie](valkyrie/README.md)   | A kanban: boards of lists and cards, moved by mouse, finger or keyboard, with labels and checklists.     | 3007 | 8449       |
-| [Althing](althing/README.md)     | A real-time chat: a lobby, rooms anyone can open, and direct messages, all kept on record.               | 3008 | 8450       |
-| [Mimir](mimir/README.md)         | Mind maps that lay themselves out from the centre to both sides, with arrows, OPML in and out, and PNG.  | 3009 | 8451       |
-| [Urd](urd/README.md)             | A time tracker that stays open all day: one big clock, Play/Stop, and time and interruptions per period. | 3010 | 8452       |
-| [Saga](saga/README.md)           | Habits Saga, a habit tracker played as a fantasy game, with its own players and a public ranking.        | 3011 | 8453       |
-| [Star](star/README.md)           | Every Man is a Star: the people you know and their families, charted as a night sky.                     | 3012 | 8454       |
-| [Fafnir](fafnir/README.md)       | Fafnir Personal Finances: what you have, what you owe and where your money goes, in US dollars.          | 3013 | 8455       |
-| [Tyr](tyr/README.md)             | A dossier of people: what was said, when and where, and how you came to know it.                         | 3014 | 8456       |
-| [Valhalla](valhalla/README.md)   | Companions you define, through the Claude API: characters, the personas you meet them as, conversations. | 3015 | 8457       |
+| Module                            | What it is                                                                                               | Port | Local port |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------- | ---- | ---------- |
+| [Heimdall](heimdall/README.md)    | The sign-in service. It holds the user accounts and sessions; the other modules ask it who is signed in. | 3000 | 443        |
+| [Loggbok](loggbok/README.md)      | A notes manager. Each signed-in user sees only their own notes.                                          | 3001 | 8443       |
+| [Yggdrasil](yggdrasil/README.md)  | An outliner like Workflowy and Dynalist: one tree of bullets per user, with OPML in and out.             | 3002 | 8444       |
+| [Janus](janus/README.md)          | A password manager like KeePass, with TOTP codes: one encrypted vault per user.                          | 3003 | 8445       |
+| [Papyrus](papyrus/README.md)      | A journal: a page for every day in each of a user's journals, with moods, #tags and "On this day".       | 3004 | 8446       |
+| [Vinr](vinr/README.md)            | A contacts manager: phones, emails, addresses, birthdays and groups, with vCard in and out.              | 3005 | 8447       |
+| [Chronos](chronos/README.md)      | A calendar: several calendars to show or hide, ISO dates and weeks, and .ics files in and out.           | 3006 | 8448       |
+| [Valkyrie](valkyrie/README.md)    | A kanban: boards of lists and cards, moved by mouse, finger or keyboard, with labels and checklists.     | 3007 | 8449       |
+| [Althing](althing/README.md)      | A real-time chat: a lobby, rooms anyone can open, and direct messages, all kept on record.               | 3008 | 8450       |
+| [Mimir](mimir/README.md)          | Mind maps that lay themselves out from the centre to both sides, with arrows, OPML in and out, and PNG.  | 3009 | 8451       |
+| [Urd](urd/README.md)              | A time tracker that stays open all day: one big clock, Play/Stop, and time and interruptions per period. | 3010 | 8452       |
+| [Saga](saga/README.md)            | Habits Saga, a habit tracker played as a fantasy game, with its own players and a public ranking.        | 3011 | 8453       |
+| [Star](star/README.md)            | Every Man is a Star: the people you know and their families, charted as a night sky.                     | 3012 | 8454       |
+| [Fafnir](fafnir/README.md)        | Fafnir Personal Finances: what you have, what you owe and where your money goes, in US dollars.          | 3013 | 8455       |
+| [Tyr](tyr/README.md)              | A dossier of people: what was said, when and where, and how you came to know it.                         | 3014 | 8456       |
+| [Valhalla](valhalla/README.md)    | Companions you define, through the Claude API: characters, the personas you meet them as, conversations. | 3015 | 8457       |
+| [Valhalla 2](valhalla2/README.md) | A fork of Valhalla: companions with a long-term memory, chats as trees of swipes and branches.           | 3016 | 8458       |
 
 Shared code lives in `packages/`:
 
@@ -97,6 +98,7 @@ star/                Every Man is a Star, the night sky of people
 fafnir/              Fafnir Personal Finances
 tyr/                 Tyr, the dossier of people
 valhalla/            Valhalla, companions through the Claude API
+valhalla2/           Valhalla 2, a fork of Valhalla with long-term memory
 ```
 
 Every module has the same shape:
