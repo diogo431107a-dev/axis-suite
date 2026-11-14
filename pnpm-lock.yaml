@@ -687,6 +687,67 @@ importers:
         specifier: ^4.1.11
         version: 4.1.11(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(happy-dom@20.14.6)(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
 
+  valhalla2:
+    dependencies:
+      '@anthropic-ai/sdk':
+        specifier: ^1.6.0
+        version: 1.8.0
+      '@axis-suite/heimdall-client':
+        specifier: workspace:*
+        version: link:../packages/heimdall-client
+      express:
+        specifier: ^5.1.0
+        version: 5.2.1(supports-color@8.1.1)
+    devDependencies:
+      '@fontsource/public-sans':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@fontsource/spectral':
+        specifier: ^5.3.0
+        version: 5.3.0
+      '@tailwindcss/vite':
+        specifier: ^4.1.11
+        version: 4.3.1(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
+      '@types/express':
+        specifier: ^5.0.6
+        version: 5.0.6
+      '@types/node':
+        specifier: 'catalog:'
+        version: 22.20.5
+      '@types/react':
+        specifier: ^19.2.17
+        version: 19.2.17
+      '@types/react-dom':
+        specifier: ^19.2.3
+        version: 19.2.3(@types/react@19.2.17)
+      '@vitejs/plugin-react':
+        specifier: ^6.0.2
+        version: 6.0.3(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
+      concurrently:
+        specifier: ^9.1.2
+        version: 9.2.3
+      lucide-react:
+        specifier: ^0.525.0
+        version: 0.525.0(react@19.2.7)
+      react:
+        specifier: ^19.2.7
+        version: 19.2.7
+      react-dom:
+        specifier: ^19.2.7
+        version: 19.2.7(react@19.2.7)
+      tailwindcss:
+        specifier: ^4.1.11
+        version: 4.3.1
+      typescript:
+        specifier: 'catalog:'
+        version: 6.0.3
+      vite:
+        specifier: ^8.1.0
+        version: 8.1.0(@types/node@22.20.5)(jiti@2.7.0)
+      vitest:
+        specifier: ^4.1.11
+        version: 4.1.11(@opentelemetry/api@1.10.0)(@types/node@22.20.5)(happy-dom@20.14.6)(vite@8.1.0(@types/node@22.20.5)(jiti@2.7.0))
+
   valkyrie:
     dependencies:
       '@axis-suite/heimdall-client':

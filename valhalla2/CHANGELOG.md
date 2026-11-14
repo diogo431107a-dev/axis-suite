@@ -1,0 +1,48 @@
+# Changelog
+
+What changed in Valhalla 2, newest first. Each version is tagged in git as `valhalla2-v<version>`. How versions are numbered and released is in the [suite README](../README.md#versions-and-changelogs).
+
+## Unreleased
+
+- Valhalla 2's first version: a fork of Valhalla, installed beside it with its own address, data
+  and API key file, so the two can be compared.
+- **Companions replace characters and personas.** A companion is one text box you write however
+  you like (tags such as `<personality>` and `<user_persona>` work well): who they are, and who you
+  are with them. It is sent exactly as written.
+- **Every chat opens with the companion's greeting.**
+- **Swipes:** any reply can be written again as often as you like, and you can step back and forth
+  between the versions (‹ 2/3 ›). After the fifth, Valhalla 2 asks once why they aren't working; an
+  answer is passed on, hidden, to the next versions.
+- **Branches, edits and deletes:** continue from any earlier reply and the old line stays one click
+  away; edit any message (the old words are kept); delete a message and everything after it.
+- **Canon or one-shot:** each chat is part of your story or a standalone scenario. You choose when
+  you open it and can change it later.
+- Settings belong to the companion, so all its chats use the same, and each companion has a second
+  model for its memory. New companions start on Haiku 5.5, with Sonnet 5.5 for memory.
+- **Valhalla 2's own words** — the memory policy, the greeting instruction, the rejection note and
+  the memory model's instructions — can be rewritten per companion. Inspect shows every hidden part
+  of what is sent.
+- **Memory.** Every chat feeds one memory per companion: what the character has established about
+  herself, your relationship, real-life facts about you, your feedback, open threads, the world and
+  the story so far. A second model (Sonnet 5.5 unless you choose another) updates it from the path
+  you selected after a chat goes quiet, when you press **Remember now**, when a long chat's oldest
+  turns slide out, and before a new chat's greeting. Edited, deleted and abandoned messages are
+  taken back out; one-shot chats stay out of the story. A run that fails changes nothing.
+- Every chat reads the whole memory, so the companion knows it without looking anything up.
+- **The Memory page** shows a companion's files, lets you edit or delete them, shows each file's
+  history as a diff and puts back any earlier version, and lists every run of the memory model with
+  what it changed and what it cost.
+- **Tidy-ups:** every ten updates (or weekly), the memory model merges duplicates, settles
+  contradictions and condenses the files; a real clash in the character's canon is listed rather
+  than rewritten. **Tidy up now** does it at once.
+- **Rebuild from every chat** writes the memory again from scratch, replaying every chat's selected
+  path in order — for a better memory model, or new instructions. Nothing changes unless it all
+  succeeds, and the old files stay in the history.
+- **Daily backups** of the database, kept for 14 days beside it, and **Back up now**.
+- Long chats send only their newest part (about 20,000 tokens); a dashed line marks where that
+  begins.
+- Everything is kept in one database file, `/var/lib/valhalla2/valhalla2.db`.
+
+**By hand:** before the first install, put the Claude API key in
+`/etc/axis-suite/valhalla2-anthropic.key`, root-only, the same way as Valhalla's (the command is
+under "Installing and data" in Valhalla 2's README). It can be the same key as Valhalla's.

@@ -17,6 +17,7 @@ packages:
   - fafnir
   - tyr
   - valhalla
+  - valhalla2
   - packages/*
 
 # One version of each shared tool for the whole suite. Packages ask for these with "catalog:".
