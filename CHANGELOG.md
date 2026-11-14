@@ -4,6 +4,30 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.181 — 2026-11-14
+
+Valhalla 2 0.0.10: copy a message, and pinned moments. A copy button under every message puts its words on the clipboard. A pin button keeps chosen words from a message, with who said them, and sends them word for word in every chat with that companion, after its memory; the memory model never rewrites them. Pins are listed and removed on the companion's Memory page. The other modules are unchanged.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.0.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla   | 0.0.6   |
+| Valhalla 2 | 0.0.10  |
+
 ## 0.0.179 — 2026-11-14
 
 Valhalla 2 0.0.8: replies read aloud. A speaker button under every reply reads it with Azure's voice Ava, who also speaks Portuguese, and a switch in the chat's header reads new replies as they arrive. Each reply is read by Azure once and the audio kept beside the pictures, so playing it again costs nothing. The other modules are unchanged.

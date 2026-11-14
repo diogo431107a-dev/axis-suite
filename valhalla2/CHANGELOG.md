@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.10 — 2026-11-14
+
 - **Copy a message.** Under every message, a copy button puts its words on the clipboard; it shows
   a check mark for a moment when it's done.
 - **Pinned moments.** Under every message, a pin button keeps words from it — trimmed to the line
