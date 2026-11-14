@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.4 — 2026-11-13
+
 - Valhalla 2's first version: a fork of Valhalla, installed beside it with its own address, data
   and API key file, so the two can be compared.
 - **Companions replace characters and personas.** A companion is one text box you write however

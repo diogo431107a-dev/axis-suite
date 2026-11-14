@@ -4,6 +4,32 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.175 — 2026-11-13
+
+Valhalla 2 0.0.4 joins the suite: a fork of Valhalla that runs beside it, with its own address, service, database and API key file, while the two are compared. Companions are one profile text box; chats open with a greeting and can be swiped, branched, edited and deleted; and each companion keeps a long-term memory, updated from your chats by a second model, with tidy-ups, a rebuild from every chat and daily backups. Valhalla itself is unchanged.
+
+**By hand:** before installing Valhalla 2, add a DNS record for `valhalla2.<domain>` (unless a wildcard covers it) and put the Claude API key in `/etc/axis-suite/valhalla2-anthropic.key` (see Valhalla 2's README).
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.0.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla   | 0.0.6   |
+| Valhalla 2 | 0.0.4   |
+
 ## 0.0.169 — 2026-11-12
 
 Valhalla 0.0.6: a turn the API declines no longer breaks the conversation, the note under a turn another model answered names both models, the cost shown is closer to the bill, and on Haiku the fallback checkbox is greyed out because Haiku has no fallback. The other modules are unchanged.
