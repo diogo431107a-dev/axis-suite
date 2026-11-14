@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.6 — 2026-11-14
+
 - **Pictures.** Under any message, a new picture button asks Claude (Sonnet 5.5) to read the scene
   and write a prompt for it; you can change the prompt, or add a note and have it written again,
   before CivitAI makes the picture. It appears under its message when it is done. Each companion

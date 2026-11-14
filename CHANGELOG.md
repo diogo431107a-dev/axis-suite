@@ -4,6 +4,32 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.177 — 2026-11-14
+
+Valhalla 2 0.0.6: pictures. Under any message, a picture button has Claude write a prompt for that moment, which you can change before CivitAI makes the picture; it appears under its message. Each companion has a Pictures page with its profile pictures and chat pictures. The picture files live beside Valhalla 2's database and are not in its daily backups. The other modules are unchanged.
+
+**By hand:** before installing Valhalla 2, put the CivitAI API key in `/etc/axis-suite/valhalla2-civitai.key` (an empty file turns pictures off; Valhalla 2 won't start while it is missing). The command is in Valhalla 2's README.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.0.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla   | 0.0.6   |
+| Valhalla 2 | 0.0.6   |
+
 ## 0.0.175 — 2026-11-13
 
 Valhalla 2 0.0.4 joins the suite: a fork of Valhalla that runs beside it, with its own address, service, database and API key file, while the two are compared. Companions are one profile text box; chats open with a greeting and can be swiped, branched, edited and deleted; and each companion keeps a long-term memory, updated from your chats by a second model, with tidy-ups, a rebuild from every chat and daily backups. Valhalla itself is unchanged.
