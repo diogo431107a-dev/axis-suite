@@ -408,8 +408,17 @@ export interface Health {
   apiKey: boolean;
   /** Whether the server has a CivitAI key, so pictures can be made. */
   pictures: boolean;
+  /** Whether the server has an Azure Speech key, so replies can be read aloud. */
+  speech: boolean;
   /** What a new companion starts from. */
   defaults: Settings;
+}
+
+/** A reply read aloud: where its audio is, and how much Azure has read this month. */
+export interface SpeechReply {
+  url: string;
+  /** Characters Azure was asked to read this calendar month (UTC), by everyone on this server. */
+  monthChars: number;
 }
 
 /** The events the server sends while a reply is being written. */

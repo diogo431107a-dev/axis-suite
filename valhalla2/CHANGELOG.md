@@ -4,6 +4,17 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Replies read aloud.** Under every reply, a speaker button reads it aloud with Azure's voice
+  Ava, who also speaks Portuguese; while it plays it becomes a stop button. A switch in the chat's
+  header (**Aloud** / **Silent**) reads each new reply as it arrives; this browser remembers it,
+  and it starts on. Asterisks are dropped, so actions are read like the rest. Each reply is read by
+  Azure once and the audio kept on the server, so playing it again costs nothing; under the
+  composer you see how many characters Azure has read this month (500,000 are free on Azure's free
+  tier).
+- **By hand:** before running the installer, put the Azure Speech key in
+  `/etc/axis-suite/valhalla2-speech.key`. Valhalla 2 won't start while that file is missing; an
+  empty file just means nothing is read aloud. The README's "Installing and data" has the command.
+
 ## 0.0.6 — 2026-11-14
 
 - **Pictures.** Under any message, a new picture button asks Claude (Sonnet 5.5) to read the scene

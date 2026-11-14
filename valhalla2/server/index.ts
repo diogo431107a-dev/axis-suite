@@ -13,6 +13,7 @@ import {
   type Orientation,
   type PictureDraftReply,
   type PictureKind,
+  type SpeechReply,
   type StreamEvent,
 } from "../shared/protocol.ts";
 import { frame } from "../shared/sse.ts";
@@ -47,6 +48,17 @@ import { createPainter } from "./pictures/painter.ts";
 import { sceneRequest, type Scene } from "./pictures/scene.ts";
 import { createPictures, knownFiles } from "./pictures/store.ts";
 import { asParams, promptView } from "./prompt.ts";
+import { createAzureSpeech } from "./speech/azure.ts";
+import { loadSpeechKey } from "./speech/key.ts";
+import {
+  charsThisMonth,
+  createSpeech,
+  forgetDeletedSpeech,
+  knownSpeechFiles,
+  ownsSpeech,
+  SPEECH_DIR,
+  speechFilesOf,
+} from "./speech/store.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3016);
@@ -114,6 +126,27 @@ if (painter) {
   const resumed = painter.resume();
   if (resumed > 0) console.log(`Picking up ${resumed} picture(s) the last stop cut short`);
 }
+
+// Reading aloud: MP3 files in their own folder, read by Azure when the server has a key for it.
+const speechFiles = createPictureFiles(SPEECH_DIR);
+{
+  const swept = speechFiles.sweep(knownSpeechFiles(db));
+  if (swept > 0) console.log(`Deleted ${swept} audio file(s) nothing refers to any more`);
+}
+const speechKey = loadSpeechKey();
+const speech = speechKey
+  ? createSpeech({
+      db,
+      azure: createAzureSpeech({ key: speechKey.key, region: config.speech.region }),
+      files: speechFiles,
+      voice: config.speech.voice,
+    })
+  : null;
+console.log(
+  speech
+    ? `Reading aloud: ${SPEECH_DIR}, ${config.speech.voice} on Azure ${config.speech.region} (key from ${speechKey?.from === "credential" ? "the systemd credential" : "SPEECH_KEY"})`
+    : "Reading aloud: off, no Azure Speech key",
+);
 
 const auth = heimdallAuth();
 
@@ -192,7 +225,12 @@ app.use("/api", express.json({ limit: "1mb" }));
 app.get("/api/me", auth.me);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ apiKey: hasApiKey(), pictures: painter !== null, defaults: config.defaults } satisfies Health);
+  res.json({
+    apiKey: hasApiKey(),
+    pictures: painter !== null,
+    speech: speech !== null,
+    defaults: config.defaults,
+  } satisfies Health);
 });
 
 // Companions
@@ -207,8 +245,10 @@ app.delete("/api/companions/:id", (req: Request, res: Response) => {
   const id = checkId(req.params.id);
   // The rows go with the companion; their files are deleted here.
   const files = my.pictures.filesOf(id);
+  const audio = speechFilesOf(db, { companionId: id });
   my.companions.remove(id);
   for (const file of files) pictureFiles.remove(file);
+  for (const file of audio) speechFiles.remove(file);
   res.status(204).end();
 });
 
@@ -229,7 +269,12 @@ app.patch("/api/chats/:id", (req: Request, res: Response) => {
   res.json(ownedBy(req).chats.change(checkId(req.params.id), req.body));
 });
 app.delete("/api/chats/:id", (req: Request, res: Response) => {
-  ownedBy(req).chats.remove(checkId(req.params.id));
+  const my = ownedBy(req);
+  const id = checkId(req.params.id);
+  my.chats.get(id);
+  const audio = speechFilesOf(db, { chatId: id });
+  my.chats.remove(id);
+  for (const file of audio) speechFiles.remove(file);
   res.status(204).end();
 });
 
@@ -356,6 +401,7 @@ app.delete("/api/chats/:id/messages/:messageId", (req: Request, res: Response) =
   const my = ownedBy(req);
   const id = checkId(req.params.id);
   my.chats.tree(id).remove(messageId(req.params.messageId));
+  for (const file of forgetDeletedSpeech(db, id)) speechFiles.remove(file);
   res.json(my.chats.page(id));
 });
 
@@ -533,6 +579,40 @@ app.delete("/api/pictures/:id", (req: Request, res: Response) => {
   const file = ownedBy(req).pictures.remove(checkId(req.params.id));
   if (file) pictureFiles.remove(file);
   res.status(204).end();
+});
+
+// Replies read aloud. Asking (POST) reads the reply if it isn't kept yet and says where the audio
+// is; the page then plays that file (GET), which an <audio> element can fetch by itself.
+app.post("/api/chats/:id/messages/:messageId/speech", async (req: Request, res: Response) => {
+  const read = speech ?? invalid("This Valhalla 2 has no Azure Speech key, so it can't read aloud");
+  const my = ownedBy(req);
+  const id = checkId(req.params.id);
+  const message = my.chats.tree(id).get(messageId(req.params.messageId));
+  const { file } = await read.of(message);
+  res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(db) } satisfies SpeechReply);
+});
+
+// The audio itself, from disk, to its owner only. It never changes: other words are another file.
+app.get("/api/speech/:file", (req: Request, res: Response) => {
+  const file = String(req.params.file);
+  if (!ownsSpeech(db, ownedBy(req).username, file)) {
+    return void res.status(404).json({ error: "No such audio" } satisfies ApiError);
+  }
+  res.sendFile(
+    speechFiles.path(file),
+    {
+      cacheControl: false,
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, max-age=31536000, immutable",
+      },
+    },
+    (err) => {
+      if (err && !res.headersSent) res.status(404).json({ error: "No such audio" } satisfies ApiError);
+    },
+  );
 });
 
 app.use("/api", (_req, res) => {

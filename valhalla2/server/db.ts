@@ -180,6 +180,29 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       CREATE INDEX pictures_chat ON pictures (chat_id);
     `);
   },
+  // v4: replies read aloud. The audio is a file in <STATE_DIRECTORY>/speech, named in `file`; the
+  // row says which message it reads, in which voice, and from which text, so an edited reply or
+  // another voice is read again. `speech_usage` adds up what Azure was asked to read each month.
+  (db) => {
+    db.exec(`
+      CREATE TABLE speech (
+        id         INTEGER PRIMARY KEY,
+        message_id INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        voice      TEXT NOT NULL,
+        text_hash  TEXT NOT NULL,                     -- sha256 of the voice and the text read
+        file       TEXT NOT NULL,                     -- <message id>-<hash>.mp3
+        bytes      INTEGER NOT NULL,
+        chars      INTEGER NOT NULL,
+        created_at TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX speech_once ON speech (message_id, voice, text_hash);
+
+      CREATE TABLE speech_usage (
+        month TEXT PRIMARY KEY,                       -- YYYY-MM, UTC
+        chars INTEGER NOT NULL
+      );
+    `);
+  },
 ];
 
 /**

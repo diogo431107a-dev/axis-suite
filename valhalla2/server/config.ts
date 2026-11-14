@@ -45,6 +45,12 @@ export const config = {
     /** How many messages before the chosen one Claude reads to picture it. */
     recent: count("VALHALLA_PICTURE_MESSAGES", 20),
   },
+  speech: {
+    /** The Azure region of the Speech resource the key belongs to. */
+    region: modelFrom("SPEECH_REGION", "brazilsouth"),
+    /** The voice that reads every reply. Multilingual, so it reads Portuguese too. */
+    voice: modelFrom("SPEECH_VOICE", "en-US-AvaMultilingualNeural"),
+  },
 };
 
 /** The size limits of a companion's memory. */

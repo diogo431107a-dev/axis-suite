@@ -9,12 +9,16 @@ import {
   Eye,
   GitBranch,
   ImagePlus,
+  LoaderCircle,
   MessageSquareReply,
   Pencil,
   RefreshCw,
   Send,
   Settings2,
+  Square,
   Trash2,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 import {
   blockText,
@@ -35,6 +39,7 @@ import { api, describeError, streamReply } from "../api.ts";
 import { usePage } from "../page.ts";
 import { Button, Dialog, inputStyle, Notice } from "../ui/bits.tsx";
 import { segmentsOf } from "../ui/emphasis.ts";
+import { hasSpeech, useReadAloud, useSpeaker } from "../ui/speaker.ts";
 import { useSave } from "../ui/useSave.ts";
 import { Usage } from "../ui/Usage.tsx";
 import { Inspect } from "./Inspect.tsx";
@@ -204,6 +209,16 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const bottom = useRef<HTMLDivElement>(null);
   const greeted = useRef(false);
 
+  const speaker = useSpeaker(id, setError);
+  const [readAloud, setReadAloud] = useReadAloud();
+  /** What to do with a reply just written: read it aloud, when that is on. Kept current for write(). */
+  const onAnswered = useRef<(message: Message) => void>(() => undefined);
+  onAnswered.current = (message) => {
+    if (health.speech && readAloud && message.role === "assistant" && hasSpeech(textOf(message))) {
+      void speaker.play(message.id, true);
+    }
+  };
+
   const loadTokens = useCallback(() => {
     api<TokenView>(`/api/chats/${id}/tokens`)
       .then(setTokens)
@@ -232,6 +247,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       setThinking(false);
       setRemembering(false);
       let failed = false;
+      let answered: Message | null = null;
       try {
         await streamReply(path, body, (event: StreamEvent) => {
           if (event.type === "remembering") setRemembering(true);
@@ -244,6 +260,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             setThinking(false);
             setIncoming((so_far) => so_far + event.text);
           }
+          if (event.type === "done") answered = event.message;
           if (event.type === "error") {
             failed = true;
             setError(event.error);
@@ -263,6 +280,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
       setThinking(false);
       setRemembering(false);
       void reload();
+      if (!failed && answered) onAnswered.current(answered);
       return !failed;
     },
     [load, reload],
@@ -464,6 +482,24 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
               <GitBranch size={14} />
             </IconButton>
           ) : null}
+          {health.speech && !mine && hasSpeech(text) ? (
+            speaker.playing?.messageId === message.id ? (
+              <IconButton
+                label={speaker.playing.phase === "loading" ? "Reading…" : "Stop reading"}
+                onClick={speaker.stop}
+              >
+                {speaker.playing.phase === "loading" ? (
+                  <LoaderCircle size={14} className="animate-spin" />
+                ) : (
+                  <Square size={13} />
+                )}
+              </IconButton>
+            ) : (
+              <IconButton label="Read aloud" onClick={() => void speaker.play(message.id)}>
+                <Volume2 size={14} />
+              </IconButton>
+            )
+          ) : null}
           {health.pictures && text ? (
             <IconButton
               label="Picture this moment"
@@ -533,6 +569,23 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             {companion.name} · {MODE_LABELS[chat.mode].label.toLowerCase()} · {companion.settings.model}
           </p>
         </div>
+        {health.speech ? (
+          <Button
+            kind="plain"
+            onClick={() => {
+              if (readAloud) speaker.stop();
+              setReadAloud(!readAloud);
+            }}
+            title={
+              readAloud
+                ? "New replies are read aloud as they arrive (on this device). Click to stop that."
+                : "New replies arrive silently (on this device). Click to have them read aloud."
+            }
+          >
+            {readAloud ? <Volume2 size={15} /> : <VolumeX size={15} />}{" "}
+            <span className="hidden sm:inline">{readAloud ? "Aloud" : "Silent"}</span>
+          </Button>
+        ) : null}
         <Button
           kind="plain"
           onClick={() => void rememberNow()}
@@ -639,6 +692,14 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           </div>
           <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
             <Usage last={last?.reply ?? null} tokens={tokens} />
+            {speaker.monthChars !== null ? (
+              <span
+                className="font-mono text-xs text-faint"
+                title="Characters Azure has read aloud for this Valhalla 2 this month, everyone's included. Azure's free tier (F0) includes 500,000 a month; a reply played again costs nothing."
+              >
+                read aloud {speaker.monthChars.toLocaleString("en-US")} chars this month
+              </span>
+            ) : null}
             <span className="text-xs text-faint">Enter sends · Shift+Enter for a new line</span>
           </div>
         </div>
