@@ -5,13 +5,16 @@ import {
   ChevronLeft,
   BookmarkCheck,
   Brain,
+  Check,
   ChevronRight,
+  Copy,
   Eye,
   GitBranch,
   ImagePlus,
   LoaderCircle,
   MessageSquareReply,
   Pencil,
+  Pin,
   RefreshCw,
   Send,
   Settings2,
@@ -37,7 +40,7 @@ import {
 } from "../../shared/protocol.ts";
 import { api, describeError, streamReply } from "../api.ts";
 import { usePage } from "../page.ts";
-import { Button, Dialog, inputStyle, Notice } from "../ui/bits.tsx";
+import { Button, Dialog, Field, inputStyle, Notice } from "../ui/bits.tsx";
 import { segmentsOf } from "../ui/emphasis.ts";
 import { hasSpeech, useReadAloud, useSpeaker } from "../ui/speaker.ts";
 import { useSave } from "../ui/useSave.ts";
@@ -65,6 +68,33 @@ function SpokenText({ text }: { text: string }) {
       )}
     </p>
   );
+}
+
+/**
+ * Copies text. The Clipboard API first; where the browser refuses it (some embedded browsers, or
+ * a page that isn't https), the older way: select the text in a hidden box and copy that.
+ */
+async function toClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    const box = document.createElement("textarea");
+    box.value = text;
+    box.setAttribute("readonly", "");
+    box.style.position = "fixed";
+    box.style.opacity = "0";
+    document.body.append(box);
+    box.select();
+    try {
+      // Deprecated, but still the only way where the Clipboard API is refused.
+      return document.execCommand("copy");
+    } catch {
+      return false;
+    } finally {
+      box.remove();
+    }
+  }
 }
 
 /** What is being written right now: your message and its answer, or another version of a reply. */
@@ -195,6 +225,10 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<{ id: number; text: string } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  /** The message just copied, which shows a check mark for a moment. */
+  const [copied, setCopied] = useState<number | null>(null);
+  /** The message something is being pinned from. */
+  const [pinning, setPinning] = useState<{ messageId: number; speaker: string; text: string } | null>(null);
   const [acting, setActing] = useState(false);
   const [remembering, setRemembering] = useState(false);
   const [filing, setFiling] = useState(false);
@@ -339,6 +373,16 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
     if (!ok) setDraft((current) => current || text);
   };
 
+  /** Puts a message's words on the clipboard. */
+  const copy = async (messageId: number, text: string) => {
+    if ((await toClipboard(text)) === false) {
+      setError("This browser wouldn't let Valhalla 2 copy. Select the text and copy it by hand.");
+      return;
+    }
+    setCopied(messageId);
+    setTimeout(() => setCopied((at) => (at === messageId ? null : at)), 1500);
+  };
+
   /** Folds this chat into the companion's memory now, and says how it went. */
   const rememberNow = async () => {
     setFiling(true);
@@ -468,6 +512,26 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           {mine && isLast ? (
             <IconButton label="Ask for an answer" disabled={busy} onClick={() => void generate(message.id)}>
               <MessageSquareReply size={14} />
+            </IconButton>
+          ) : null}
+          {text ? (
+            <IconButton label={copied === message.id ? "Copied" : "Copy"} onClick={() => void copy(message.id, text)}>
+              {copied === message.id ? <Check size={14} /> : <Copy size={14} />}
+            </IconButton>
+          ) : null}
+          {text && !refused ? (
+            <IconButton
+              label={
+                page.pinned.includes(message.id)
+                  ? "Pinned. Pin more of it"
+                  : "Pin: keep these words, as they are, in every chat"
+              }
+              disabled={busy}
+              onClick={() =>
+                setPinning({ messageId: message.id, speaker: mine ? "" : companion.name, text: text.trim() })
+              }
+            >
+              <Pin size={14} className={page.pinned.includes(message.id) ? "fill-current text-accent" : undefined} />
             </IconButton>
           ) : null}
           <IconButton label="Edit" disabled={busy} onClick={() => setEditing({ id: message.id, text })}>
@@ -754,6 +818,20 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           }
         />
       ) : null}
+      {pinning ? (
+        <PinDialog
+          start={pinning}
+          companionName={companion.name}
+          onClose={() => setPinning(null)}
+          onPinned={(next) => {
+            setPage(next);
+            setPinning(null);
+            loadTokens();
+          }}
+          onMemory={() => open({ kind: "memory", companionId: companion.id })}
+          chatId={chat.id}
+        />
+      ) : null}
       <ChatDialog
         open={showSettings}
         onClose={() => setShowSettings(false)}
@@ -762,6 +840,85 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
         onCompanion={() => open({ kind: "companion", id: companion.id })}
       />
     </div>
+  );
+}
+
+/** Pins words from a message: you trim them to what matters, and say who said them. */
+function PinDialog({
+  start,
+  companionName,
+  chatId,
+  onClose,
+  onPinned,
+  onMemory,
+}: {
+  start: { messageId: number; speaker: string; text: string };
+  companionName: string;
+  chatId: string;
+  onClose: () => void;
+  onPinned: (page: ChatPage) => void;
+  onMemory: () => void;
+}) {
+  const { error, saving, run } = useSave();
+  const [speaker, setSpeaker] = useState(start.speaker);
+  const [text, setText] = useState(start.text.slice(0, LIMITS.pinText));
+  const tooLong = start.text.length > LIMITS.pinText;
+
+  const pin = () =>
+    run(async () => {
+      onPinned(
+        await api<ChatPage>(`/api/chats/${chatId}/pins`, {
+          method: "POST",
+          body: { messageId: start.messageId, speaker, text },
+        }),
+      );
+    });
+
+  return (
+    <Dialog open onClose={onClose} title="Pin a moment">
+      <div className="space-y-4">
+        <p className="text-sm text-faint">
+          A pinned moment is sent, word for word, in every chat with {companionName}, after the memory. The memory model
+          never rewrites it. Keep only the line that matters: every pin is sent every turn.
+        </p>
+        <Field label="Who said it" hint="As the model should read it: your name in the story, or the companion's.">
+          <input
+            className={inputStyle}
+            value={speaker}
+            maxLength={LIMITS.pinSpeaker}
+            placeholder={start.speaker ? undefined : "Your name in the story"}
+            onChange={(e) => setSpeaker(e.target.value)}
+          />
+        </Field>
+        <Field
+          label="The words to keep"
+          hint={
+            tooLong
+              ? `The message is longer than a pin can be (${LIMITS.pinText} characters), so it was cut. Trim it to the part that matters.`
+              : `Up to ${LIMITS.pinText} characters.`
+          }
+        >
+          <textarea
+            className={`${inputStyle} min-h-28 resize-y leading-relaxed`}
+            value={text}
+            maxLength={LIMITS.pinText}
+            onChange={(e) => setText(e.target.value)}
+          />
+        </Field>
+        <Notice>{error}</Notice>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button kind="strong" onClick={pin} disabled={saving || !speaker.trim() || !text.trim()}>
+            <Pin size={14} /> {saving ? "Pinning…" : "Pin"}
+          </Button>
+          <Button kind="quiet" onClick={onClose}>
+            Cancel
+          </Button>
+          <button type="button" className="ml-auto text-sm text-accent hover:underline" onClick={onMemory}>
+            See and remove pins on the Memory page
+          </button>
+        </div>
+      </div>
+    </Dialog>
   );
 }
 

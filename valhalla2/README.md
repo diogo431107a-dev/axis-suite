@@ -9,7 +9,7 @@ moves from one to the other.
 You write a companion in one text box: who they are, what they look like, how they behave, and who
 _you_ are when you talk to them — before a queen you might be a cup-bearer; in a wolf pack, a wolf.
 Then you talk. Every chat opens with their greeting, any reply can be written again as many times as
-you like, and any message can be edited, deleted or branched from.
+you like, and any message can be edited, deleted, branched from, copied or pinned.
 
 It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is
 signed in there sees their own companions and chats and nobody else's.
@@ -114,6 +114,17 @@ system prompt mid-chat would cost the cache and the companion's earlier thinking
 outgrows that, its oldest ten exchanges slide out at once — not one per turn, which would change the
 start of the request, and so miss the cache, every turn. They are folded into memory first. A dashed
 line in the chat marks where what is sent begins.
+
+**Pinned moments.** The memory model writes in its own words, and tidy-ups condense, so the exact
+wording of a promise or an origin line can drift. For words that must stay as they were said, the
+pin under a message keeps them: you trim them to the line that matters and say who said them, and
+every chat with the companion gets them word for word in a `<pinned_moments>` block after its
+memory, under a short note (**Pinned moments note**, one of the companion's own texts). The memory
+model never sees or changes them; a tidy-up or rebuild leaves them alone, and a deleted chat leaves
+its pins behind. The chat you pinned from takes a fresh look at memory on its next turn — one turn
+with a cold cache, as after a mode change — and other chats see the pin when they next look. Pins
+are listed, and unpinned, on the Memory page; 30 at most, of 500 characters each, since every one
+is sent every turn.
 
 Every change to every file is kept, with where it came from (a chat, your edit, a revert). The
 Memory page shows a file's history as a line-by-line diff, and **puts back** any earlier version as
@@ -370,6 +381,7 @@ One module holding both halves, like the rest of the suite.
 | `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`)                                                                                                                                                                                         |
 | `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation, tidy-ups and rebuilds (`consolidate.ts`, `cleanup.ts`, `rebuild.ts`, `run.ts`) and when they run (`scheduler.ts`) |
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
+| `server/pins.ts`       | pinned moments: kept word for word, sent after memory, and the chats that must look again                                                                                                                                                                                |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
 | `server/speech/`       | reading aloud: the only file that talks to Azure (`azure.ts`), what is read (`text.ts`), its key (`key.ts`), and the kept audio (`store.ts`)                                                                                                                             |

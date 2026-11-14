@@ -4,6 +4,16 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Copy a message.** Under every message, a copy button puts its words on the clipboard; it shows
+  a check mark for a moment when it's done.
+- **Pinned moments.** Under every message, a pin button keeps words from it — trimmed to the line
+  that matters, with who said them — and sends them word for word in every chat with that
+  companion, after its memory. Unlike memory, the memory model never rewrites or condenses them.
+  The chat you pinned from sees the pin on its next reply; other chats see it the next time they
+  refresh their memory. The companion's **Memory** page lists the pins (30 at most) and unpins
+  them. The short note sent above the pins is one of the companion's own texts, **Pinned moments
+  note**, which you can rewrite.
+
 ## 0.0.8 — 2026-11-14
 
 - **Replies read aloud.** Under every reply, a speaker button reads it aloud with Azure's voice

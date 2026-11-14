@@ -13,6 +13,7 @@ import type { Companions } from "../companions.ts";
 import { conflict, notFound, tooMany } from "../errors.ts";
 import { hasPending } from "../memory/consolidate.ts";
 import { picturesOn } from "../pictures/store.ts";
+import { pinnedAmong } from "../pins.ts";
 import { createTree } from "./tree.ts";
 
 interface Row {
@@ -132,6 +133,7 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
     page(id: string): ChatPage {
       const chat = get(id);
       const path = createTree(db, id).entries(swipeAsk);
+      const onPath = path.map((entry) => entry.message.id);
       return {
         chat,
         companion: companions.get(chat.companionId),
@@ -140,11 +142,8 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
           db.prepare("SELECT window_start FROM chats WHERE id = ?").get(id) as { window_start: number | null }
         ).window_start,
         memoryPending: hasPending(db, id),
-        pictures: picturesOn(
-          db,
-          id,
-          path.map((entry) => entry.message.id),
-        ),
+        pictures: picturesOn(db, id, onPath),
+        pinned: pinnedAmong(db, id, onPath),
       };
     },
 

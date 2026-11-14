@@ -31,7 +31,30 @@ export const LIMITS = {
   pictures: 5_000,
   /** How many pictures one person can have being made at once. */
   picturesAtOnce: 3,
+  /** A pinned moment: the words kept, and who said them. */
+  pinText: 500,
+  pinSpeaker: 80,
+  /** How many moments one companion keeps pinned. Every one is sent in every chat. */
+  pins: 30,
 } as const;
+
+/**
+ * A moment you pinned: words from a chat kept exactly as they are, and sent in every chat with the
+ * companion, beside its memory. The memory model never changes them.
+ */
+export interface Pin {
+  id: number;
+  companionId: string;
+  /** Where it came from; null once that chat (or message) is deleted. The pin stays. */
+  chatId: string | null;
+  messageId: number | null;
+  /** Who said it, as the model reads it: the companion's name, or yours in the story. */
+  speaker: string;
+  /** The chat's title when it was pinned. */
+  chatTitle: string;
+  text: string;
+  createdAt: string;
+}
 
 /** Profile pictures are made from the companion page; chat pictures from a message. */
 export const PICTURE_KINDS = ["profile", "chat"] as const;
@@ -177,7 +200,15 @@ export interface Settings {
  * The texts Valhalla 2 itself adds to what the model reads. Each companion can rewrite any of them;
  * one left out uses the default in shared/prompts.ts.
  */
-export const PROMPT_KEYS = ["memoryPolicy", "greeting", "rejection", "consolidation", "cleanup", "picture"] as const;
+export const PROMPT_KEYS = [
+  "memoryPolicy",
+  "pins",
+  "greeting",
+  "rejection",
+  "consolidation",
+  "cleanup",
+  "picture",
+] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
 export type Prompts = Partial<Record<PromptKey, string>>;
 
@@ -295,6 +326,8 @@ export interface ChatPage {
   memoryPending: boolean;
   /** The pictures made from messages on the selected path, oldest first. */
   pictures: Picture[];
+  /** The messages on the selected path with something pinned from them. */
+  pinned: number[];
 }
 
 /** One of a companion's memory files, as the list shows it. */
@@ -339,6 +372,8 @@ export interface MemoryPage {
   chats: number;
   /** The database's daily backups, newest first. */
   backups: { day: string; bytes: number }[];
+  /** The moments pinned for this companion, oldest first, as they are sent. */
+  pins: Pin[];
 }
 
 export interface MemoryFileView {
