@@ -1,0 +1,152 @@
+import { useState } from "react";
+import { LIMITS, PROMPT_KEYS, type Companion, type Prompts, type Settings } from "../../shared/protocol.ts";
+import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
+import { api } from "../api.ts";
+import { usePage } from "../page.ts";
+import { SettingsForm } from "./SettingsForm.tsx";
+import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
+import { useSave } from "../ui/useSave.ts";
+
+/**
+ * A new companion starts with this in its profile. It is a suggestion in a field you own, not
+ * something Valhalla 2 adds behind your back: change it, or clear it, and that is what gets sent.
+ */
+const SUGGESTED_PROFILE = `<personality>
+Who she is, under everything.
+</personality>
+
+<appearance>
+What you would see.
+</appearance>
+
+<behavior>
+Stay in character. Write only her words and actions — never mine, and never a summary.
+</behavior>
+
+<user_persona>
+Who you are when you talk to her.
+</user_persona>`;
+
+const area = `${inputStyle} resize-y font-body leading-relaxed`;
+
+export function CompanionForm({ companion }: { companion: Companion | null }) {
+  const { health, chats, reload, open } = usePage();
+  const { error, saving, run } = useSave();
+  const [name, setName] = useState(companion?.name ?? "");
+  const [profile, setProfile] = useState(companion?.profile ?? SUGGESTED_PROFILE);
+  const [settings, setSettings] = useState<Settings>(companion?.settings ?? { ...health.defaults });
+  const [prompts, setPrompts] = useState<Prompts>(companion?.prompts ?? {});
+  const [confirming, setConfirming] = useState(false);
+
+  const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
+
+  const save = () =>
+    run(async () => {
+      const id = companion?.id ?? crypto.randomUUID();
+      await api(`/api/companions/${id}`, { method: "PUT", body: { name, profile, settings, prompts } });
+      await reload();
+      open({ kind: "companion", id });
+    });
+
+  const remove = () =>
+    run(async () => {
+      if (!companion) return;
+      await api(`/api/companions/${companion.id}`, { method: "DELETE" });
+      await reload();
+      open({ kind: "none" });
+    });
+
+  return (
+    <div className="mx-auto max-w-3xl space-y-5 p-5">
+      <h1 className="font-display text-2xl">{companion ? companion.name : "A new companion"}</h1>
+
+      <Field label="Name" hint="For the list. The model reads the profile, not this.">
+        <input
+          className={inputStyle}
+          value={name}
+          maxLength={LIMITS.name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Wealhtheow"
+        />
+      </Field>
+
+      <Field
+        label="Profile"
+        hint="Everything the model reads about who it is, and who you are when you talk to it. Sent exactly as you write it, tags and all."
+      >
+        <textarea
+          className={`${area} min-h-96 font-mono text-xs`}
+          value={profile}
+          maxLength={LIMITS.profile}
+          onChange={(e) => setProfile(e.target.value)}
+        />
+      </Field>
+
+      <SettingsForm settings={settings} onChange={setSettings} note="Every chat with this companion uses these." />
+
+      <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
+        <div>
+          <h2 className="font-display text-lg">Valhalla 2's own words</h2>
+          <p className="mt-1 text-xs text-faint">
+            The only text Valhalla 2 adds besides your profile and the chat. Leave one empty to use the default shown in
+            it. Inspect, in a chat, shows each one where it goes out.
+          </p>
+        </div>
+        {PROMPT_KEYS.map((key) => (
+          <Field key={key} label={PROMPT_LABELS[key].label} hint={PROMPT_LABELS[key].hint}>
+            <textarea
+              className={`${area} min-h-24`}
+              value={prompts[key] ?? ""}
+              maxLength={LIMITS.prompt}
+              placeholder={DEFAULT_PROMPTS[key]}
+              onChange={(e) => setPrompts({ ...prompts, [key]: e.target.value })}
+            />
+            {prompts[key]?.trim() ? (
+              <button
+                type="button"
+                className="mt-1 text-xs text-faint hover:text-accent"
+                onClick={() => setPrompts({ ...prompts, [key]: "" })}
+              >
+                Back to the default
+              </button>
+            ) : null}
+          </Field>
+        ))}
+      </section>
+
+      <Notice>{error}</Notice>
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Button kind="strong" onClick={save} disabled={saving || !name.trim()}>
+          {saving ? "Saving…" : "Save"}
+        </Button>
+        <Button kind="quiet" onClick={() => open({ kind: "none" })}>
+          Cancel
+        </Button>
+        {companion ? (
+          <span className="ml-auto flex items-center gap-2">
+            {confirming ? (
+              <>
+                <span className="text-sm text-warn">
+                  {chatCount === 0
+                    ? "Delete this companion?"
+                    : `Delete this companion and its ${chatCount === 1 ? "chat" : `${chatCount} chats`}?`}
+                </span>
+                <Button kind="danger" onClick={remove} disabled={saving}>
+                  Delete
+                </Button>
+                <Button kind="quiet" onClick={() => setConfirming(false)}>
+                  Keep
+                </Button>
+              </>
+            ) : (
+              <Button kind="danger" onClick={() => setConfirming(true)} disabled={saving}>
+                Delete…
+              </Button>
+            )}
+          </span>
+        ) : null}
+      </div>
+    </div>
+  );
+}
