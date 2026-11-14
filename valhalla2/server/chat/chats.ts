@@ -12,6 +12,7 @@ import { id as checkId, object, oneOf, text } from "../check.ts";
 import type { Companions } from "../companions.ts";
 import { conflict, notFound, tooMany } from "../errors.ts";
 import { hasPending } from "../memory/consolidate.ts";
+import { picturesOn } from "../pictures/store.ts";
 import { createTree } from "./tree.ts";
 
 interface Row {
@@ -130,14 +131,20 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
     /** Everything the page needs to show a chat. */
     page(id: string): ChatPage {
       const chat = get(id);
+      const path = createTree(db, id).entries(swipeAsk);
       return {
         chat,
         companion: companions.get(chat.companionId),
-        path: createTree(db, id).entries(swipeAsk),
+        path,
         windowStart: (
           db.prepare("SELECT window_start FROM chats WHERE id = ?").get(id) as { window_start: number | null }
         ).window_start,
         memoryPending: hasPending(db, id),
+        pictures: picturesOn(
+          db,
+          id,
+          path.map((entry) => entry.message.id),
+        ),
       };
     },
 

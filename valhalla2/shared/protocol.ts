@@ -21,7 +21,71 @@ export const LIMITS = {
   /** The reply length you can ask for. Replies stream, so a long ceiling costs nothing. */
   minTokens: 256,
   maxTokens: 64_000,
+  /** A picture's prompt, and its negative prompt. */
+  picturePrompt: 4_000,
+  /** What you add when asking for a picture: "at sunset", "from behind". */
+  pictureHint: 1_000,
+  /** The one line under a picture in the gallery. */
+  pictureCaption: 300,
+  /** How many pictures one companion keeps. */
+  pictures: 5_000,
+  /** How many pictures one person can have being made at once. */
+  picturesAtOnce: 3,
 } as const;
+
+/** Profile pictures are made from the companion page; chat pictures from a message. */
+export const PICTURE_KINDS = ["profile", "chat"] as const;
+export type PictureKind = (typeof PICTURE_KINDS)[number];
+
+export const ORIENTATIONS = ["portrait", "landscape", "square"] as const;
+export type Orientation = (typeof ORIENTATIONS)[number];
+
+/** The sizes SDXL was trained on, one per orientation. */
+export const PICTURE_SIZES: Readonly<Record<Orientation, { width: number; height: number }>> = {
+  portrait: { width: 832, height: 1216 },
+  landscape: { width: 1216, height: 832 },
+  square: { width: 1024, height: 1024 },
+};
+
+/** A picture's prompt, written by Claude and yours to change before the picture is made. */
+export interface PictureDraft {
+  prompt: string;
+  negativePrompt: string;
+  orientation: Orientation;
+  /** One plain line saying what the picture shows, for the gallery. */
+  caption: string;
+}
+
+/** What writing a prompt answers: the draft, and what asking Claude for it cost. */
+export interface PictureDraftReply extends PictureDraft {
+  /** In dollars, at the published prices; null when a price is unknown. */
+  cost: number | null;
+}
+
+/** What a picture is made from, besides its prompt. */
+export interface PictureParams {
+  model: string;
+  width: number;
+  height: number;
+  steps: number;
+  cfgScale: number;
+  seed: number;
+}
+
+/** A picture of a companion, made or being made. Its file is GET /api/pictures/:id/file. */
+export interface Picture extends PictureDraft {
+  id: string;
+  companionId: string;
+  kind: PictureKind;
+  /** The chat and message a chat picture was made from; null once that chat is deleted. */
+  chatId: string | null;
+  chatTitle: string | null;
+  messageId: number | null;
+  params: PictureParams;
+  status: "working" | "done" | "failed";
+  error: string | null;
+  createdAt: string;
+}
 
 /**
  * How much effort the model puts into a reply. This replaces the temperature slider other
@@ -113,7 +177,7 @@ export interface Settings {
  * The texts Valhalla 2 itself adds to what the model reads. Each companion can rewrite any of them;
  * one left out uses the default in shared/prompts.ts.
  */
-export const PROMPT_KEYS = ["memoryPolicy", "greeting", "rejection", "consolidation", "cleanup"] as const;
+export const PROMPT_KEYS = ["memoryPolicy", "greeting", "rejection", "consolidation", "cleanup", "picture"] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
 export type Prompts = Partial<Record<PromptKey, string>>;
 
@@ -229,6 +293,8 @@ export interface ChatPage {
   windowStart: number | null;
   /** Whether the chat has anything the companion's memory doesn't have yet. */
   memoryPending: boolean;
+  /** The pictures made from messages on the selected path, oldest first. */
+  pictures: Picture[];
 }
 
 /** One of a companion's memory files, as the list shows it. */
@@ -340,6 +406,8 @@ export interface TokenView {
 export interface Health {
   /** Whether the server has a Claude API key to send with. */
   apiKey: boolean;
+  /** Whether the server has a CivitAI key, so pictures can be made. */
+  pictures: boolean;
   /** What a new companion starts from. */
   defaults: Settings;
 }

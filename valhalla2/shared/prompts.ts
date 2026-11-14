@@ -49,6 +49,27 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "- Keep the file structure as it is: do not create, rename or delete files, and keep each file's headings.\n\n" +
     "Work in as few commands as you can — rewriting a whole file with `create` is fine. When done, answer with " +
     "one short line saying what you tidied.",
+  picture:
+    "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
+    "an anime illustration style and reads Danbooru-style tags best. You are given a companion character's " +
+    "profile and either the end of a chat with the user, ending on the moment to picture, or a request for a " +
+    "portrait. Write the prompt for one picture.\n\n" +
+    "- prompt: comma-separated tags, short phrases allowed, about 40 to 70 of them. Start with " +
+    '"masterpiece, best quality, amazing quality", then the count of people (1girl, 1boy, 1girl 1boy, 2girls, ' +
+    "solo…), then each person's look (hair colour and style, eyes, build, clothing, accessories), then pose, " +
+    "action and expression, then the place, time of day, lighting, mood and framing (close-up, cowboy shot, full " +
+    "body, from side…).\n" +
+    "- Take the companion's look from the profile (an <appearance> section if there is one) and keep it the same " +
+    "from picture to picture. Draw the user from the profile's description of them; if it says nothing about their " +
+    "looks, keep them plain, or show them from behind or only in part.\n" +
+    "- Picture the chosen moment, not the whole chat. What the chat says about the place, clothes and mood wins; " +
+    "where it is vague, invent freely: setting, weather, light and composition that fit the scene and its feeling.\n" +
+    '- negativePrompt: start with "bad quality, worst quality, worst detail, sketch, censor", then add what this ' +
+    "picture should avoid (extra people, the wrong hair colour…).\n" +
+    "- orientation: portrait for one figure or a close shot, landscape for two people or a wide place, square " +
+    "when neither fits.\n" +
+    "- caption: one short plain sentence saying what the picture shows, for the gallery.\n\n" +
+    "If the user adds a note, follow it.",
 };
 
 /** Said to the memory model before each step of a rebuild, after the memory-keeping instructions. */
@@ -93,6 +114,10 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
   greeting: {
     label: "Greeting instruction",
     hint: "Hidden from you. Sent once at the start of every chat, so the companion opens it.",
+  },
+  picture: {
+    label: "Picture instructions",
+    hint: "What Claude is told when it writes the prompt for a picture: the image model's style, and how to fill in what the chat leaves vague.",
   },
   rejection: {
     label: "Rejection note",

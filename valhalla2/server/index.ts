@@ -1,11 +1,18 @@
 import express, { type ErrorRequestHandler, type Request, type Response } from "express";
 import { heimdallAuth, knownUsers } from "@axis-suite/heimdall-client/server";
+import { randomUUID } from "node:crypto";
 import {
   LIMITS,
+  ORIENTATIONS,
+  PICTURE_KINDS,
+  PICTURE_SIZES,
   type ApiError,
   type Companion,
   type Health,
   type MemoryPage,
+  type Orientation,
+  type PictureDraftReply,
+  type PictureKind,
   type StreamEvent,
 } from "../shared/protocol.ts";
 import { frame } from "../shared/sse.ts";
@@ -20,8 +27,11 @@ import {
   keySource,
   runMemoryModel,
   streamReply,
+  writePicturePrompt,
 } from "./claude.ts";
-import { id as checkId, messageId, object, required, text } from "./check.ts";
+import { id as checkId, messageId, object, oneOf, required, text } from "./check.ts";
+import { createCivitai, PICTURE_DEFAULTS, randomSeed } from "./civitai.ts";
+import { loadCivitaiKey } from "./civitaiKey.ts";
 import { createCompanions } from "./companions.ts";
 import { config } from "./config.ts";
 import { join } from "node:path";
@@ -32,6 +42,10 @@ import { memoryBusy, withMemoryLock } from "./memory/lock.ts";
 import { createScheduler } from "./memory/scheduler.ts";
 import { createMemoryService } from "./memory/service.ts";
 import { createMemory } from "./memory/store.ts";
+import { createPictureFiles, PICTURES_DIR } from "./pictures/files.ts";
+import { createPainter } from "./pictures/painter.ts";
+import { sceneRequest, type Scene } from "./pictures/scene.ts";
+import { createPictures, knownFiles } from "./pictures/store.ts";
 import { asParams, promptView } from "./prompt.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
@@ -81,13 +95,38 @@ if (known) {
   }
 }
 
+// Pictures: files in their own folder, made by CivitAI when the server has a key for it.
+const pictureFiles = createPictureFiles();
+{
+  const swept = pictureFiles.sweep(knownFiles(db));
+  if (swept > 0) console.log(`Deleted ${swept} picture file(s) nothing refers to any more`);
+}
+const civitaiKey = loadCivitaiKey();
+const painter = civitaiKey
+  ? createPainter({ db, civitai: createCivitai({ token: civitaiKey.token }), files: pictureFiles })
+  : null;
+console.log(
+  painter
+    ? `Pictures: ${PICTURES_DIR}, made by CivitAI (key from ${civitaiKey?.from === "credential" ? "the systemd credential" : "CIVITAI_API_KEY"})`
+    : "Pictures: off, no CivitAI key",
+);
+if (painter) {
+  const resumed = painter.resume();
+  if (resumed > 0) console.log(`Picking up ${resumed} picture(s) the last stop cut short`);
+}
+
 const auth = heimdallAuth();
 
 /** The signed-in person's own companions and chats. Made per request: they hold no state. */
 function ownedBy(req: Request) {
   const { username } = auth.user(req);
   const companions = createCompanions(db, username, config.defaults);
-  return { username, companions, chats: createChats(db, username, companions, config.swipeAsk) };
+  return {
+    username,
+    companions,
+    chats: createChats(db, username, companions, config.swipeAsk),
+    pictures: createPictures(db, username),
+  };
 }
 
 const busy = createBusy();
@@ -153,7 +192,7 @@ app.use("/api", express.json({ limit: "1mb" }));
 app.get("/api/me", auth.me);
 
 app.get("/api/health", (_req, res) => {
-  res.json({ apiKey: hasApiKey(), defaults: config.defaults } satisfies Health);
+  res.json({ apiKey: hasApiKey(), pictures: painter !== null, defaults: config.defaults } satisfies Health);
 });
 
 // Companions
@@ -164,7 +203,12 @@ app.put("/api/companions/:id", (req: Request, res: Response) => {
   res.json(ownedBy(req).companions.save(checkId(req.params.id), req.body));
 });
 app.delete("/api/companions/:id", (req: Request, res: Response) => {
-  ownedBy(req).companions.remove(checkId(req.params.id));
+  const my = ownedBy(req);
+  const id = checkId(req.params.id);
+  // The rows go with the companion; their files are deleted here.
+  const files = my.pictures.filesOf(id);
+  my.companions.remove(id);
+  for (const file of files) pictureFiles.remove(file);
   res.status(204).end();
 });
 
@@ -391,6 +435,103 @@ app.get("/api/companions/:id/memory/versions/:versionId", (req: Request, res: Re
 });
 app.post("/api/companions/:id/memory/versions/:versionId/revert", async (req: Request, res: Response) => {
   await memoryService.revert(companionOf(req), versionId(req.params.versionId));
+  res.status(204).end();
+});
+
+// Pictures of a companion: a profile picture from its page, a chat picture from a message. Claude
+// writes the prompt, you look it over, and CivitAI makes the picture in the background.
+
+/** CivitAI, or a refusal when the server has no key for it. */
+function needPictures() {
+  return painter ?? invalid("This Valhalla 2 has no CivitAI key, so it can't make pictures");
+}
+
+/** The chat and message a chat picture is of, checked against the companion. */
+function sceneOf(req: Request, companion: Companion, body: Record<string, unknown>) {
+  const my = ownedBy(req);
+  const chat = my.chats.get(checkId(body.chatId));
+  if (chat.companionId !== companion.id) invalid("That chat is with another companion");
+  const tree = my.chats.tree(chat.id);
+  const at = messageId(body.messageId);
+  tree.get(at);
+  return { chat, messageId: at, path: tree.pathTo(at) };
+}
+
+app.post("/api/companions/:id/pictures/prompt", async (req: Request, res: Response) => {
+  needPictures();
+  const companion = companionOf(req);
+  const body = object(req.body);
+  const kind = oneOf<PictureKind>(body.kind, PICTURE_KINDS, "The kind of picture");
+  const hint = body.hint === undefined ? "" : text(body.hint, LIMITS.pictureHint, "The note");
+  const scene: Scene = kind === "profile" ? { kind } : { kind, path: sceneOf(req, companion, body).path };
+  const draft = await writePicturePrompt(
+    sceneRequest(companion, scene, hint, config.pictures.recent),
+    config.pictures.promptModel,
+  );
+  res.json(draft satisfies PictureDraftReply);
+});
+
+app.post("/api/companions/:id/pictures", (req: Request, res: Response) => {
+  const paint = needPictures();
+  const companion = companionOf(req);
+  const body = object(req.body);
+  const kind = oneOf<PictureKind>(body.kind, PICTURE_KINDS, "The kind of picture");
+  const from = kind === "chat" ? sceneOf(req, companion, body) : null;
+  const orientation = oneOf<Orientation>(body.orientation, ORIENTATIONS, "The orientation");
+  const picture = ownedBy(req).pictures.create({
+    id: randomUUID(),
+    companionId: companion.id,
+    kind,
+    chatId: from?.chat.id ?? null,
+    messageId: from?.messageId ?? null,
+    prompt: required(body.prompt, LIMITS.picturePrompt, "The prompt"),
+    negativePrompt: text(body.negativePrompt ?? "", LIMITS.picturePrompt, "The negative prompt"),
+    orientation,
+    caption: text(body.caption ?? "", LIMITS.pictureCaption, "The caption"),
+    params: {
+      model: config.pictures.model,
+      ...PICTURE_SIZES[orientation],
+      ...PICTURE_DEFAULTS,
+      seed: randomSeed(),
+    },
+  });
+  void paint.paint(picture.id, null);
+  res.status(201).json(picture);
+});
+
+app.get("/api/companions/:id/pictures", (req: Request, res: Response) => {
+  const companion = companionOf(req);
+  res.json(ownedBy(req).pictures.of(companion.id));
+});
+
+app.get("/api/pictures/:id", (req: Request, res: Response) => {
+  res.json(ownedBy(req).pictures.get(checkId(req.params.id)));
+});
+
+// The picture itself, from disk, to its owner only. It never changes: a new picture is a new id.
+app.get("/api/pictures/:id/file", (req: Request, res: Response) => {
+  const file = ownedBy(req).pictures.fileOf(checkId(req.params.id));
+  if (!file) return void res.status(404).json({ error: "That picture isn't ready" } satisfies ApiError);
+  res.sendFile(
+    pictureFiles.path(file),
+    {
+      cacheControl: false,
+      headers: {
+        "Content-Security-Policy": "default-src 'none'; sandbox",
+        "X-Content-Type-Options": "nosniff",
+        "Cache-Control": "private, max-age=31536000, immutable",
+      },
+    },
+    (err) => {
+      // Its file is gone (deleted by hand, say), or the download was cut off.
+      if (err && !res.headersSent) res.status(404).json({ error: "No such picture" } satisfies ApiError);
+    },
+  );
+});
+
+app.delete("/api/pictures/:id", (req: Request, res: Response) => {
+  const file = ownedBy(req).pictures.remove(checkId(req.params.id));
+  if (file) pictureFiles.remove(file);
   res.status(204).end();
 });
 

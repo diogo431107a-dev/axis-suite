@@ -151,6 +151,35 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE chats ADD COLUMN window_start INTEGER;
     `);
   },
+  // v3: pictures of a companion. The image itself is a file in <STATE_DIRECTORY>/pictures, named
+  // in `file`; the row says what it is, who it belongs to, and how it was made.
+  (db) => {
+    db.exec(`
+      CREATE TABLE pictures (
+        id              TEXT PRIMARY KEY,
+        companion_id    TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+        kind            TEXT NOT NULL CHECK (kind IN ('profile', 'chat')),
+        -- What a chat picture was made from. A deleted chat leaves its pictures in the gallery.
+        chat_id         TEXT REFERENCES chats(id) ON DELETE SET NULL,
+        message_id      INTEGER REFERENCES messages(id) ON DELETE SET NULL,
+        prompt          TEXT NOT NULL,
+        negative_prompt TEXT NOT NULL,
+        orientation     TEXT NOT NULL,
+        caption         TEXT NOT NULL,
+        params          TEXT NOT NULL,                -- JSON: PictureParams
+        status          TEXT NOT NULL DEFAULT 'working' CHECK (status IN ('working', 'done', 'failed')),
+        workflow_id     TEXT,                         -- CivitAI's id for it, once asked for
+        error           TEXT,
+        file            TEXT,                         -- <id>.<png|jpg|webp>, once done
+        bytes           INTEGER,
+        created_at      TEXT NOT NULL,
+        finished_at     TEXT
+      );
+      CREATE INDEX pictures_companion ON pictures (companion_id, created_at);
+      CREATE INDEX pictures_message ON pictures (message_id);
+      CREATE INDEX pictures_chat ON pictures (chat_id);
+    `);
+  },
 ];
 
 /**

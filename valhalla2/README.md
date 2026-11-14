@@ -23,7 +23,9 @@ signed in there sees their own companions and chats and nobody else's.
 | Address  | `https://valhalla2.<domain>`; https://localhost:8458 in WSL; port 5188 in `pnpm dev`  |
 
 Like Valhalla and Fafnir, Valhalla 2 calls outside the suite: every message goes to
-`api.anthropic.com`, on the server's API key, which whoever runs the suite pays for.
+`api.anthropic.com`, on the server's API key, which whoever runs the suite pays for. Pictures, when
+you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
+pays in Buzz.
 
 ## Minimum interference
 
@@ -130,6 +132,30 @@ held, a window's worth at a time — for when memory went wrong, a better memory
 you rewrote its instructions. The current files stay in place until it finishes and stay in each
 file's history after; if any step fails, nothing changes.
 
+## Pictures
+
+A picture of the moment, or of the companion. Under any message, the picture button asks Claude
+(`PICTURE_PROMPT_MODEL`, Sonnet 5.5) to read the profile and the last 20 messages of the path up to
+that one, and write a prompt for the image model: who is there and what they look like, what they
+are doing, the place, the light. Where the chat is vague, it invents. Nothing runs on ordinary
+replies; a prompt costs a cent or two, and only when you ask.
+
+The prompt opens in a dialog for you to change, with a note for Claude ("at sunset", "from
+behind") if you want it written again. **Make the picture** sends it to CivitAI, which makes it on
+the WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) at 30 steps and CFG 7, at a size SDXL was
+trained on for the shape Claude chose. It takes a few seconds to a minute; the picture appears under
+its message when it is done, only on that branch of the chat.
+
+Each companion's **Pictures** page, from its own page, has two shelves: **Profile pictures**, made
+there from the profile alone, and **Chat pictures**, each naming the chat it came from. Any picture
+can be opened full size, made again from the same prompt with a new seed, or deleted. How Claude
+writes the prompts is one of the companion's own texts, **Picture instructions**, which you can
+rewrite like the others.
+
+Pictures are files on the server's disk, read from there each time they are shown. A deleted chat
+leaves its pictures in the gallery; a deleted companion takes its pictures with it. Without a
+CivitAI key Valhalla 2 works as before and offers no new pictures.
+
 ## When the API declines a turn
 
 The current models run **Anthropic's safety classifiers** on every request. They are part of the
@@ -199,6 +225,12 @@ it in `data/secret.env`, which git ignores and the installer never copies:
 echo 'ANTHROPIC_API_KEY=<your key>' > valhalla2/data/secret.env
 ```
 
+For pictures, add the CivitAI key on a line of its own in the same file:
+
+```bash
+echo 'CIVITAI_API_KEY=<your key>' >> valhalla2/data/secret.env
+```
+
 If you have signed in with `ant auth login` instead, leave it out: the SDK finds that profile by
 itself. The key is read by the server process and never reaches the browser.
 
@@ -212,21 +244,24 @@ pnpm --filter valhalla2 smoke   # one real chat, then its memory, against the AP
 Set in `dev.env` for development and in `deploy/valhalla2.service` on a server. Every one has a
 default.
 
-| Variable                     | Default             | What it does                                                      |
-| ---------------------------- | ------------------- | ----------------------------------------------------------------- |
-| `CHAT_MODEL`                 | `claude-opus-5-5`   | The model a new companion answers with. Each can change it.       |
-| `MEMORY_MODEL`               | `claude-sonnet-5-5` | The model a new companion keeps its memory with. Each can change. |
-| `VALHALLA_SWIPE_ASK`         | `5`                 | Swipes on one reply before asking why they aren't working.        |
-| `VALHALLA_WINDOW_TOKENS`     | `20000`             | About how many tokens of a chat are sent each turn.               |
-| `VALHALLA_WINDOW_CHUNK`      | `10`                | How many exchanges slide out at once when a chat outgrows that.   |
-| `VALHALLA_IDLE_MINUTES`      | `30`                | How long a chat is quiet before it is folded into memory.         |
-| `VALHALLA_MEMORY_FILE_KB`    | `8`                 | The largest a memory file may be.                                 |
-| `VALHALLA_MEMORY_STORY_KB`   | `16`                | The largest `story/recent.md` and `story/arcs.md` may be.         |
-| `VALHALLA_MEMORY_FILES`      | `20`                | How many memory files a companion may have.                       |
-| `VALHALLA_MEMORY_ITERATIONS` | `16`                | The most requests one run of the memory model may make.           |
-| `VALHALLA_CLEANUP_EVERY`     | `10`                | Consolidations between two tidy-ups of a companion's memory.      |
-| `VALHALLA_CLEANUP_DAYS`      | `7`                 | …or days, if memory changed at all in that time.                  |
-| `VALHALLA_BACKUPS_KEPT`      | `14`                | How many daily backups of the database are kept.                  |
+| Variable                     | Default                                          | What it does                                                      |
+| ---------------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
+| `CHAT_MODEL`                 | `claude-opus-5-5`                                | The model a new companion answers with. Each can change it.       |
+| `MEMORY_MODEL`               | `claude-sonnet-5-5`                              | The model a new companion keeps its memory with. Each can change. |
+| `VALHALLA_SWIPE_ASK`         | `5`                                              | Swipes on one reply before asking why they aren't working.        |
+| `VALHALLA_WINDOW_TOKENS`     | `20000`                                          | About how many tokens of a chat are sent each turn.               |
+| `VALHALLA_WINDOW_CHUNK`      | `10`                                             | How many exchanges slide out at once when a chat outgrows that.   |
+| `VALHALLA_IDLE_MINUTES`      | `30`                                             | How long a chat is quiet before it is folded into memory.         |
+| `VALHALLA_MEMORY_FILE_KB`    | `8`                                              | The largest a memory file may be.                                 |
+| `VALHALLA_MEMORY_STORY_KB`   | `16`                                             | The largest `story/recent.md` and `story/arcs.md` may be.         |
+| `VALHALLA_MEMORY_FILES`      | `20`                                             | How many memory files a companion may have.                       |
+| `VALHALLA_MEMORY_ITERATIONS` | `16`                                             | The most requests one run of the memory model may make.           |
+| `VALHALLA_CLEANUP_EVERY`     | `10`                                             | Consolidations between two tidy-ups of a companion's memory.      |
+| `VALHALLA_CLEANUP_DAYS`      | `7`                                              | …or days, if memory changed at all in that time.                  |
+| `VALHALLA_BACKUPS_KEPT`      | `14`                                             | How many daily backups of the database are kept.                  |
+| `PICTURE_MODEL`              | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                 |
+| `PICTURE_PROMPT_MODEL`       | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                         |
+| `VALHALLA_PICTURE_MESSAGES`  | `20`                                             | How many messages it reads, up to the one being pictured.         |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 
@@ -240,6 +275,10 @@ A message is stored exactly as the API returned it, thinking blocks included. A 
 it deleted, and an edit keeps the earlier words beside the new ones. A companion's memory files,
 every version of them, every run of the memory model and every command it made are in the same
 file, and go with the companion when it is deleted.
+
+Pictures are files beside it, in `pictures/` (`/var/lib/private/valhalla2/pictures` on a server),
+one per picture; the database says whose each one is and how it was made. Files nothing refers to
+any more are deleted when Valhalla 2 starts.
 
 ## Things the current API decides, not Valhalla 2
 
@@ -281,7 +320,6 @@ because people pause, and a cold cache costs twenty times a warm one.
 ## Not here yet
 
 - **Scenes** — the frame a chat sits in, reusable across companions.
-- **Images** — appearance is text that feeds the prompt.
 
 ## How it is built
 
@@ -299,6 +337,8 @@ One module holding both halves, like the rest of the suite.
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
+| `server/civitai.ts`    | the only file that talks to CivitAI; `civitaiKey.ts` finds its key                                                                                                                                                                                                       |
+| `server/pictures/`     | pictures: what Claude reads to picture a scene (`scene.ts`), the rows (`store.ts`), the files (`files.ts`), and making them in the background (`painter.ts`)                                                                                                             |
 | `server/claude.ts`     | the only file that talks to the Claude API                                                                                                                                                                                                                               |
 | `server/busy.ts`       | one reply at a time per chat                                                                                                                                                                                                                                             |
 | `server/index.ts`      | the routes and sign-in                                                                                                                                                                                                                                                   |
@@ -324,6 +364,13 @@ sudo bash deploy/install.sh valhalla2
 To change the key, run the first line again, then `sudo systemctl restart valhalla2`. It is not named
 `valhalla2.key` on purpose: for that name the installer would write a random key of its own.
 
+**The CivitAI key goes beside it, the same way**, and has to exist before the service starts, even
+if it is empty (an empty file means no pictures):
+
+```
+read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-civitai.key && unset KEY
+```
+
 Everyone who can sign in to Heimdall can talk to companions on this key, so give the suite a key of
 its own and set a monthly spend limit for it in the Claude Console.
 
@@ -339,6 +386,13 @@ can read them:
 
 ```
 sudo install -m 600 -o "$USER" /var/lib/private/valhalla2/backups/valhalla2-$(date +%F).db ~/
+```
+
+**The daily backups don't hold the pictures**, only the database that lists them. To keep them,
+copy the folder elsewhere now and then:
+
+```
+sudo tar -czf ~/valhalla2-pictures-$(date +%F).tar.gz -C /var/lib/private/valhalla2 pictures && sudo chown "$USER" ~/valhalla2-pictures-*.tar.gz
 ```
 
 To go back to one: stop the service, put the copy in place of `valhalla2.db`, start it again.

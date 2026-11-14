@@ -37,6 +37,14 @@ export const config = {
   cleanup: { every: count("VALHALLA_CLEANUP_EVERY", 10), days: count("VALHALLA_CLEANUP_DAYS", 7) },
   /** How many daily backups of the database are kept. */
   backupsKept: count("VALHALLA_BACKUPS_KEPT", 14),
+  pictures: {
+    /** The CivitAI model that makes pictures, as an AIR. */
+    model: modelFrom("PICTURE_MODEL", "urn:air:sdxl:checkpoint:civitai:827184@2883731"),
+    /** The Claude model that writes a picture's prompt. */
+    promptModel: modelFrom("PICTURE_PROMPT_MODEL", "claude-sonnet-5-5"),
+    /** How many messages before the chosen one Claude reads to picture it. */
+    recent: count("VALHALLA_PICTURE_MESSAGES", 20),
+  },
 };
 
 /** The size limits of a companion's memory. */
