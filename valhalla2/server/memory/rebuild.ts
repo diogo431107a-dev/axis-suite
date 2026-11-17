@@ -3,14 +3,15 @@
 // For when the memory went wrong, or a better memory model is out, or the instructions changed:
 // the files start again from their seeds, in a space of their own, and every chat's selected path
 // (deleted messages excluded) is replayed through the memory model in the order the chats were
-// held, a window's worth at a time, with the chat's mode and the reasons you gave for rejecting
-// replies. The old memory is untouched until the very end, when the new one replaces it in one
+// held, a window's worth at a time, with the chat's mode, the reasons you gave for rejecting
+// replies and the praise you gave liked ones. The old memory is untouched until the very end, when the new one replaces it in one
 // transaction, each changed file recorded as a `rebuild` version — so the old one is still in the
 // history. If any step fails, nothing changes.
 import type { ChatMode, Companion, Message, RunOutcome } from "../../shared/protocol.ts";
 import { CONSOLIDATION_MODES, promptOf, REBUILD_NOTE } from "../../shared/prompts.ts";
 import { createTree } from "../chat/tree.ts";
 import { transaction } from "../db.ts";
+import { allPraise, forgetFiled, markFiled, type Praise } from "../likes.ts";
 import { promptFor } from "./consolidate.ts";
 import { tokensOf } from "./history.ts";
 import { withMemoryLock } from "./lock.ts";
@@ -46,7 +47,7 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
       .prepare("SELECT id, title, mode FROM chats WHERE companion_id = ? ORDER BY created_at, id")
       .all(companion.id) as { id: string; title: string; mode: ChatMode }[];
     const steps: Extract<Awaited<ReturnType<typeof runStep>>, { ok: true }>[] = [];
-    const filed: { chatId: string; ids: number[]; feedback: number[] }[] = [];
+    const filed: { chatId: string; ids: number[]; feedback: number[]; praise: Praise[] }[] = [];
 
     for (const chat of chats) {
       const path = createTree(db, chat.id).activePath();
@@ -56,6 +57,7 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
           "SELECT id, parent_id, reason FROM swipe_feedback WHERE chat_id = ? AND reason IS NOT NULL ORDER BY id",
         )
         .all(chat.id) as { id: number; parent_id: number | null; reason: string }[];
+      const praise = allPraise(db, chat.id, new Set(path.map((message) => message.id)));
       const parts = partsOf(path, deps.partTokens);
       for (const [at, part] of parts.entries()) {
         const last = at === parts.length - 1;
@@ -73,6 +75,7 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
             fresh: part,
             corrections: [],
             feedback: last ? feedback : [],
+            praise: last ? praise : [],
             modeChanged: false,
             needed: true,
           }),
@@ -86,7 +89,12 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
         finishRun(db, step);
         steps.push(step);
       }
-      filed.push({ chatId: chat.id, ids: path.map((message) => message.id), feedback: feedback.map((row) => row.id) });
+      filed.push({
+        chatId: chat.id,
+        ids: path.map((message) => message.id),
+        feedback: feedback.map((row) => row.id),
+        praise,
+      });
     }
 
     const at = new Date().toISOString();
@@ -97,12 +105,14 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
         db.prepare("UPDATE messages SET consolidated_at = NULL, needs_correction = 0 WHERE chat_id = ?").run(chat.id);
         db.prepare("UPDATE swipe_feedback SET consolidated_at = NULL WHERE chat_id = ?").run(chat.id);
         db.prepare("UPDATE chats SET consolidated_mode = mode, memory_snapshot = NULL WHERE id = ?").run(chat.id);
+        forgetFiled(db, chat.id);
       }
       const mark = db.prepare("UPDATE messages SET consolidated_at = ? WHERE id = ?");
       const markFeedback = db.prepare("UPDATE swipe_feedback SET consolidated_at = ? WHERE id = ?");
       for (const chat of filed) {
         for (const id of chat.ids) mark.run(at, id);
         for (const id of chat.feedback) markFeedback.run(at, id);
+        markFiled(db, chat.praise, at);
       }
     });
     const summary =

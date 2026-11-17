@@ -11,6 +11,7 @@ import {
 import { id as checkId, object, oneOf, text } from "../check.ts";
 import type { Companions } from "../companions.ts";
 import { conflict, notFound, tooMany } from "../errors.ts";
+import { likedAmong } from "../likes.ts";
 import { hasPending } from "../memory/consolidate.ts";
 import { picturesOn } from "../pictures/store.ts";
 import { pinnedAmong } from "../pins.ts";
@@ -144,6 +145,7 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
         memoryPending: hasPending(db, id),
         pictures: picturesOn(db, id, onPath),
         pinned: pinnedAmong(db, id, onPath),
+        liked: likedAmong(db, id, onPath),
       };
     },
 

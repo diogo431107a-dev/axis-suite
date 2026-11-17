@@ -36,7 +36,15 @@ export const LIMITS = {
   pinSpeaker: 80,
   /** How many moments one companion keeps pinned. Every one is sent in every chat. */
   pins: 30,
+  /** What you say you liked about a reply. */
+  likeComment: 1_000,
 } as const;
+
+/** A reply you liked, as the chat page shows it. A null comment: liked only for you. */
+export interface Liked {
+  messageId: number;
+  comment: string | null;
+}
 
 /**
  * A moment you pinned: words from a chat kept exactly as they are, and sent in every chat with the
@@ -328,6 +336,8 @@ export interface ChatPage {
   pictures: Picture[];
   /** The messages on the selected path with something pinned from them. */
   pinned: number[];
+  /** The replies on the selected path you liked, with what you said about them. */
+  liked: Liked[];
 }
 
 /** One of a companion's memory files, as the list shows it. */

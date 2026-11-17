@@ -4,6 +4,17 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Like a reply.** Under every reply from the companion, a heart likes it, and a small box opens
+  under it asking what made it good. Saying is optional. With a comment, the like is praise: the
+  memory model reads it at its next run and keeps what you liked in `feedback.md`, so later chats
+  do more of it. Up to now memory only learned from the replies you rejected. Without a comment,
+  the like is just for you, and nothing is sent anywhere. A like is never added to the chat itself,
+  so it doesn't change the next reply or what it costs. Tap the heart again to change the comment
+  or unlike; memory is told when praise it already has is taken back. The line that tells the
+  memory model how to use praise is part of the default **Memory-keeping instructions**: a
+  companion whose instructions you rewrote still gets the praise, but not that line, unless you
+  add it.
+
 ## 0.0.10 — 2026-11-14
 
 - **Copy a message.** Under every message, a copy button puts its words on the clipboard; it shows

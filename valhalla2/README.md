@@ -66,22 +66,45 @@ used straight away. (The number is `VALHALLA_SWIPE_ASK`, below.)
 Each chat is **canon** (part of your story together) or a **one-shot** (a standalone scenario). You
 choose when you open it, and can change it later; memory treats the two differently (below).
 
+## Liking a reply
+
+Swipes tell memory what didn't work; a like tells it what did. The heart under a companion's reply
+likes it at once and opens a box asking what made it good. There is no dislike: a swipe, with its
+reason, already is one.
+
+- **With a comment**, the like is praise. The memory model reads it at its next run, beside the
+  reasons you gave for rejecting replies, and keeps what it shows as "what to keep doing" in
+  `feedback.md`, in general terms rather than as a quote. It never goes into the chat's own
+  messages, so the next reply, the cache and the companion's earlier thinking are untouched; it
+  reaches the companion when a chat next takes a fresh look at memory.
+- **Without one**, the like is only for you: it is kept and shown, and nothing is sent anywhere.
+- **It keeps the words you liked.** Edit the reply later and the praise is still about what it said
+  then. The memory model also sees up to three of the reply's other versions, so it can tell what
+  you chose over what. Liking a version you then swipe away is fine: the memory model is told it
+  is not on the selected path, and takes the writing from it, never facts or events.
+- **Taking it back.** Change the comment, remove it, unlike, or delete the reply, and the memory
+  model is told what it was told before, so it can take back what came only from that.
+- **It is not a pin.** The memory model rewrites praise in its own words. For words that must stay
+  exactly as they were said, pin them.
+
+The comment shows in small print under the reply; tap the heart again to change it or unlike.
+
 ## Memory
 
 Every chat with a companion feeds one memory, so the companion stays the same person with a growing
 history, without the old chats being sent again. It is a handful of Markdown files, which you can
 read, edit and put back on the companion's **Memory** page:
 
-| File                 | What it holds                                                                                         |
-| -------------------- | ----------------------------------------------------------------------------------------------------- |
-| `character_canon.md` | what the character has established about herself beyond the profile: backstory, tastes, habits, scars |
-| `relationship.md`    | how the bond has changed, nicknames, inside jokes, rituals, promises, where things stand              |
-| `user.md`            | the real person behind the persona: real-life facts only                                              |
-| `feedback.md`        | standing requests about how the character writes or behaves, and patterns in rejected replies         |
-| `open_threads.md`    | unresolved plot hooks, and real-life things to ask about later                                        |
-| `world.md`           | places, recurring characters, owned items, lore                                                       |
-| `story/recent.md`    | 3–6 line summaries of the latest canon chats                                                          |
-| `story/arcs.md`      | older history, condensed into arcs                                                                    |
+| File                 | What it holds                                                                                           |
+| -------------------- | ------------------------------------------------------------------------------------------------------- |
+| `character_canon.md` | what the character has established about herself beyond the profile: backstory, tastes, habits, scars   |
+| `relationship.md`    | how the bond has changed, nicknames, inside jokes, rituals, promises, where things stand                |
+| `user.md`            | the real person behind the persona: real-life facts only                                                |
+| `feedback.md`        | standing requests about how the character writes or behaves, and patterns in rejected and liked replies |
+| `open_threads.md`    | unresolved plot hooks, and real-life things to ask about later                                          |
+| `world.md`           | places, recurring characters, owned items, lore                                                         |
+| `story/recent.md`    | 3–6 line summaries of the latest canon chats                                                            |
+| `story/arcs.md`      | older history, condensed into arcs                                                                      |
 
 **Only the memory model writes it**, never a chat. A reply can be swiped away, edited, deleted or
 left behind on another branch, so if replies wrote memory, a rejected one could leave invented
@@ -96,7 +119,8 @@ reads the chat's **selected path** afterwards and updates the files with the mem
 
 It gets what is new on the path, what was **edited, deleted or left on another branch** since it
 last ran (with what replaced it, so it can take back what came only from that), and your reasons for
-rejecting replies; it folds a reason into `feedback.md` only when it is a lasting preference. A
+rejecting replies and your praise for liked ones; it folds a reason into `feedback.md` only when it
+is a lasting preference. A
 **one-shot** chat may not touch `world.md` or `story/`: its events aren't part of the story, but what
 it shows about the two of you is kept. It works on a copy of the files, swapped in whole when it
 finishes; a run that is declined, fails or runs out of steps changes nothing and is tried again
@@ -382,6 +406,7 @@ One module holding both halves, like the rest of the suite.
 | `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation, tidy-ups and rebuilds (`consolidate.ts`, `cleanup.ts`, `rebuild.ts`, `run.ts`) and when they run (`scheduler.ts`) |
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
 | `server/pins.ts`       | pinned moments: kept word for word, sent after memory, and the chats that must look again                                                                                                                                                                                |
+| `server/likes.ts`      | liked replies: the words as they were liked, and the praise memory hasn't heard of yet, or must take back                                                                                                                                                                |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
 | `server/speech/`       | reading aloud: the only file that talks to Azure (`azure.ts`), what is read (`text.ts`), its key (`key.ts`), and the kept audio (`store.ts`)                                                                                                                             |
