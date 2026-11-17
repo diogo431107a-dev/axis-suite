@@ -6,7 +6,9 @@ import type { Tree } from "../chat/tree.ts";
 import type { MemoryRunRequest, MemoryRunResult, MemoryRunner } from "../claude.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
+import { createLikes } from "../likes.ts";
 import { consolidate, hasPending } from "./consolidate.ts";
+import { rebuild } from "./rebuild.ts";
 import { windowFor } from "./history.ts";
 import { peekSnapshot, snapshotFor } from "./inject.ts";
 import { createScheduler } from "./scheduler.ts";
@@ -177,6 +179,57 @@ describe("consolidation", () => {
     put(tree, greeting, "user", "Hi.");
     await consolidate(deps, "chat-0001", companion);
     expect(model.asked[1]!.prompt).not.toContain("Too formal");
+  });
+
+  it("passes on praise for liked replies once, again when it changes, and when it is taken back", async () => {
+    const { db, companion, chats, memory, tree } = setup();
+    const likes = createLikes(db, chats);
+    const greeting = put(tree, null, "assistant", "Welcome.");
+    const mine = put(tree, greeting, "user", "Hello.");
+    const passed = put(tree, mine, "assistant", "Good day to you.");
+    const liked = put(tree, mine, "assistant", "*raises an eyebrow* You again?");
+    const model = scriptedModel(() => []);
+    const deps = { db, memory, limits: LIMITS, run: model.run, maxIterations: 8 };
+    await consolidate(deps, "chat-0001", companion);
+    expect(model.asked[0]!.prompt).not.toContain("<praise>");
+
+    // A like without a comment is yours alone.
+    likes.like("chat-0001", liked);
+    expect(hasPending(db, "chat-0001")).toBe(false);
+
+    likes.like("chat-0001", liked, "The dry teasing.");
+    likes.like("chat-0001", passed, "Polite, for once.");
+    expect(hasPending(db, "chat-0001")).toBe(true);
+    await consolidate(deps, "chat-0001", companion);
+    const praise = model.asked[1]!.prompt;
+    expect(praise).toContain("<praise>\nThe user liked these replies");
+    expect(praise).toContain('"*raises an eyebrow* You again?"\n  The user said: "The dry teasing."');
+    expect(praise).toContain('Another version of it: "Good day to you."');
+    expect(praise).toContain("not on the selected path: it is about the writing only");
+    expect(hasPending(db, "chat-0001")).toBe(false);
+
+    likes.like("chat-0001", liked, "The dry teasing and the eyebrow.");
+    likes.unlike("chat-0001", passed);
+    await consolidate(deps, "chat-0001", companion);
+    const changed = model.asked[2]!.prompt;
+    expect(changed).toContain('Before, the user had said: "The dry teasing."');
+    expect(changed).toContain(
+      '<withdrawn_praise>\nThe user took back this praise. Remove what came only from it.\n- "Polite, for once."',
+    );
+    expect(hasPending(db, "chat-0001")).toBe(false);
+  });
+
+  it("gives praise to a rebuild, and leaves nothing pending after it", async () => {
+    const { db, companion, chats, memory, tree } = setup();
+    const likes = createLikes(db, chats);
+    const greeting = put(tree, null, "assistant", "Welcome, cup-bearer.");
+    likes.like("chat-0001", greeting, "A queen's welcome.");
+    const model = scriptedModel(() => []);
+    const deps = { db, memory, limits: LIMITS, run: model.run, maxIterations: 8 };
+    await consolidate(deps, "chat-0001", companion);
+    await rebuild({ ...deps, partTokens: 20_000 }, companion);
+    expect(model.asked[1]!.prompt).toContain('A greeting the user liked:\n  "Welcome, cup-bearer."');
+    expect(hasPending(db, "chat-0001")).toBe(false);
   });
 
   it("keeps a one-shot chat out of the story", async () => {

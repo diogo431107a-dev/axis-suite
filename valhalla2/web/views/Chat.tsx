@@ -10,6 +10,7 @@ import {
   Copy,
   Eye,
   GitBranch,
+  Heart,
   ImagePlus,
   LoaderCircle,
   MessageSquareReply,
@@ -212,6 +213,56 @@ function AskWhy({
   );
 }
 
+/**
+ * Under a reply you just liked, or one you liked before: what made it good, if you want to say.
+ * Only a comment reaches the companion, through the memory model; without one the like is yours.
+ */
+function LikeNote({
+  comment,
+  companionName,
+  onSave,
+  onUnlike,
+  onClose,
+  disabled,
+}: {
+  comment: string | null;
+  companionName: string;
+  onSave: (comment: string) => void;
+  onUnlike: () => void;
+  onClose: () => void;
+  disabled: boolean;
+}) {
+  const [said, setSaid] = useState(comment ?? "");
+  const changed = said.trim() !== (comment ?? "");
+  return (
+    <div className="mt-2 space-y-2 rounded border border-dashed border-accent/60 bg-sheet/50 p-3">
+      <p className="text-sm">Liked. What made it good? (optional)</p>
+      <textarea
+        className={`${inputStyle} min-h-16 resize-y`}
+        value={said}
+        maxLength={LIMITS.likeComment}
+        placeholder="The dodged question, the slow build-up, the dry humour…"
+        onChange={(e) => setSaid(e.target.value)}
+      />
+      <p className="text-xs text-faint">
+        Only a comment reaches {companionName}: the memory model reads it at its next run and keeps what you liked.
+        Without one, the like is just for you. For words that must stay exactly as they were said, pin them instead.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button kind="strong" onClick={() => onSave(said.trim())} disabled={disabled || !changed}>
+          {said.trim() || !comment ? "Save" : "Remove the comment"}
+        </Button>
+        <Button kind="quiet" onClick={onClose} disabled={disabled}>
+          {comment ? "Keep it as it is" : "Just like it"}
+        </Button>
+        <Button kind="quiet" onClick={onUnlike} disabled={disabled}>
+          Unlike
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const { reload, open, health } = usePage();
   const [page, setPage] = useState<ChatPage | null>(null);
@@ -225,6 +276,8 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const [error, setError] = useState("");
   const [editing, setEditing] = useState<{ id: number; text: string } | null>(null);
   const [deleting, setDeleting] = useState<number | null>(null);
+  /** The liked reply whose comment box is open. */
+  const [noting, setNoting] = useState<number | null>(null);
   /** The message just copied, which shows a check mark for a moment. */
   const [copied, setCopied] = useState<number | null>(null);
   /** The message something is being pinned from. */
@@ -434,6 +487,8 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
     const text = textOf(message);
     const refused = message.reply?.stopReason === "refusal";
     const pictures = page.pictures.filter((picture) => picture.messageId === message.id);
+    const like = page.liked.find((entry) => entry.messageId === message.id);
+    const likePath = `/api/chats/${id}/messages/${message.id}/like`;
 
     return (
       <article key={message.id} className={mine ? "pl-6 sm:pl-16" : "pr-6 sm:pr-16"}>
@@ -519,6 +574,22 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
               {copied === message.id ? <Check size={14} /> : <Copy size={14} />}
             </IconButton>
           ) : null}
+          {!mine && text.trim() && !refused ? (
+            <IconButton
+              label={like ? "Liked. Change the comment or unlike" : "Like"}
+              disabled={busy}
+              onClick={() => {
+                if (noting === message.id) {
+                  setNoting(null);
+                  return;
+                }
+                if (!like) void change(likePath, "PUT", {});
+                setNoting(message.id);
+              }}
+            >
+              <Heart size={14} className={like ? "fill-current text-accent" : undefined} />
+            </IconButton>
+          ) : null}
           {text && !refused ? (
             <IconButton
               label={
@@ -598,6 +669,20 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             </IconButton>
           )}
         </div>
+
+        {like && noting === message.id ? (
+          <LikeNote
+            key={`${message.id}:${like.comment ?? ""}`}
+            comment={like.comment}
+            companionName={companion.name}
+            disabled={busy}
+            onSave={(comment) => void change(likePath, "PUT", { comment: comment || null }).then(() => setNoting(null))}
+            onUnlike={() => void change(likePath, "DELETE").then(() => setNoting(null))}
+            onClose={() => setNoting(null)}
+          />
+        ) : like?.comment ? (
+          <p className="mt-1 text-xs text-faint italic">You liked: “{like.comment}”</p>
+        ) : null}
 
         {pictures.length > 0 ? (
           <div className={`mt-2 flex flex-wrap gap-2 ${mine ? "justify-end" : ""}`}>

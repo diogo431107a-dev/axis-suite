@@ -47,6 +47,7 @@ import { createPictureFiles, PICTURES_DIR } from "./pictures/files.ts";
 import { createPainter } from "./pictures/painter.ts";
 import { sceneRequest, type Scene } from "./pictures/scene.ts";
 import { createPictures, knownFiles } from "./pictures/store.ts";
+import { createLikes } from "./likes.ts";
 import { createPins, pinsOf } from "./pins.ts";
 import { asParams, promptView } from "./prompt.ts";
 import { createAzureSpeech } from "./speech/azure.ts";
@@ -162,6 +163,7 @@ function ownedBy(req: Request) {
     chats,
     pictures: createPictures(db, username),
     pins: createPins(db, username, chats),
+    likes: createLikes(db, chats),
   };
 }
 
@@ -417,6 +419,25 @@ app.post("/api/chats/:id/feedback", (req: Request, res: Response) => {
   const reason =
     body.reason === null || body.reason === undefined ? null : text(body.reason, LIMITS.reason, "The reason") || null;
   my.chats.feedback(id, parentId, reason);
+  res.json(my.chats.page(id));
+});
+
+/**
+ * Likes a reply, `{ comment? }`: with a comment it is praise the memory model reads at its next
+ * run; without one it is only for you. Liking it again changes the comment.
+ */
+app.put("/api/chats/:id/messages/:messageId/like", (req: Request, res: Response) => {
+  const my = ownedBy(req);
+  const id = checkId(req.params.id);
+  my.likes.like(id, messageId(req.params.messageId), req.body === undefined ? undefined : object(req.body).comment);
+  res.json(my.chats.page(id));
+});
+
+/** Takes a like back. */
+app.delete("/api/chats/:id/messages/:messageId/like", (req: Request, res: Response) => {
+  const my = ownedBy(req);
+  const id = checkId(req.params.id);
+  my.likes.unlike(id, messageId(req.params.messageId));
   res.json(my.chats.page(id));
 });
 

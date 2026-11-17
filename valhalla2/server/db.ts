@@ -223,6 +223,28 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       CREATE INDEX pins_message ON pins (message_id);
     `);
   },
+  // v6: liked replies. A like with a comment is praise, passed to the memory model like a rejection
+  // reason; one without is only for you. `text` keeps the reply's words as they were liked, and
+  // `filed_comment` what memory was last told, so a changed or withdrawn like can be taken back.
+  // An unliked row is kept, with `withdrawn_at`, only until memory has heard of it.
+  (db) => {
+    db.exec(`
+      CREATE TABLE likes (
+        id              INTEGER PRIMARY KEY,
+        chat_id         TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+        message_id      INTEGER NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+        text            TEXT NOT NULL,
+        comment         TEXT,                         -- NULL: liked only for you
+        filed_comment   TEXT,                         -- what memory has; NULL: nothing
+        consolidated_at TEXT,
+        withdrawn_at    TEXT,
+        created_at      TEXT NOT NULL,
+        updated_at      TEXT NOT NULL
+      );
+      CREATE UNIQUE INDEX likes_once ON likes (message_id);
+      CREATE INDEX likes_chat ON likes (chat_id);
+    `);
+  },
 ];
 
 /**

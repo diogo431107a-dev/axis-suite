@@ -7,6 +7,7 @@
 //   - the ones that were, but have since been edited, deleted, or left on another branch, with
 //     what took their place, so whatever came only from them can be taken back;
 //   - the reasons you gave for rejecting replies;
+//   - the praise you gave liked replies, and any you took back (see likes.ts);
 //   - the chat's mode, and a note when it changed since the chat was last filed.
 //
 // The model works with the memory tool on a scratch copy of the companion's files. Only when it
@@ -18,6 +19,7 @@ import { blockText, type ChatMode, type Companion, type Message, type RunOutcome
 import { CONSOLIDATION_MODES, promptOf } from "../../shared/prompts.ts";
 import { transaction } from "../db.ts";
 import { createTree } from "../chat/tree.ts";
+import { markFiled, praiseFor, type Praise } from "../likes.ts";
 import { renderFiles } from "./render.ts";
 import { withMemoryLock } from "./lock.ts";
 import type { Memory } from "./store.ts";
@@ -102,10 +104,50 @@ export function pendingFor(db: DatabaseSync, chatId: string) {
     )
     .all(chatId) as { id: number; parent_id: number | null; reason: string }[];
 
+  const praise = praiseFor(db, chatId, onPath);
+
   const modeChanged = chat.consolidated_mode !== null && chat.consolidated_mode !== chat.mode;
   const needed =
-    fresh.length > 0 || corrections.some((c) => c.what !== "restored") || feedback.length > 0 || modeChanged;
-  return { chat, path, fresh, corrections, feedback, modeChanged, needed };
+    fresh.length > 0 ||
+    corrections.some((c) => c.what !== "restored") ||
+    feedback.length > 0 ||
+    praise.length > 0 ||
+    modeChanged;
+  return { chat, path, fresh, corrections, feedback, praise, modeChanged, needed };
+}
+
+const cutShort = (words: string): string => (words.length > 300 ? `${words.slice(0, 300).trimEnd()}…` : words);
+
+/** The praise you gave, and took back, as the memory model reads it. */
+function praiseBlocks(praise: Praise[]): string[] {
+  const parts: string[] = [];
+  const quote = (words: string) => `"${words.replaceAll("\n", "\n  ")}"`;
+  const given = praise.filter((p) => p.kind !== "withdrawn");
+  if (given.length > 0) {
+    const lines = given.map((p) => {
+      const about = p.isGreeting ? "A greeting" : "A reply";
+      const where = p.onPath
+        ? ""
+        : " (a version that is not on the selected path: it is about the writing only, so take no facts or events from it)";
+      const out = [`- ${about} the user liked${where}:`, `  ${quote(p.text)}`, `  The user said: "${p.comment}"`];
+      if (p.kind === "changed") out.push(`  Before, the user had said: "${p.before}"`);
+      for (const other of p.passedOver) out.push(`  Another version of it: ${quote(other)}`);
+      return out.join("\n");
+    });
+    parts.push(
+      "<praise>\nThe user liked these replies and said what made them good: what to keep doing.\n" +
+        `${lines.join("\n")}\n</praise>`,
+    );
+  }
+  const withdrawn = praise.filter((p) => p.kind === "withdrawn");
+  if (withdrawn.length > 0) {
+    const lines = withdrawn.map((p) => `- "${p.before}", about the reply: ${quote(cutShort(p.text))}`);
+    parts.push(
+      "<withdrawn_praise>\nThe user took back this praise. Remove what came only from it.\n" +
+        `${lines.join("\n")}\n</withdrawn_praise>`,
+    );
+  }
+  return parts;
 }
 
 /** Whether a chat has anything memory doesn't have yet. */
@@ -117,7 +159,7 @@ export function promptFor(
   files: ReturnType<Memory["files"]>,
   pending: NonNullable<ReturnType<typeof pendingFor>>,
 ): string {
-  const { chat, path, fresh, corrections, feedback, modeChanged } = pending;
+  const { chat, path, fresh, corrections, feedback, praise, modeChanged } = pending;
   const who = (role: Message["role"]) => (role === "user" ? "USER" : companion.name.toUpperCase());
   const said = (message: Message) => `[${who(message.role)}] ${message.content.map(blockText).join("").trim()}`;
   const parts: string[] = [];
@@ -161,6 +203,7 @@ export function promptFor(
     });
     parts.push(`<rejection_reasons>\n${lines.join("\n")}\n</rejection_reasons>`);
   }
+  parts.push(...praiseBlocks(praise));
   return parts.join("\n\n");
 }
 
@@ -215,6 +258,7 @@ ${CONSOLIDATION_MODES[pending.chat.mode]}`,
       for (const row of pending.feedback) {
         db.prepare("UPDATE swipe_feedback SET consolidated_at = ? WHERE id = ?").run(at, row.id);
       }
+      markFiled(db, pending.praise, at);
       db.prepare("UPDATE chats SET consolidated_mode = mode WHERE id = ?").run(chatId);
       finishRun(db, step, at);
     });
