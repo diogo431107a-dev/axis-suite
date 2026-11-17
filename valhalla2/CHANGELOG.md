@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.12 — 2026-11-17
+
 - **Like a reply.** Under every reply from the companion, a heart likes it, and a small box opens
   under it asking what made it good. Saying is optional. With a comment, the like is praise: the
   memory model reads it at its next run and keeps what you liked in `feedback.md`, so later chats
