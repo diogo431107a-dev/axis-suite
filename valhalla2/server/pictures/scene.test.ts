@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type Companion, type Message } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS } from "../../shared/prompts.ts";
-import { draftOf } from "../claude.ts";
+import { draftOf } from "../claude/pictures.ts";
 import { sceneRequest } from "./scene.ts";
 
 const companion: Companion = {

@@ -8,7 +8,7 @@ import { DEFAULT_SETTINGS, blockText } from "../../shared/protocol.ts";
 import { backUp, backups } from "../backup.ts";
 import { createChats } from "../chat/chats.ts";
 import type { Tree } from "../chat/tree.ts";
-import type { MemoryRunRequest, MemoryRunResult, MemoryRunner } from "../claude.ts";
+import type { MemoryRunRequest, MemoryRunResult, MemoryRunner } from "../claude/memory.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { cleanup, cleanupDue } from "./cleanup.ts";

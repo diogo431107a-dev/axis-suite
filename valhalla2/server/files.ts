@@ -1,23 +1,21 @@
-// The pictures themselves: one file each, in a folder next to the database.
+// Files kept next to the database, one folder per kind: the pictures (pictures/feature.ts) and the
+// audio of replies read aloud (speech/feature.ts).
 //
 //   <STATE_DIRECTORY>/pictures/<id>.<png|jpg|webp>
+//   <STATE_DIRECTORY>/speech/<message id>-<hash>.mp3
 //
-// What each one is and whose it is lives in the database (store.ts). A file is written to
-// <name>.tmp and renamed once complete, so a half-written one is never served.
+// What each one is and whose it is lives in the database. A file is written to <name>.tmp and
+// renamed once complete, so a half-written one is never served.
 import { mkdirSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
-import { join, resolve } from "node:path";
-import { STATE_DIR } from "../db.ts";
+import { join } from "node:path";
 
-/** Next to the database, as an absolute path, which sendFile needs. */
-export const PICTURES_DIR = resolve(STATE_DIR, "pictures");
-
-export function createPictureFiles(dir: string = PICTURES_DIR) {
+export function createFileStore(dir: string) {
   mkdirSync(dir, { recursive: true, mode: 0o700 });
 
   return {
     path: (file: string): string => join(dir, file),
 
-    /** Saves a picture's bytes as `<id>.<ext>` and returns that name. */
+    /** Saves bytes as `<id>.<ext>` and returns that name. */
     write(id: string, ext: string, bytes: Uint8Array): string {
       const file = `${id}.${ext}`;
       const tmp = join(dir, `${file}.tmp`);
@@ -36,8 +34,8 @@ export function createPictureFiles(dir: string = PICTURES_DIR) {
     },
 
     /**
-     * Deletes every file no picture in the database (`known`) names: pictures whose companion was
-     * deleted, and anything a crash left half-written. Returns how many went.
+     * Deletes every file the database (`known`) doesn't name: files whose companion was deleted,
+     * and anything a crash left half-written. Returns how many went.
      */
     sweep(known: ReadonlySet<string>): number {
       let removed = 0;
@@ -51,4 +49,4 @@ export function createPictureFiles(dir: string = PICTURES_DIR) {
   };
 }
 
-export type PictureFiles = ReturnType<typeof createPictureFiles>;
+export type FileStore = ReturnType<typeof createFileStore>;

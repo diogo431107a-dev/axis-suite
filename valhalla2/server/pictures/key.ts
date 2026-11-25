@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// The CivitAI API key, which makes pictures. Like the Claude key (key.ts), it is read here, in the
+// The CivitAI API key, which makes pictures. Like the Claude key (../key.ts), it is read here, in the
 // server process, and never reaches the browser.
 //
 // On a server it is /etc/axis-suite/valhalla2-civitai.key (root-only, put there by hand), which

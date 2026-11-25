@@ -1,5 +1,5 @@
 // What Valhalla 2 knows about each picture: whose it is, what it was made from, and how far along
-// it is. The bytes are files (files.ts); the painter (painter.ts) moves a picture from "working"
+// it is. The bytes are files (../files.ts); the painter (painter.ts) moves a picture from "working"
 // to "done" or "failed".
 import type { DatabaseSync } from "node:sqlite";
 import {

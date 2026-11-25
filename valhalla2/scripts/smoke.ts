@@ -14,7 +14,8 @@
 import { DEFAULT_SETTINGS, blockText, type Message } from "../shared/protocol.ts";
 import { createChats } from "../server/chat/chats.ts";
 import { generate, send, type TurnContext } from "../server/chat/turn.ts";
-import { runMemoryModel, streamReply } from "../server/claude.ts";
+import { runMemoryModel } from "../server/claude/memory.ts";
+import { streamReply } from "../server/claude/reply.ts";
 import { config } from "../server/config.ts";
 import { consolidate } from "../server/memory/consolidate.ts";
 import { createMemory } from "../server/memory/store.ts";

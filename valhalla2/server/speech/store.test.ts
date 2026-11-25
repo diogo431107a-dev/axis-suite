@@ -7,7 +7,7 @@ import { createChats } from "../chat/chats.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { StoreError } from "../errors.ts";
-import { createPictureFiles } from "../pictures/files.ts";
+import { createFileStore } from "../files.ts";
 import type { AzureSpeech } from "./azure.ts";
 import {
   charsThisMonth,
@@ -39,7 +39,7 @@ function setup(voice = "en-US-AvaMultilingualNeural") {
 
   const dir = mkdtempSync(join(tmpdir(), "valhalla2-speech-"));
   made.push(dir);
-  const files = createPictureFiles(dir);
+  const files = createFileStore(dir);
   const read: string[] = [];
   const azure: AzureSpeech = {
     synthesize: async (ssml: string) => {

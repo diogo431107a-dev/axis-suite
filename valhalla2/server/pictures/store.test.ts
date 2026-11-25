@@ -4,10 +4,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_SETTINGS, type PictureParams } from "../../shared/protocol.ts";
 import { createChats } from "../chat/chats.ts";
-import { CivitaiError, type Civitai } from "../civitai.ts";
+import { CivitaiError, type Civitai } from "./civitai.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
-import { createPictureFiles } from "./files.ts";
+import { createFileStore } from "../files.ts";
 import { createPainter } from "./painter.ts";
 import { createPictures, knownFiles, setWorkflow, type NewPicture } from "./store.ts";
 
@@ -30,7 +30,7 @@ function setup() {
   tree.setLeaf(hello.id);
   const dir = mkdtempSync(join(tmpdir(), "valhalla2-pictures-"));
   made.push(dir);
-  const files = createPictureFiles(dir);
+  const files = createFileStore(dir);
   return { db, companions, chats, tree, hello, files, dir, pictures: createPictures(db, "odin") };
 }
 

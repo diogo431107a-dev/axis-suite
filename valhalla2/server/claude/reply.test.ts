@@ -1,8 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
-import { DEFAULT_SETTINGS } from "../shared/protocol.ts";
-import { eventOf, messagesToCount, replyOf, requestFor } from "./claude.ts";
-import type { SystemBlock } from "./prompt.ts";
+import { DEFAULT_SETTINGS } from "../../shared/protocol.ts";
+import type { SystemBlock } from "../prompt.ts";
+import { eventOf, replyOf, requestFor } from "./reply.ts";
+import { messagesToCount } from "./tokens.ts";
 
 const system: SystemBlock[] = [
   { type: "text", text: "<personality>Proud.</personality>", cache_control: { type: "ephemeral", ttl: "1h" } },

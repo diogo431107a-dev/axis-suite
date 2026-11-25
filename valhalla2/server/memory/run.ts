@@ -6,7 +6,7 @@
 // are kept is up to the caller, which finishes a successful run inside the transaction that keeps
 // them (`finishRun`).
 import type { ChatMode, Companion } from "../../shared/protocol.ts";
-import type { MemoryRunner } from "../claude.ts";
+import type { MemoryRunner } from "../claude/memory.ts";
 import type { MemoryLimits } from "../config.ts";
 import type { DatabaseSync } from "node:sqlite";
 import { memoryTool } from "./tool.ts";
