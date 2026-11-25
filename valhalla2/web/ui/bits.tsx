@@ -1,4 +1,5 @@
-// The handful of shapes every view uses: a button, a field, a notice, a dialog.
+// The handful of shapes every view uses: a button, a field, a notice, a dialog, an icon button and
+// a speech bubble.
 import { useEffect, useRef, type ReactNode } from "react";
 
 const base =
@@ -85,5 +86,42 @@ export function Dialog({
       </div>
       {children}
     </dialog>
+  );
+}
+
+export function Bubble({ mine, refused, children }: { mine: boolean; refused?: boolean; children: ReactNode }) {
+  return (
+    <div
+      className={`rounded-lg border px-3.5 py-2.5 ${mine ? "border-rule bg-accent-soft" : "border-rule bg-sheet"} ${
+        refused ? "border-warn/50" : ""
+      }`}
+    >
+      {children}
+    </div>
+  );
+}
+
+export function IconButton({
+  label,
+  onClick,
+  disabled,
+  children,
+}: {
+  label: string;
+  onClick: () => void;
+  disabled?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      disabled={disabled}
+      className="rounded p-1 text-faint hover:text-accent disabled:opacity-40"
+    >
+      {children}
+    </button>
   );
 }

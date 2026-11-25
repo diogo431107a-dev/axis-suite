@@ -29,18 +29,27 @@ export interface ApiOptions {
   body?: unknown;
 }
 
-export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
+/**
+ * Sends a request with a JSON body, and answers with the response once it is known to be good. A
+ * refusal becomes an ApiFailure, and so does a server that can't be reached (status 0).
+ */
+async function request(path: string, method: string, body: unknown): Promise<Response> {
   let res: Response;
   try {
     res = await fetch(path, {
-      method: options.method ?? "GET",
+      method,
       headers: { "Content-Type": "application/json" },
-      body: options.body === undefined ? undefined : JSON.stringify(options.body),
+      body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
     throw new ApiFailure(0, "Valhalla 2 can't be reached. Check the connection and try again.");
   }
   if (!res.ok) throw await failure(res);
+  return res;
+}
+
+export async function api<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const res = await request(path, options.method ?? "GET", options.body);
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -59,18 +68,8 @@ export function describeError(err: unknown): string {
  * and still saves the reply if this page goes away mid-stream.
  */
 export async function streamReply(path: string, body: unknown, onEvent: (event: StreamEvent) => void): Promise<void> {
-  let res: Response;
-  try {
-    res = await fetch(path, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(body),
-    });
-  } catch {
-    throw new ApiFailure(0, "Valhalla 2 can't be reached. Check the connection and try again.");
-  }
   // A refusal before the stream starts is still ordinary JSON.
-  if (!res.ok) throw await failure(res);
+  const res = await request(path, "POST", body);
   if (!res.body) throw new ApiFailure(0, "Valhalla 2 sent no reply to read.");
 
   const reader = res.body.getReader();
