@@ -38,8 +38,9 @@ In practice that means:
 - **The prompt is yours.** The system prompt is your companion's profile, exactly as you wrote it.
 - **Valhalla 2's own words are few, and yours to rewrite.** A chat needs a little text you didn't
   write: the memory policy that comes with the companion's memory, the instruction that has it open
-  the chat, the note that passes on why you rejected a reply, and the instructions the memory model
-  works by. Each companion has its own copy of every one of them, which you can rewrite or leave on
+  the chat, the note that passes on why you rejected a reply, the instructions the memory model
+  works by, those Claude reads a scene and writes a picture's prompt by, and the notes above your
+  pins and the topics to leave alone. Each companion has its own copy of every one of them, which you can rewrite or leave on
   the default. The **Inspect** panel in a chat shows the exact request that goes out, built
   by the same code that sends it, with every hidden part marked.
 - **Nothing is softened on the way back.** If the API declines a turn, that turn is stored and
@@ -150,6 +151,23 @@ with a cold cache, as after a mode change — and other chats see the pin when t
 are listed, and unpinned, on the Memory page; 30 at most, of 500 characters each, since every one
 is sent every turn.
 
+**Memory is background, not material.** Everything in memory goes out with every turn, and a model
+tends to use what it is shown: a vivid detail from one old scene can turn up in reply after reply.
+So the memory policy tells the companion to bring a remembered detail up only when the moment calls
+for it or you raise it, never the same one turn after turn, and to let finished arcs stay finished.
+The memory model is told to keep the gist of a scene ("she was mistreated early on") rather than
+its every count and object, and to write a finished arc as one brief line in the past tense; tidy-ups
+cut one-scene specifics down the same way.
+
+**Leave alone.** When the companion still keeps returning to something, add it under **Leave alone**
+on the Memory page ("the old debt", "the cellar"). Every chat with the companion gets the list in a
+`<leave_alone>` block after its memory and pins, under a short note (**Leave-alone note**), telling
+it not to raise those topics unless you do; each chat takes a fresh look on its next turn. The memory
+model is shown the list too, adds nothing about those topics, and cuts what memory has on them to a
+brief line, and so does a rebuild. Taking one off the list lets the companion bring it up again; 30
+at most, of 200 characters each. Editing the memory files works as well, and takes effect the same
+way: what the files say now is what is sent, and their history is only kept for putting things back.
+
 Every change to every file is kept, with where it came from (a chat, your edit, a revert). The
 Memory page shows a file's history as a line-by-line diff, and **puts back** any earlier version as
 one more change.
@@ -168,13 +186,42 @@ held, a window's worth at a time — for when memory went wrong, a better memory
 you rewrote its instructions. The current files stay in place until it finishes and stay in each
 file's history after; if any step fails, nothing changes.
 
+## The scene
+
+A picture of a moment and reading a reply aloud both need to understand the moment: where and when
+it happens, who is there and in what state, and whether a line is a joke, a tease or meant. One
+message alone rarely says: the rain was thirty messages ago, and "fine" can be cold or fond. So
+before either, Claude (`SCENE_MODEL`, Haiku 5.5) reads the companion's profile, its memory and
+pinned moments, and the chat up to the moment (about `VALHALLA_SCENE_TOKENS` of it), and works out
+the **scene**:
+
+- **the setting**: place, time of day, the weather and what it has done, the light;
+- **who is there**: for each, their look right now, their clothes and their state (soaked, torn),
+  what they are doing, and their mood and intent, with a few words of why;
+- **how it is said**, for a reply: every line (Valhalla 2 cuts it into sentences, actions apart
+  from speech, so the words are always the reply's own) with its feeling (teasing, whispering,
+  angry, tender…) and how strongly.
+
+It is read once per message and kept, a fraction of a cent each, and nothing is added to the chat
+itself: what the companion is sent each turn doesn't change. It is read again when the chat up to
+the moment changes (an edit, another version), not when only the memory does. The clapperboard
+under any message opens it: correct anything, from the weather to the feeling of one line, and
+save, and it stays as you left it until the message's own words change. **Read it again** asks
+afresh. What was sent and what it cost are under it. How Claude reads a scene is one of the
+companion's own texts, **Scene reading instructions**.
+
 ## Pictures
 
-A picture of the moment, or of the companion. Under any message, the picture button asks Claude
-(`PICTURE_PROMPT_MODEL`, Sonnet 5.5) to read the profile and the last 20 messages of the path up to
-that one, and write a prompt for the image model: who is there and what they look like, what they
-are doing, the place, the light. Where the chat is vague, it invents. Nothing runs on ordinary
-replies; a prompt costs a cent or two, and only when you ask.
+A picture of the moment, or of the companion. Under any message, the picture button works out the
+scene (above), or uses the one kept, and asks Claude (`PICTURE_PROMPT_MODEL`, Sonnet 5.5) to write
+a prompt for the image model from it: who is there and what they look like, what they are doing,
+the place, the light. The image model invents whatever a prompt leaves unsaid, so Claude is told to
+state all of it, choosing something plain where nothing says. A profile picture is written from the
+profile and the memory. Nothing runs on ordinary replies; a prompt costs a cent or two, and only
+when you ask.
+
+The dialog shows the scene the prompt was drawn from; **Correct the scene** opens it, and the
+prompt can then be written again from the correction.
 
 The prompt opens in a dialog for you to change, with a note for Claude ("at sunset", "from
 behind") if you want it written again. **Make the picture** sends it to CivitAI, which makes it on
@@ -208,6 +255,14 @@ A companion's replies can be read aloud, by Azure AI Speech's neural voices.
 - **As replies arrive.** The speaker switch in a chat's header (**Aloud** / **Silent**) says whether
   each new reply, version or greeting is read as soon as it is written. It is remembered by the
   browser, not the companion — on at home, off on the phone in public — and starts on.
+- **With feeling.** Unless **Read with feeling** is off on the companion's page, a reply is read
+  the way its scene says each line is said (above), worked out the first time it is read. A line
+  whose feeling matches one of the voice's own styles is read in it; only about fifty voices have
+  styles (most of them US English or Chinese; among the Brazilian Portuguese ones only Francisca,
+  "calm"), and the voice finder shows them ("styles"). Every other line, on any voice, is read with
+  speed, pitch and volume set for its feeling: a whisper softer and slower, anger louder and
+  quicker. Actions are read a little slower and quieter, as narration. If the scene can't be read
+  (Claude unreachable), the reply is read plainly. **Hear it** can try a voice in any feeling.
 - **On demand.** The speaker button under any reply reads it; while it plays it becomes a stop
   button. Starting one reply stops the other, and leaving the chat stops it.
 
@@ -217,7 +272,8 @@ button under the reply always works.
 
 **Each reply is read once.** The first time it is asked for, Azure reads it and the MP3 is kept on
 the server, about 0.4 MB a minute; playing it again is instant and costs nothing. An edited reply is
-read again, and the old audio deleted; so is a reply whose companion changed voice. Under the composer, after the first reading in a visit, is how
+read again, and the old audio deleted; so is a reply whose companion changed voice, or whose scene
+you corrected. Under the composer, after the first reading in a visit, is how
 many characters Azure has read this month for the whole server. Azure's free tier (F0) includes
 500,000 characters a month; the paid tier (S0) bills per million characters. Everyone who can sign in
 to Heimdall reads on the server's key.
@@ -335,7 +391,8 @@ default.
 | `VALHALLA_BACKUPS_KEPT`      | `14`                                             | How many daily backups of the database are kept.                  |
 | `PICTURE_MODEL`              | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                 |
 | `PICTURE_PROMPT_MODEL`       | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                         |
-| `VALHALLA_PICTURE_MESSAGES`  | `20`                                             | How many messages it reads, up to the one being pictured.         |
+| `SCENE_MODEL`                | `claude-haiku-5-5`                               | The model that works out a moment's scene and how lines are said. |
+| `VALHALLA_SCENE_TOKENS`      | `12000`                                          | About how much of the chat it reads, up to the moment.            |
 | `SPEECH_REGION`              | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.       |
 | `SPEECH_VOICE`               | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none of its own.           |
 
@@ -417,13 +474,15 @@ One module holding both halves, like the rest of the suite.
 | `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation, tidy-ups and rebuilds (`consolidate.ts`, `cleanup.ts`, `rebuild.ts`, `run.ts`) and when they run (`scheduler.ts`) |
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
 | `server/pins.ts`       | pinned moments: kept word for word, sent after memory, and the chats that must look again                                                                                                                                                                                |
+| `server/quiet.ts`      | topics to leave alone: sent after memory and pins, shown to the memory model, and every chat looks again                                                                                                                                                                 |
 | `server/likes.ts`      | liked replies: the words as they were liked, and the praise memory hasn't heard of yet, or must take back                                                                                                                                                                |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
 | `server/files.ts`      | the folders of kept files, pictures and audio, written whole and swept of strays                                                                                                                                                                                         |
-| `server/speech/`       | reading aloud: started in `feature.ts`, the only file that talks to Azure (`azure.ts`), what is read (`text.ts`), its key (`key.ts`), and the kept audio (`store.ts`)                                                                                                    |
+| `server/scene/`        | a moment worked out: what Claude reads of it (`context.ts`), a reply cut into lines (`lines.ts`), and the kept readings (`sheet.ts`)                                                                                                                                     |
+| `server/speech/`       | reading aloud: started in `feature.ts`, the only file that talks to Azure (`azure.ts`), what is read (`text.ts`), each line said its way (`direct.ts`), its key (`key.ts`), and the kept audio (`store.ts`)                                                              |
 | `server/pictures/`     | pictures: started in `feature.ts`, the only file that talks to CivitAI (`civitai.ts`), its key (`key.ts`), what Claude reads to picture a scene (`scene.ts`), the rows (`store.ts`), and making them in the background (`painter.ts`)                                    |
-| `server/claude/`       | the only folder that talks to the Claude API: the client and its errors (`client.ts`), chat replies (`reply.ts`), memory runs (`memory.ts`), picture prompts (`pictures.ts`), counting (`tokens.ts`)                                                                     |
+| `server/claude/`       | the only folder that talks to the Claude API: the client and its errors (`client.ts`), chat replies (`reply.ts`), memory runs (`memory.ts`), scenes (`scene.ts`), picture prompts (`pictures.ts`), counting (`tokens.ts`)                                                |
 | `server/busy.ts`       | one reply at a time per chat                                                                                                                                                                                                                                             |
 | `web/`                 | React, Vite and Tailwind; `useState` and one context, no router. The chat page is `views/chat/` (its state in `useChat.ts`), the memory page `views/memory/`; pieces any page uses are in `ui/`                                                                          |
 | `deploy/`              | the systemd unit (sandboxed, with the key) and the Caddy site                                                                                                                                                                                                            |

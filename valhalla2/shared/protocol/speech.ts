@@ -12,6 +12,8 @@ export interface Voice {
   gender: string;
   /** Whether it also reads other languages, telling them from the text. */
   multilingual: boolean;
+  /** The speaking styles it has of its own (cheerful, whispering…); most voices have none. */
+  styles: string[];
 }
 
 /** Every voice the server's Azure region offers, and the one used when a companion names none. */

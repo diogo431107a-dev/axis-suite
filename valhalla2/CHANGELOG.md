@@ -4,6 +4,41 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Memory stays in the background.** A companion was bringing the same old details up in reply
+  after reply. Its memory instructions now say to raise a remembered detail only when the moment
+  calls for it or you do, and to let finished arcs stay finished; the memory model keeps the gist of
+  a scene instead of every count and object, and writes a finished arc as one short line. A new
+  companion's canon file no longer calls its facts "highest priority". **By hand:** in an existing
+  companion's `character_canon.md`, on its Memory page, change "Highest priority: never contradict
+  these." to "Never contradict these, but they are background: don't bring them up unprompted.", and
+  trim any detail it keeps repeating. If you rewrote a companion's **Memory policy**,
+  **Memory-keeping instructions** or **Tidy-up instructions**, they keep your text.
+- **Leave alone.** A new list on the Memory page for topics the companion keeps bringing up that
+  you'd rather it didn't. Every chat with it is told not to raise them unless you do, from its next
+  turn, and the memory model adds nothing more about them. The note above the list is one of the
+  companion's own texts, **Leave-alone note**.
+
+- **Pictures keep track of the story.** Before a picture of a moment, Claude now works out the
+  scene from the companion's memory and much more of the chat than before: the place, the time, the
+  weather and what it has done (still soaked from the rain thirty messages ago), and everyone's
+  look, clothes and state. The picture's prompt is written from that, and is told to state every
+  detail, since the image model makes up whatever is left unsaid. A profile picture reads the memory
+  too. **By hand:** if you rewrote a companion's **Picture instructions**, they keep your text; look
+  at the new default to take its "state everything" line.
+- **Replies read with feeling.** Reading aloud now follows how each line is said: teasing,
+  whispered, angry, tender, and how strongly, judged from the chat around it rather than the reply
+  alone. A voice with styles of its own (Serena Multilingual, say) uses them; every other voice is
+  steered by speed, pitch and volume. Actions are read as narration. It costs a fraction of a cent
+  a reply, the first time it is read, and can be turned off with **Read with feeling** under the
+  companion's voice. **Hear it** can now try a voice in any feeling, and the voice finder shows
+  which voices have styles.
+- **See and correct the scene.** A clapperboard under each message shows how Claude read the moment:
+  the setting, who is there, and each line with its feeling. Correct anything and it stays as you
+  left it; a picture or reading aloud uses your correction. The picture dialog shows the scene its
+  prompt was drawn from, with a way to correct it.
+- **One more of Valhalla 2's own words:** **Scene reading instructions**, on the companion's page,
+  editable like the rest.
+
 ## 0.0.20 — 2026-11-25
 
 - **Nothing changes in use.** The code is reorganised into smaller parts, one per area, so new

@@ -1,8 +1,9 @@
 // The voice a companion's replies are read aloud in: any of the voices Azure offers, found by
-// name or language, and heard before it is chosen.
+// name or language, and heard before it is chosen; and whether replies are read with the feeling
+// of each line, as the scene works it out.
 import { useEffect, useMemo, useRef, useState } from "react";
 import { LoaderCircle, Volume2 } from "lucide-react";
-import { LIMITS, type Voice, type VoiceList } from "../../shared/protocol.ts";
+import { FEELINGS, LIMITS, type Feeling, type Voice, type VoiceList } from "../../shared/protocol.ts";
 import { api, apiBlob, describeError } from "../api.ts";
 import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 
@@ -10,20 +11,42 @@ import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 const SAMPLE = "Hello. This is how I sound when your replies are read aloud.";
 
 const describe = (voice: Voice): string =>
-  [voice.name, voice.gender, voice.multilingual ? "multilingual" : ""].filter(Boolean).join(" · ");
+  [
+    voice.name,
+    voice.gender,
+    voice.multilingual ? "multilingual" : "",
+    voice.styles.length > 0 ? `${voice.styles.length} styles` : "",
+  ]
+    .filter(Boolean)
+    .join(" · ");
 
 const matches = (voice: Voice, words: string[]): boolean => {
   const about =
-    `${voice.id} ${voice.name} ${voice.language} ${voice.gender} ${voice.multilingual ? "multilingual" : ""}`.toLowerCase();
+    `${voice.id} ${voice.name} ${voice.language} ${voice.gender} ${voice.multilingual ? "multilingual" : ""} ${
+      voice.styles.length > 0 ? `styles ${voice.styles.join(" ")}` : ""
+    }`.toLowerCase();
   return words.every((word) => about.includes(word));
 };
 
-export function VoicePicker({ value, onChange }: { value: string | null; onChange: (voice: string | null) => void }) {
+export function VoicePicker({
+  value,
+  onChange,
+  feeling,
+  onFeeling,
+}: {
+  value: string | null;
+  onChange: (voice: string | null) => void;
+  /** Whether replies are read with the feeling of each line. */
+  feeling: boolean;
+  onFeeling: (feeling: boolean) => void;
+}) {
   const [list, setList] = useState<VoiceList | null>(null);
   const [error, setError] = useState("");
   const [find, setFind] = useState("");
   const [sample, setSample] = useState(SAMPLE);
   const [hearing, setHearing] = useState(false);
+  /** The feeling the sample is read with; null reads it plainly. */
+  const [sampleFeeling, setSampleFeeling] = useState<Feeling | null>(null);
   const player = useRef<HTMLAudioElement | null>(null);
 
   useEffect(() => {
@@ -36,6 +59,7 @@ export function VoicePicker({ value, onChange }: { value: string | null; onChang
   const voices = useMemo(() => list?.voices ?? [], [list]);
   const byId = (id: string) => voices.find((voice) => voice.id === id);
   const serverVoice = list ? byId(list.default) : undefined;
+  const chosen = value ? byId(value) : serverVoice;
 
   // The voices that match what you typed, by language; the chosen one is always there.
   const groups = useMemo(() => {
@@ -51,7 +75,7 @@ export function VoicePicker({ value, onChange }: { value: string | null; onChang
     setHearing(true);
     setError("");
     try {
-      const audio = await apiBlob("/api/voices/sample", { voice: value, text: sample });
+      const audio = await apiBlob("/api/voices/sample", { voice: value, text: sample, feeling: sampleFeeling });
       const url = URL.createObjectURL(audio);
       player.current?.pause();
       const playing = new Audio(url);
@@ -107,6 +131,19 @@ export function VoicePicker({ value, onChange }: { value: string | null; onChang
               ))}
             </select>
           </Field>
+          <label className="flex items-start gap-2 text-sm">
+            <input type="checkbox" className="mt-1" checked={feeling} onChange={(e) => onFeeling(e.target.checked)} />
+            <span>
+              Read with feeling
+              <span className="mt-0.5 block text-xs text-faint">
+                Before a reply is read, Claude works out the scene (the clapperboard under it) and how each line is
+                said: teasing, whispered, angry. A fraction of a cent a reply, and a moment's wait the first time.{" "}
+                {chosen && chosen.styles.length > 0
+                  ? `${chosen.name} has styles of its own (${chosen.styles.join(", ")}), which sound the most natural; other feelings are read with speed, pitch and volume.`
+                  : "This voice has no styles of its own, so feelings are read with speed, pitch and volume. Type “styles” above to find voices that have them."}
+              </span>
+            </span>
+          </label>
           <Field
             label="Try it"
             hint="Read by Azure like a reply, so it counts toward this month's characters; hearing the same words again is free."
@@ -118,6 +155,19 @@ export function VoicePicker({ value, onChange }: { value: string | null; onChang
                 maxLength={LIMITS.voiceSample}
                 onChange={(e) => setSample(e.target.value)}
               />
+              <select
+                aria-label="Read it"
+                className={`${inputStyle} w-auto`}
+                value={sampleFeeling ?? ""}
+                onChange={(e) => setSampleFeeling(e.target.value === "" ? null : (e.target.value as Feeling))}
+              >
+                <option value="">plainly</option>
+                {FEELINGS.filter((one) => one !== "neutral").map((one) => (
+                  <option key={one} value={one}>
+                    {one}
+                  </option>
+                ))}
+              </select>
               <Button kind="plain" onClick={() => void hear()} disabled={hearing || !sample.trim()}>
                 {hearing ? <LoaderCircle size={15} className="animate-spin" /> : <Volume2 size={15} />} Hear it
               </Button>

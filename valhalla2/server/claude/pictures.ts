@@ -55,7 +55,7 @@ export function draftOf(text: string): PictureDraft {
 export async function writePicturePrompt(
   request: { system: string; prompt: string },
   model: string,
-): Promise<PictureDraftReply> {
+): Promise<Omit<PictureDraftReply, "scene">> {
   let message: Anthropic.Beta.BetaMessage;
   try {
     message = await client.beta.messages.create({

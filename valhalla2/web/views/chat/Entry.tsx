@@ -33,6 +33,7 @@ export function Entry({
   generate,
   onPin,
   onPicture,
+  onScene,
   onView,
 }: {
   chatId: string;
@@ -56,6 +57,7 @@ export function Entry({
   generate: (parentId: number | null) => Promise<boolean>;
   onPin: (start: { messageId: number; speaker: string; text: string }) => void;
   onPicture: (messageId: number) => void;
+  onScene: (messageId: number) => void;
   onView: (pictureId: string) => void;
 }) {
   const { message, siblings } = entry;
@@ -128,6 +130,7 @@ export function Entry({
         onPin={onPin}
         onEdit={() => setEditing({ id: message.id, text })}
         onPicture={() => onPicture(message.id)}
+        onScene={() => onScene(message.id)}
         onDeleting={(asking) => setDeleting(asking ? message.id : null)}
       />
 

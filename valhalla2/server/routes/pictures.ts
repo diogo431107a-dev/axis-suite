@@ -19,7 +19,7 @@ import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import { PICTURE_DEFAULTS, randomSeed } from "../pictures/civitai.ts";
-import { sceneRequest, type Scene } from "../pictures/scene.ts";
+import { backgroundOf, sceneRequest, type Scene } from "../scene/context.ts";
 import type { Services } from "../services.ts";
 
 export function pictureRoutes(s: Services): Router {
@@ -47,12 +47,22 @@ export function pictureRoutes(s: Services): Router {
     const body = object(req.body);
     const kind = oneOf<PictureKind>(body.kind, PICTURE_KINDS, "The kind of picture");
     const hint = body.hint === undefined ? "" : text(body.hint, LIMITS.pictureHint, "The note");
-    const scene: Scene = kind === "profile" ? { kind } : { kind, path: sceneOf(req, companion, body).path };
+    const from = kind === "chat" ? sceneOf(req, companion, body) : null;
+    const scene: Scene = from ? { kind: "chat", path: from.path } : { kind: "profile" };
+    // A chat picture is drawn from the moment worked out: read once, kept, and yours to correct.
+    const read = from ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
     const draft = await writePicturePrompt(
-      sceneRequest(companion, scene, hint, config.pictures.recent),
+      sceneRequest(
+        companion,
+        scene,
+        hint,
+        backgroundOf(companion, s.remembered(companion.id)),
+        config.scene.tokens,
+        read?.sheet,
+      ),
       config.pictures.promptModel,
     );
-    res.json(draft satisfies PictureDraftReply);
+    res.json({ ...draft, scene: read } satisfies PictureDraftReply);
   });
 
   routes.post("/companions/:id/pictures", (req: Request, res: Response) => {

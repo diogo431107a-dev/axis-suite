@@ -8,10 +8,12 @@ import type { Settings } from "./models.ts";
 export const PROMPT_KEYS = [
   "memoryPolicy",
   "pins",
+  "quiet",
   "greeting",
   "rejection",
   "consolidation",
   "cleanup",
+  "scene",
   "picture",
 ] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
@@ -30,6 +32,8 @@ export interface Companion {
   prompts: Prompts;
   /** The Azure voice its replies are read aloud in; null for the server's own. */
   voice: string | null;
+  /** Whether its replies are read with the feeling of each line (the scene), or plainly. */
+  voiceFeeling: boolean;
   createdAt: string;
   updatedAt: string;
 }

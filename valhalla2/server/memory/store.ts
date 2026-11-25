@@ -44,7 +44,7 @@ export const SEED_FILES: readonly { path: string; content: string }[] = [
   {
     path: "character_canon.md",
     content:
-      "# Character canon\n\nFacts the character has established about herself that aren't in the profile: invented backstory, tastes, opinions, habits, scars, quirks. Highest priority: never contradict these.\n",
+      "# Character canon\n\nFacts the character has established about herself that aren't in the profile: invented backstory, tastes, opinions, habits, scars, quirks. Never contradict these, but they are background: don't bring them up unprompted.\n",
   },
   {
     path: "relationship.md",

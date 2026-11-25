@@ -11,6 +11,7 @@ import { FileList } from "./FileList.tsx";
 import { FilePane } from "./FilePane.tsx";
 import { NewFile } from "./NewFile.tsx";
 import { Pins } from "./Pins.tsx";
+import { Quiet } from "./Quiet.tsx";
 import { Runs } from "./Runs.tsx";
 import { Upkeep } from "./Upkeep.tsx";
 
@@ -107,6 +108,8 @@ export function Memory({ companion }: { companion: Companion }) {
       ) : null}
 
       {page ? <Pins companion={companion} page={page} onPage={setPage} onError={setError} /> : null}
+
+      {page ? <Quiet companion={companion} page={page} onPage={setPage} onError={setError} /> : null}
 
       {page ? <Runs page={page} /> : null}
     </div>

@@ -1,10 +1,20 @@
 // Replies read aloud. Asking (POST) reads the reply if it isn't kept yet and says where the audio
 // is; the page then plays that file (GET), which an <audio> element can fetch by itself. A reply is
-// read in its companion's voice, or the server's when it names none; the voices to choose from,
+// read in its companion's voice, or the server's when it names none, and with the feeling of each
+// line as the scene worked it out, unless the companion reads plainly. The voices to choose from,
 // and a short sample of one, are here too.
 import { Router, type Request, type Response } from "express";
-import { LIMITS, type ApiError, type SpeechReply, type VoiceList } from "../../shared/protocol.ts";
-import { id as checkId, messageId, object, required, voice as checkVoice } from "../check.ts";
+import {
+  FEELINGS,
+  LIMITS,
+  type ApiError,
+  type Companion,
+  type Feeling,
+  type Message,
+  type SpeechReply,
+  type VoiceList,
+} from "../../shared/protocol.ts";
+import { id as checkId, messageId, object, oneOf, required, voice as checkVoice } from "../check.ts";
 import { invalid, StoreError } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import type { Services } from "../services.ts";
@@ -24,6 +34,20 @@ async function asked<T>(work: () => Promise<T>): Promise<T> {
 export function speechRoutes(s: Services): Router {
   const routes = Router();
 
+  /**
+   * How each line of the reply at the end of `path` is said, from its scene. When the scene can't
+   * be read (Claude is unreachable, say), the reply is read plainly rather than not at all.
+   */
+  async function feelingOf(companion: Companion, path: readonly Message[]) {
+    const at = path.at(-1)!;
+    try {
+      return (await s.scenes.of(at.id, s.moment(companion, path))).sheet.lines;
+    } catch (err) {
+      console.warn(`Reading message ${at.id} plainly: its scene couldn't be read:`, (err as Error).message);
+      return null;
+    }
+  }
+
   /** Azure Speech, or a refusal when the server has no key for it. */
   const needSpeech = () => s.speech ?? invalid("This Valhalla 2 has no Azure Speech key, so it can't read aloud");
 
@@ -32,9 +56,11 @@ export function speechRoutes(s: Services): Router {
     const my = s.ownedBy(req);
     const id = checkId(req.params.id);
     const chat = my.chats.get(id);
-    const message = my.chats.tree(id).get(messageId(req.params.messageId));
-    const voice = my.companions.get(chat.companionId).voice ?? undefined;
-    const { file } = await asked(() => read.of(message, voice));
+    const tree = my.chats.tree(id);
+    const message = tree.get(messageId(req.params.messageId));
+    const companion = my.companions.get(chat.companionId);
+    const lines = companion.voiceFeeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
+    const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines));
     res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(s.db) } satisfies SpeechReply);
   });
 
@@ -53,13 +79,17 @@ export function speechRoutes(s: Services): Router {
     res.json({ voices: await asked(() => read.voices()), default: read.voice } satisfies VoiceList);
   });
 
-  /** `{ voice, text }` read aloud, to hear a voice before choosing it. Answers with the MP3. */
+  /** `{ voice, text, feeling? }` read aloud, to hear a voice before choosing it. Answers with the MP3. */
   routes.post("/voices/sample", async (req: Request, res: Response) => {
     const read = needSpeech();
     const body = object(req.body);
     const voice = checkVoice(body.voice) ?? read.voice;
     const text = required(body.text, LIMITS.voiceSample, "The sample");
-    const audio = await asked(() => read.sample(voice, text));
+    const feeling =
+      body.feeling === undefined || body.feeling === null
+        ? null
+        : oneOf<Feeling>(body.feeling, FEELINGS, "The feeling");
+    const audio = await asked(() => read.sample(voice, text, feeling));
     res.type("audio/mpeg").send(Buffer.from(audio));
   });
 

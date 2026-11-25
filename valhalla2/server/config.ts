@@ -42,8 +42,12 @@ export const config = {
     model: modelFrom("PICTURE_MODEL", "urn:air:sdxl:checkpoint:civitai:827184@2883731"),
     /** The Claude model that writes a picture's prompt. */
     promptModel: modelFrom("PICTURE_PROMPT_MODEL", "claude-sonnet-5-5"),
-    /** How many messages before the chosen one Claude reads to picture it. */
-    recent: count("VALHALLA_PICTURE_MESSAGES", 20),
+  },
+  scene: {
+    /** About how many tokens of the chat, up to the moment, Claude reads to understand it. */
+    tokens: count("VALHALLA_SCENE_TOKENS", 12_000, 500),
+    /** The Claude model that works out a moment: the scene, and how each line is said. */
+    model: modelFrom("SCENE_MODEL", "claude-haiku-5-5"),
   },
   speech: {
     /** The Azure region of the Speech resource the key belongs to. */

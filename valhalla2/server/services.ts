@@ -21,8 +21,13 @@ import { createMemory } from "./memory/store.ts";
 import { runMemoryModel } from "./claude/memory.ts";
 import { startPictures } from "./pictures/feature.ts";
 import { createPictures } from "./pictures/store.ts";
-import { createPins } from "./pins.ts";
+import { createPins, pinsOf } from "./pins.ts";
+import { createQuiet } from "./quiet.ts";
+import { readScene } from "./claude/scene.ts";
+import type { Remembered } from "./scene/context.ts";
+import { createScenes, momentRequest } from "./scene/sheet.ts";
 import { startSpeech } from "./speech/feature.ts";
+import type { Companion, Message } from "../shared/protocol.ts";
 import { closeCutShortRuns, removeGoneUsers } from "./startup.ts";
 
 export function createServices(db: DatabaseSync) {
@@ -64,8 +69,19 @@ export function createServices(db: DatabaseSync) {
       pictures: createPictures(db, username),
       pins: createPins(db, username, chats),
       likes: createLikes(db, chats),
+      quiet: createQuiet(db, companions),
     };
   }
+
+  /** What a companion remembers, as the scene reading takes it. */
+  const remembered = (companionId: string): Remembered => ({
+    files: memory.files(companionId),
+    pins: pinsOf(db, companionId),
+  });
+
+  /** What is asked about the moment at the end of `path`. */
+  const moment = (companion: Companion, path: readonly Message[]) =>
+    momentRequest(companion, remembered(companion.id), path, config.scene.tokens);
 
   /** The signed-in person's companion named by `:id` in the path. */
   const companionOf = (req: Request) => ownedBy(req).companions.get(checkId(req.params.id));
@@ -83,6 +99,10 @@ export function createServices(db: DatabaseSync) {
     painter: pictures.painter,
     speechFiles: speech.files,
     speech: speech.speech,
+    /** Moments worked out, kept. */
+    scenes: createScenes({ db, read: readScene, model: config.scene.model }),
+    remembered,
+    moment,
     ownedBy,
     companionOf,
     /** Stops the timers, so the process can end. */

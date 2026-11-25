@@ -71,6 +71,7 @@ describe("Azure's voices", () => {
       LocaleName: "English (United States)",
       Gender: "Female",
       SecondaryLocaleList: ["pt-BR"],
+      StyleList: ["cheerful", "whispering"],
     },
     { DisplayName: "No name" },
   ];
@@ -88,6 +89,7 @@ describe("Azure's voices", () => {
         language: "English (United States)",
         gender: "Female",
         multilingual: true,
+        styles: ["cheerful", "whispering"],
       },
       {
         id: "pt-BR-FranciscaNeural",
@@ -96,6 +98,7 @@ describe("Azure's voices", () => {
         language: "Portuguese (Brazil)",
         gender: "Female",
         multilingual: false,
+        styles: [],
       },
     ]);
   });

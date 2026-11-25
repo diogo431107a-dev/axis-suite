@@ -1,7 +1,7 @@
 // Companions write in the convention of the page: what is set between asterisks is action or
 // ambience, and everything else is spoken aloud. This splits a turn's text into those two
-// registers so the page can draw them apart. The asterisks are kept, so what is on screen stays
-// what was written — only its weight changes.
+// registers, so the page can draw them apart and reading aloud can say them apart. The asterisks
+// are kept, so what is on screen stays what was written — only its weight changes.
 
 export type Segment = { text: string; action: boolean };
 

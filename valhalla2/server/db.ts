@@ -249,6 +249,38 @@ const migrations: ((db: DatabaseSync) => void)[] = [
   (db) => {
     db.exec(`ALTER TABLE companions ADD COLUMN voice TEXT;`);
   },
+  // v8: moments worked out (scene/sheet.ts): the place, who is there and how, and how each line of
+  // a reply is said, read once and shared by a picture of the moment and reading it aloud. And
+  // whether a companion's replies are read with that feeling, or plainly.
+  (db) => {
+    db.exec(`
+      CREATE TABLE scenes (
+        message_id   INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+        context_hash TEXT NOT NULL,                   -- sha256 of the instructions and the chat up to it
+        text_hash    TEXT NOT NULL,                   -- sha256 of the message's own words
+        sheet        TEXT NOT NULL,                   -- JSON: SceneSheet
+        model        TEXT NOT NULL,
+        cost         REAL,                            -- dollars; NULL when a price is unknown
+        request      TEXT NOT NULL,                   -- JSON: exactly what was sent
+        created_at   TEXT NOT NULL,
+        edited_at    TEXT                             -- you corrected it
+      );
+      ALTER TABLE companions ADD COLUMN voice_feeling INTEGER NOT NULL DEFAULT 1;
+    `);
+  },
+  // v9: topics a companion leaves alone (quiet.ts): it doesn't bring them up unless you do, and the
+  // memory model keeps them brief.
+  (db) => {
+    db.exec(`
+      CREATE TABLE quiet_topics (
+        id           INTEGER PRIMARY KEY,
+        companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+        text         TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX quiet_topics_companion ON quiet_topics (companion_id, id);
+    `);
+  },
 ];
 
 /**

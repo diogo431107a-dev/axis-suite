@@ -3,6 +3,7 @@ import {
   Check,
   ChevronLeft,
   ChevronRight,
+  Clapperboard,
   Copy,
   GitBranch,
   Heart,
@@ -42,6 +43,7 @@ export function MessageActions({
   onPin,
   onEdit,
   onPicture,
+  onScene,
   onDeleting,
 }: {
   chatId: string;
@@ -67,6 +69,7 @@ export function MessageActions({
   onPin: (start: { messageId: number; speaker: string; text: string }) => void;
   onEdit: () => void;
   onPicture: () => void;
+  onScene: () => void;
   onDeleting: (asking: boolean) => void;
 }) {
   const { health } = usePage();
@@ -172,6 +175,11 @@ export function MessageActions({
       {health.pictures && text ? (
         <IconButton label="Picture this moment" disabled={busy} onClick={onPicture}>
           <ImagePlus size={14} />
+        </IconButton>
+      ) : null}
+      {text && !refused ? (
+        <IconButton label="The scene: where, who, and how it is said" disabled={busy} onClick={onScene}>
+          <Clapperboard size={14} />
         </IconButton>
       ) : null}
       {deleting ? (

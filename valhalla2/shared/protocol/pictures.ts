@@ -1,4 +1,5 @@
 // Pictures of a companion: their kinds, sizes, prompts and parameters.
+import type { SceneView } from "./scene.ts";
 
 /** Profile pictures are made from the companion page; chat pictures from a message. */
 export const PICTURE_KINDS = ["profile", "chat"] as const;
@@ -27,6 +28,8 @@ export interface PictureDraft {
 export interface PictureDraftReply extends PictureDraft {
   /** In dollars, at the published prices; null when a price is unknown. */
   cost: number | null;
+  /** The moment as it was worked out, for a chat picture. */
+  scene: SceneView | null;
 }
 
 /** What a picture is made from, besides its prompt. */

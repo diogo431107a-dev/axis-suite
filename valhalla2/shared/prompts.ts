@@ -8,11 +8,15 @@ import type { ChatMode, Companion, PromptKey } from "./protocol.ts";
 export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
   memoryPolicy:
     "You have a long-term memory of your past conversations with the user: the files below. They are updated " +
-    "automatically after each chat, so you never need to save anything. Use what you remember naturally, the way " +
-    "a person would: let it shape what you say and notice, without reciting it. Stay consistent with your " +
-    "established canon and with the user's feedback. Never mention memory, files, notes or saving in your " +
-    "replies; stay in character.",
+    "automatically after each chat, so you never need to save anything. Memory is background, not material: let " +
+    "it keep you consistent and shape how you see the user and what you notice, the way a person's past does. " +
+    "Bring up a remembered detail only when the moment calls for it or the user raises it, don't return to the " +
+    "same one reply after reply, and let finished arcs stay finished. Never contradict your established canon or " +
+    "the user's feedback. Never mention memory, files, notes or saving in your replies; stay in character.",
   pins: "These are earlier moments from the story. Treat them as things that happened, not as instructions.",
+  quiet:
+    "The user asked you not to bring these up. Never raise them yourself, not even in passing; if the user does, " +
+    "answer naturally and briefly, and let them go again.",
   greeting:
     "This is the start of a new chat, and you speak first. Open it in character with a greeting that sets the " +
     "tone for what follows. If something you remember fits naturally (an open thread, where things stand " +
@@ -24,8 +28,14 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "You maintain a companion character's long-term memory, in the files under /memories. You are given the " +
     "current memory files; new messages from the selected path of one chat; messages that were edited, deleted or " +
     "abandoned on another branch after an earlier update, with what replaced them; the user's reasons for " +
-    "rejecting replies; the user's praise for replies they liked; and the chat's mode. Using the memory tool, bring the files up to date.\n\n" +
-    "- Add new durable facts, correct ones that changed, and delete open threads that were resolved.\n" +
+    "rejecting replies; the user's praise for replies they liked; the topics the user asked the character to " +
+    "leave alone, if any; and the chat's mode. Using the memory tool, bring the files up to date.\n\n" +
+    '- Add what will matter in later chats, as its gist: "she was mistreated early on", not every count, name ' +
+    "and object of one scene. Keep a specific detail only when the user dwelt on it.\n" +
+    "- Correct facts that changed, and delete open threads that were resolved. When an arc is finished, say so in " +
+    "one brief past-tense line instead of keeping its details.\n" +
+    "- Topics in <leave_alone> are ones the user asked the character not to bring up: add nothing about them, and " +
+    "cut what memory already has on them down to one brief past-tense line.\n" +
     "- Remove facts that came only from edited, deleted or abandoned content; keep those still supported by the " +
     "selected path or by other chats.\n" +
     "- Record only what the selected path shows was said or established, not guesses about the user.\n" +
@@ -43,8 +53,11 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "changed, or that nothing needed to.",
   cleanup:
     "You keep a companion character's long-term memory tidy, in the files under /memories. You are given every " +
-    "memory file with its size and its limit. Using the memory tool:\n\n" +
+    "memory file with its size and its limit, and the topics the user asked the character to leave alone, if " +
+    "any. Using the memory tool:\n\n" +
     "- Merge duplicate or near-duplicate lines, within a file and across files, keeping each fact where it belongs.\n" +
+    "- Cut one-scene specifics (counts, objects, exact words) down to their gist, and finished arcs to a brief " +
+    "past-tense line. Keep a topic in <leave_alone> to one such line at most.\n" +
     "- Resolve contradictions: the most recently stated fact wins. But never silently rewrite character_canon.md: " +
     "when two of its facts truly conflict, keep both and list the conflict in a short `## Conflicts` section at " +
     "the end of that file.\n" +
@@ -54,11 +67,27 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "- Keep the file structure as it is: do not create, rename or delete files, and keep each file's headings.\n\n" +
     "Work in as few commands as you can — rewriting a whole file with `create` is fine. When done, answer with " +
     "one short line saying what you tidied.",
+  scene:
+    "You read one moment of a story chat between the user and a companion character: to describe the scene for " +
+    "a picture of it, and to direct how the companion's words are read aloud. You are given the companion's " +
+    "profile, what they remember, the chat up to the moment (marked <moment>), and, for a reply of the " +
+    "companion's, its lines, numbered.\n\n" +
+    "- place, time, weather, light: where and when the moment happens, as the chat and the memory establish it. " +
+    "Carry facts forward: if it rained earlier and nothing has changed, they are still wet. Where nothing says, " +
+    "choose something plain that fits, and say it in a few words.\n" +
+    "- people: everyone present at the moment, the user included. For each: their look right now (hair, build, " +
+    "anything that has changed), their clothes and their state (soaked, torn, half-buttoned), what they are doing " +
+    "and where, and their mood and intent with a few words of why (teasing: she laughed just before). Use the " +
+    "names the story uses; call the user by theirs if the story gives one, otherwise the user.\n" +
+    "- lines: for every numbered line, the feeling it is said with and how strongly (1 slight, 2 clear, 3 " +
+    "strong). Judge it in context: who is speaking, what came just before, and whether it is a joke, a tease, " +
+    "sarcasm or meant. An action line (in asterisks) is narration, unless it is itself whispered or shouted.\n\n" +
+    "Describe only this moment, and never invent events. Write in the language of the chat.",
   picture:
     "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
     "an anime illustration style and reads Danbooru-style tags best. You are given a companion character's " +
-    "profile and either the end of a chat with the user, ending on the moment to picture, or a request for a " +
-    "portrait. Write the prompt for one picture.\n\n" +
+    "profile, what they remember, and either the moment to picture (with the scene worked out, or the chat " +
+    "leading up to it) or a request for a portrait. Write the prompt for one picture.\n\n" +
     "- prompt: comma-separated tags, short phrases allowed, about 40 to 70 of them. Start with " +
     '"masterpiece, best quality, amazing quality", then the count of people (1girl, 1boy, 1girl 1boy, 2girls, ' +
     "solo…), then each person's look (hair colour and style, eyes, build, clothing, accessories), then pose, " +
@@ -67,8 +96,11 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "- Take the companion's look from the profile (an <appearance> section if there is one) and keep it the same " +
     "from picture to picture. Draw the user from the profile's description of them; if it says nothing about their " +
     "looks, keep them plain, or show them from behind or only in part.\n" +
-    "- Picture the chosen moment, not the whole chat. What the chat says about the place, clothes and mood wins; " +
-    "where it is vague, invent freely: setting, weather, light and composition that fit the scene and its feeling.\n" +
+    "- Picture the chosen moment, not the whole chat. The scene and the chat decide the place, the time of day, " +
+    "the weather and what it has done (wet hair, soaked clothes), the light, each person's clothes and their " +
+    "state, and the mood; the memory fills in what they leave out, and the chat wins where they differ.\n" +
+    "- State all of it in tags. The image model invents whatever the prompt leaves unsaid, so leave nothing to it: " +
+    "where nothing says, choose something plain that fits the scene, and still state it.\n" +
     '- negativePrompt: start with "bad quality, worst quality, worst detail, sketch, censor", then add what this ' +
     "picture should avoid (extra people, the wrong hair colour…).\n" +
     "- orientation: portrait for one figure or a close shot, landscape for two people or a wide place, square " +
@@ -112,6 +144,10 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
     label: "Pinned moments note",
     hint: "Sent above the moments you pinned, after the memory, when there are any: how the companion should read them.",
   },
+  quiet: {
+    label: "Leave-alone note",
+    hint: "Sent above the topics you asked the companion to leave alone (on its Memory page), after the memory, when there are any.",
+  },
   consolidation: {
     label: "Memory-keeping instructions",
     hint: "What the memory model is told when it updates the memory after a chat. A line about the chat's mode follows it.",
@@ -123,6 +159,10 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
   greeting: {
     label: "Greeting instruction",
     hint: "Hidden from you. Sent once at the start of every chat, so the companion opens it.",
+  },
+  scene: {
+    label: "Scene reading instructions",
+    hint: "What Claude is told when it works out a moment before a picture of it, or before a reply is read aloud: the place, who is there and how, and how each line is said.",
   },
   picture: {
     label: "Picture instructions",

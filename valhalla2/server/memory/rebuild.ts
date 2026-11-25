@@ -12,6 +12,7 @@ import { CONSOLIDATION_MODES, promptOf, REBUILD_NOTE } from "../../shared/prompt
 import { createTree } from "../chat/tree.ts";
 import { transaction } from "../db.ts";
 import { allPraise, forgetFiled, markFiled, type Praise } from "../likes.ts";
+import { quietOf } from "../quiet.ts";
 import { promptFor } from "./consolidate.ts";
 import { tokensOf } from "./history.ts";
 import { withMemoryLock } from "./lock.ts";
@@ -69,16 +70,22 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
           source: "rebuild",
           mode: chat.mode,
           system: `${promptOf(companion, "consolidation")}\n\n${CONSOLIDATION_MODES[chat.mode]}\n\n${REBUILD_NOTE}`,
-          prompt: promptFor(companion, memory.files(space), {
-            chat: { ...chat, companion_id: companion.id, consolidated_mode: null },
-            path,
-            fresh: part,
-            corrections: [],
-            feedback: last ? feedback : [],
-            praise: last ? praise : [],
-            modeChanged: false,
-            needed: true,
-          }),
+          prompt: promptFor(
+            companion,
+            memory.files(space),
+            {
+              chat: { ...chat, companion_id: companion.id, consolidated_mode: null },
+              path,
+              fresh: part,
+              corrections: [],
+              feedback: last ? feedback : [],
+              praise: last ? praise : [],
+              modeChanged: false,
+              needed: true,
+            },
+            // A rebuild replays every chat, the topics included: it is told about them throughout.
+            quietOf(db, companion.id),
+          ),
         });
         if (!step.ok) {
           memory.drop(space, companion.id);

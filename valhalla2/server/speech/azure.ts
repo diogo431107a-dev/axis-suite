@@ -98,6 +98,7 @@ export function voiceOf(entry: unknown): Voice[] {
   const id = str(fields.ShortName);
   if (!id) return [];
   const secondary = Array.isArray(fields.SecondaryLocaleList) ? fields.SecondaryLocaleList : [];
+  const styles = Array.isArray(fields.StyleList) ? fields.StyleList.filter((style) => typeof style === "string") : [];
   return [
     {
       id,
@@ -106,6 +107,7 @@ export function voiceOf(entry: unknown): Voice[] {
       language: str(fields.LocaleName) || str(fields.Locale),
       gender: str(fields.Gender),
       multilingual: secondary.length > 0 || id.includes("Multilingual"),
+      styles,
     },
   ];
 }
