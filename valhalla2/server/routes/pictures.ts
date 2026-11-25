@@ -19,7 +19,8 @@ import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import { PICTURE_DEFAULTS, randomSeed } from "../pictures/civitai.ts";
-import { sceneRequest, type Scene } from "../pictures/scene.ts";
+import { pinsOf } from "../pins.ts";
+import { backgroundOf, sceneRequest, type Scene } from "../scene/context.ts";
 import type { Services } from "../services.ts";
 
 export function pictureRoutes(s: Services): Router {
@@ -49,7 +50,13 @@ export function pictureRoutes(s: Services): Router {
     const hint = body.hint === undefined ? "" : text(body.hint, LIMITS.pictureHint, "The note");
     const scene: Scene = kind === "profile" ? { kind } : { kind, path: sceneOf(req, companion, body).path };
     const draft = await writePicturePrompt(
-      sceneRequest(companion, scene, hint, config.pictures.recent),
+      sceneRequest(
+        companion,
+        scene,
+        hint,
+        backgroundOf(companion, { files: s.memory.files(companion.id), pins: pinsOf(s.db, companion.id) }),
+        config.scene.tokens,
+      ),
       config.pictures.promptModel,
     );
     res.json(draft satisfies PictureDraftReply);

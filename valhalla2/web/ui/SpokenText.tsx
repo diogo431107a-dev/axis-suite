@@ -1,6 +1,6 @@
 // A message's words as the chat shows them.
 import { Fragment } from "react";
-import { segmentsOf } from "./emphasis.ts";
+import { segmentsOf } from "../../shared/emphasis.ts";
 
 /** Spoken text, with action and ambience set a step back from the dialogue. */
 export function SpokenText({ text }: { text: string }) {

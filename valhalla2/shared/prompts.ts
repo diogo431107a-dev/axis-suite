@@ -57,8 +57,8 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
   picture:
     "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
     "an anime illustration style and reads Danbooru-style tags best. You are given a companion character's " +
-    "profile and either the end of a chat with the user, ending on the moment to picture, or a request for a " +
-    "portrait. Write the prompt for one picture.\n\n" +
+    "profile, what they remember, and either the moment to picture (with the scene worked out, or the chat " +
+    "leading up to it) or a request for a portrait. Write the prompt for one picture.\n\n" +
     "- prompt: comma-separated tags, short phrases allowed, about 40 to 70 of them. Start with " +
     '"masterpiece, best quality, amazing quality", then the count of people (1girl, 1boy, 1girl 1boy, 2girls, ' +
     "solo…), then each person's look (hair colour and style, eyes, build, clothing, accessories), then pose, " +
@@ -67,8 +67,11 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "- Take the companion's look from the profile (an <appearance> section if there is one) and keep it the same " +
     "from picture to picture. Draw the user from the profile's description of them; if it says nothing about their " +
     "looks, keep them plain, or show them from behind or only in part.\n" +
-    "- Picture the chosen moment, not the whole chat. What the chat says about the place, clothes and mood wins; " +
-    "where it is vague, invent freely: setting, weather, light and composition that fit the scene and its feeling.\n" +
+    "- Picture the chosen moment, not the whole chat. The scene and the chat decide the place, the time of day, " +
+    "the weather and what it has done (wet hair, soaked clothes), the light, each person's clothes and their " +
+    "state, and the mood; the memory fills in what they leave out, and the chat wins where they differ.\n" +
+    "- State all of it in tags. The image model invents whatever the prompt leaves unsaid, so leave nothing to it: " +
+    "where nothing says, choose something plain that fits the scene, and still state it.\n" +
     '- negativePrompt: start with "bad quality, worst quality, worst detail, sketch, censor", then add what this ' +
     "picture should avoid (extra people, the wrong hair colour…).\n" +
     "- orientation: portrait for one figure or a close shot, landscape for two people or a wide place, square " +
