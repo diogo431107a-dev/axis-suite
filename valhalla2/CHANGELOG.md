@@ -6,6 +6,11 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 - **Nothing changes in use.** The code is reorganised into smaller parts, one per area, so new
   features are quicker and safer to add. Pages, settings, data and costs are exactly as before.
+- **Valhalla 2's own words start filled in.** On a companion's page, each box under "Valhalla 2's
+  own words" now holds the default text itself, ready to edit, instead of showing it greyed out in
+  an empty box. A box you change says "Your own words" and offers "Back to the default"; one you
+  leave as the default keeps following it when a later version improves it. Emptying a box still
+  means the default is used, and the box now says so.
 
 ## 0.0.12 — 2026-11-17
 
