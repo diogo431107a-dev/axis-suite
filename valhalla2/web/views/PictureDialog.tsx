@@ -1,5 +1,6 @@
 // Asking for a picture: Claude writes the prompt, you look it over and change what you like, and
-// only then does CivitAI make it.
+// only then does CivitAI make it. A chat picture is drawn from the moment as Claude worked it out
+// (the scene), which you can correct before writing the prompt again.
 import { useCallback, useEffect, useState } from "react";
 import { ImagePlus, RefreshCw } from "lucide-react";
 import {
@@ -10,9 +11,11 @@ import {
   type Picture,
   type PictureDraft,
   type PictureDraftReply,
+  type SceneView,
 } from "../../shared/protocol.ts";
 import { api, describeError } from "../api.ts";
 import { Button, Dialog, Field, inputStyle, Notice } from "../ui/bits.tsx";
+import { SceneDialog } from "./chat/SceneDialog.tsx";
 
 /** What the picture is of: the companion alone, or a moment in a chat. */
 export type PictureTarget = { kind: "profile" } | { kind: "chat"; chatId: string; messageId: number };
@@ -46,6 +49,10 @@ export function PictureDialog({
   const [writing, setWriting] = useState(false);
   const [making, setMaking] = useState(false);
   const [error, setError] = useState("");
+  const [scene, setScene] = useState<SceneView | null>(null);
+  /** The scene dialog is open; and whether the scene changed since the prompt was written. */
+  const [correcting, setCorrecting] = useState(false);
+  const [sceneChanged, setSceneChanged] = useState(false);
 
   const base = `/api/companions/${companion.id}/pictures`;
   // The target as plain values, so a new object for the same target asks nothing again.
@@ -62,9 +69,11 @@ export function PictureDialog({
           method: "POST",
           body: { kind, chatId, messageId, hint: note },
         });
-        const { cost: spent, ...written } = reply;
+        const { cost: spent, scene: read, ...written } = reply;
         setDraft(written);
         setCost(spent);
+        setScene(read);
+        setSceneChanged(false);
       } catch (err) {
         setError(describeError(err));
       } finally {
@@ -151,6 +160,45 @@ export function PictureDialog({
               </label>
             </div>
           </>
+        ) : null}
+
+        {scene && chatId !== null && messageId !== null ? (
+          <details className="rounded border border-rule p-3 text-sm">
+            <summary className="cursor-pointer font-medium">The scene it was drawn from</summary>
+            <dl className="mt-2 space-y-1 text-faint">
+              {[
+                ["Place", scene.sheet.place],
+                ["Time", scene.sheet.time],
+                ["Weather", scene.sheet.weather],
+                ["Light", scene.sheet.light],
+                ...scene.sheet.people.map((person) => [
+                  person.name,
+                  [person.appearance, person.clothes, person.action].filter(Boolean).join("; "),
+                ]),
+              ].map(([label, value], at) => (
+                <div key={at}>
+                  <dt className="inline text-ink">{label}: </dt>
+                  <dd className="inline">{value}</dd>
+                </div>
+              ))}
+            </dl>
+            <Button kind="quiet" onClick={() => setCorrecting(true)}>
+              Correct the scene
+            </Button>
+          </details>
+        ) : null}
+        {sceneChanged ? <Notice kind="quiet">The scene changed. Write the prompt again to draw from it.</Notice> : null}
+        {correcting && chatId !== null && messageId !== null ? (
+          <SceneDialog
+            chatId={chatId}
+            messageId={messageId}
+            companionName={companion.name}
+            onClose={() => setCorrecting(false)}
+            onSaved={(saved) => {
+              setScene(saved);
+              setSceneChanged(true);
+            }}
+          />
         ) : null}
 
         <div className="space-y-2 rounded border border-dashed border-rule p-3">

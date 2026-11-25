@@ -18,6 +18,7 @@ import { Entry } from "./Entry.tsx";
 import { Live } from "./Live.tsx";
 import { textOf } from "./message.ts";
 import { PinDialog } from "./PinDialog.tsx";
+import { SceneDialog } from "./SceneDialog.tsx";
 import { useChat } from "./useChat.ts";
 
 export function Chat({ id, greet }: { id: string; greet: boolean }) {
@@ -57,6 +58,8 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const [pinning, setPinning] = useState<{ messageId: number; speaker: string; text: string } | null>(null);
 
   /** The message a picture is being asked for, and the prompt to start from when making one again. */
+  /** The message whose scene is open. */
+  const [scening, setScening] = useState<number | null>(null);
   const [picturing, setPicturing] = useState<{ messageId: number; start?: PictureDraft } | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
 
@@ -203,6 +206,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
                 generate={generate}
                 onPin={setPinning}
                 onPicture={(messageId) => setPicturing({ messageId })}
+                onScene={setScening}
                 onView={setViewing}
               />
             </Fragment>
@@ -279,6 +283,15 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
               All pictures
             </Button>
           }
+        />
+      ) : null}
+      {scening !== null ? (
+        <SceneDialog
+          chatId={chat.id}
+          messageId={scening}
+          companionName={companion.name}
+          onClose={() => setScening(null)}
+          onHear={health.speech ? () => void speaker.play(scening) : undefined}
         />
       ) : null}
       {pinning ? (
