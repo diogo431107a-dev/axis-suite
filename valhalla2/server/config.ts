@@ -46,6 +46,8 @@ export const config = {
   scene: {
     /** About how many tokens of the chat, up to the moment, Claude reads to understand it. */
     tokens: count("VALHALLA_SCENE_TOKENS", 12_000, 500),
+    /** The Claude model that works out a moment: the scene, and how each line is said. */
+    model: modelFrom("SCENE_MODEL", "claude-haiku-5-5"),
   },
   speech: {
     /** The Azure region of the Speech resource the key belongs to. */

@@ -54,6 +54,22 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "- Keep the file structure as it is: do not create, rename or delete files, and keep each file's headings.\n\n" +
     "Work in as few commands as you can — rewriting a whole file with `create` is fine. When done, answer with " +
     "one short line saying what you tidied.",
+  scene:
+    "You read one moment of a story chat between the user and a companion character: to describe the scene for " +
+    "a picture of it, and to direct how the companion's words are read aloud. You are given the companion's " +
+    "profile, what they remember, the chat up to the moment (marked <moment>), and, for a reply of the " +
+    "companion's, its lines, numbered.\n\n" +
+    "- place, time, weather, light: where and when the moment happens, as the chat and the memory establish it. " +
+    "Carry facts forward: if it rained earlier and nothing has changed, they are still wet. Where nothing says, " +
+    "choose something plain that fits, and say it in a few words.\n" +
+    "- people: everyone present at the moment, the user included. For each: their look right now (hair, build, " +
+    "anything that has changed), their clothes and their state (soaked, torn, half-buttoned), what they are doing " +
+    "and where, and their mood and intent with a few words of why (teasing: she laughed just before). Use the " +
+    "names the story uses; call the user by theirs if the story gives one, otherwise the user.\n" +
+    "- lines: for every numbered line, the feeling it is said with and how strongly (1 slight, 2 clear, 3 " +
+    "strong). Judge it in context: who is speaking, what came just before, and whether it is a joke, a tease, " +
+    "sarcasm or meant. An action line (in asterisks) is narration, unless it is itself whispered or shouted.\n\n" +
+    "Describe only this moment, and never invent events. Write in the language of the chat.",
   picture:
     "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
     "an anime illustration style and reads Danbooru-style tags best. You are given a companion character's " +
@@ -126,6 +142,10 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
   greeting: {
     label: "Greeting instruction",
     hint: "Hidden from you. Sent once at the start of every chat, so the companion opens it.",
+  },
+  scene: {
+    label: "Scene reading instructions",
+    hint: "What Claude is told when it works out a moment before a picture of it, or before a reply is read aloud: the place, who is there and how, and how each line is said.",
   },
   picture: {
     label: "Picture instructions",

@@ -38,6 +38,9 @@ export const LIMITS = {
   pins: 30,
   /** What you say you liked about a reply. */
   likeComment: 1_000,
+  /** One field of a scene you correct (the place, someone's clothes…), and how many people it has. */
+  sceneField: 1_000,
+  scenePeople: 8,
   /** An Azure voice name, such as en-US-AvaMultilingualNeural. */
   voice: 100,
   /** What a voice reads when you try it. */

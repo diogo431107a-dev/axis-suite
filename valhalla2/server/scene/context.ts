@@ -2,7 +2,7 @@
 // and the chat up to that moment. It is read for a picture's prompt, and to work out the scene and
 // how a reply is said (sheet.ts); it is never sent in the chat itself. Only the words: no thinking
 // and no hidden instructions.
-import { blockText, type Companion, type Message, type Pin } from "../../shared/protocol.ts";
+import { blockText, type Companion, type Message, type Pin, type SceneSheet } from "../../shared/protocol.ts";
 import { promptOf } from "../../shared/prompts.ts";
 import { tokensOf } from "../memory/history.ts";
 import { renderPins } from "../memory/inject.ts";
@@ -61,9 +61,25 @@ export function chatUpTo(companion: Companion, path: readonly Message[], budget:
   return `<chat>\n${lines.join("\n")}\n</chat>`;
 }
 
+/** A worked-out moment (sheet.ts) as a picture's prompt reads it. */
+export function renderSheet(sheet: SceneSheet): string {
+  const lines = [
+    `Place: ${sheet.place}`,
+    `Time: ${sheet.time}`,
+    `Weather: ${sheet.weather}`,
+    `Light: ${sheet.light}`,
+    ...sheet.people.map(
+      (person) =>
+        `${person.name}: looks ${person.appearance}; wears ${person.clothes}; ${person.action}; ${person.mood}`,
+    ),
+  ];
+  return `<scene>\n${lines.join("\n")}\n</scene>`;
+}
+
 /**
  * The request for one picture's prompt. `background` is backgroundOf(); `budget` how many tokens
- * of the chat go with a chat picture.
+ * of the chat go with a chat picture. With the moment worked out (`sheet`), that stands in for the
+ * chat, and only the moment itself goes with it.
  */
 export function sceneRequest(
   companion: Companion,
@@ -71,6 +87,7 @@ export function sceneRequest(
   hint: string,
   background: string,
   budget: number,
+  sheet?: SceneSheet,
 ): SceneRequest {
   const parts = [background];
 
@@ -78,6 +95,12 @@ export function sceneRequest(
     parts.push(
       `Write the prompt for a profile picture of ${companion.name}: a portrait of them alone, showing their ` +
         "appearance clearly, in a setting and mood that fit who they are.",
+    );
+  } else if (sheet) {
+    parts.push(renderSheet(sheet), chatUpTo(companion, scene.path, 0));
+    parts.push(
+      "Write the prompt for a picture of the moment marked <moment>. The scene above was worked out from the " +
+        "whole chat and the memory: draw the place, the people and their state as it says.",
     );
   } else {
     parts.push(chatUpTo(companion, scene.path, budget));

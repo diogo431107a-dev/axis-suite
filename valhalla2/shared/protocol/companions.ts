@@ -12,6 +12,7 @@ export const PROMPT_KEYS = [
   "rejection",
   "consolidation",
   "cleanup",
+  "scene",
   "picture",
 ] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
