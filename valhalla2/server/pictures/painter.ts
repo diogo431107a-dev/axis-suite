@@ -2,14 +2,14 @@
 // picture; this then asks CivitAI for it, waits, downloads it, and marks it done or failed. The
 // page looks at the picture every few seconds until then.
 import type { DatabaseSync } from "node:sqlite";
-import { CivitaiError, type Civitai, type Workflow } from "../civitai.ts";
-import type { PictureFiles } from "./files.ts";
+import { CivitaiError, type Civitai, type Workflow } from "./civitai.ts";
+import type { FileStore } from "../files.ts";
 import { jobOf, markDone, markFailed, setWorkflow, unfinished } from "./store.ts";
 
 export interface PainterOptions {
   db: DatabaseSync;
   civitai: Civitai;
-  files: PictureFiles;
+  files: FileStore;
 }
 
 export function createPainter({ db, civitai, files }: PainterOptions) {

@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_SETTINGS, type Message } from "../../shared/protocol.ts";
 import { createChats } from "../chat/chats.ts";
 import type { Tree } from "../chat/tree.ts";
-import type { MemoryRunRequest, MemoryRunResult, MemoryRunner } from "../claude.ts";
+import type { MemoryRunRequest, MemoryRunResult, MemoryRunner } from "../claude/memory.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { createLikes } from "../likes.ts";

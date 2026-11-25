@@ -1,5 +1,5 @@
 // Replies read aloud. A reply is read by Azure the first time it is asked for, and the MP3 is kept
-// as a file (in the same kind of folder as the pictures, pictures/files.ts), so playing it again
+// as a file (in its own folder, see files.ts), so playing it again
 // is instant and costs nothing. An edited reply, or another voice, is read again, and the old
 // audio is deleted.
 import { createHash } from "node:crypto";
@@ -8,7 +8,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { blockText, type Message } from "../../shared/protocol.ts";
 import { STATE_DIR, transaction } from "../db.ts";
 import { invalid, notFound } from "../errors.ts";
-import type { PictureFiles } from "../pictures/files.ts";
+import type { FileStore } from "../files.ts";
 import type { AzureSpeech } from "./azure.ts";
 import { spokenText, ssmlOf } from "./text.ts";
 
@@ -30,7 +30,7 @@ export interface Spoken {
 export interface SpeechOptions {
   db: DatabaseSync;
   azure: AzureSpeech;
-  files: PictureFiles;
+  files: FileStore;
   /** The voice every reply is read in. */
   voice: string;
 }

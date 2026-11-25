@@ -4,6 +4,9 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Nothing changes in use.** The code is reorganised into smaller parts, one per area, so new
+  features are quicker and safer to add. Pages, settings, data and costs are exactly as before.
+
 ## 0.0.12 — 2026-11-17
 
 - **Like a reply.** Under every reply from the companion, a heart likes it, and a small box opens

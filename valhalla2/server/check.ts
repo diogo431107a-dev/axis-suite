@@ -70,6 +70,12 @@ export function messageId(value: unknown): number {
   return n;
 }
 
+/** A row id from a URL (a memory version, a pin): a positive whole number. */
+export function rowId(value: unknown, what: string): number {
+  const n = typeof value === "string" && /^[0-9]{1,15}$/.test(value) ? Number(value) : NaN;
+  return Number.isSafeInteger(n) && n > 0 ? n : invalid(`${what} isn't valid`);
+}
+
 /** Settings from the page, anything left out taken from `defaults`. */
 export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS): Settings {
   if (value === undefined || value === null) return { ...defaults };

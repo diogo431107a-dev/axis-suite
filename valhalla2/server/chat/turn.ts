@@ -7,7 +7,7 @@
 import type { DatabaseSync } from "node:sqlite";
 import type { Companion, Message, StreamEvent } from "../../shared/protocol.ts";
 import { promptOf, rejectionNote } from "../../shared/prompts.ts";
-import type { Writer } from "../claude.ts";
+import type { Writer } from "../claude/reply.ts";
 import { transaction } from "../db.ts";
 import { invalid } from "../errors.ts";
 import { windowFor } from "../memory/history.ts";

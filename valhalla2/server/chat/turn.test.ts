@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_SETTINGS, blockText, type ContentBlock, type StreamEvent } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS, OPENER } from "../../shared/prompts.ts";
-import type { Reply, Writer } from "../claude.ts";
+import type { Reply, Writer } from "../claude/reply.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { createMemory } from "../memory/store.ts";
