@@ -11,6 +11,7 @@ const companion: Companion = {
   settings: DEFAULT_SETTINGS,
   prompts: {},
   voice: null,
+  voiceFeeling: true,
   createdAt: "",
   updatedAt: "",
 };

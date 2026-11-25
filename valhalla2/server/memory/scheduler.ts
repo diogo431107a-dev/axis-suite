@@ -27,7 +27,7 @@ export interface SchedulerDeps extends RunDeps {
   partTokens: number;
 }
 
-const COMPANION = `SELECT p.id, p.name, p.profile, p.settings, p.prompts, p.voice, p.created_at, p.updated_at FROM companions p`;
+const COMPANION = `SELECT p.id, p.name, p.profile, p.settings, p.prompts, p.voice, p.voice_feeling, p.created_at, p.updated_at FROM companions p`;
 
 export function createScheduler(deps: SchedulerDeps) {
   const { db } = deps;

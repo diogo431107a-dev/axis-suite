@@ -2,15 +2,18 @@
 // as a file (in its own folder, see files.ts), so playing it again
 // is instant and costs nothing. An edited reply, or another voice, is read again, and the old
 // audio is deleted. Each companion may have its own voice; one that names none is read in the
-// server's.
+// server's. A reply is read with the feeling of each line when the scene has worked it out
+// (direct.ts), and is read again when that changes.
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { blockText, type Message, type Voice } from "../../shared/protocol.ts";
+import { blockText, type Feeling, type Message, type SceneLine, type Voice } from "../../shared/protocol.ts";
 import { STATE_DIR, transaction } from "../db.ts";
 import { invalid, notFound } from "../errors.ts";
 import type { FileStore } from "../files.ts";
+import { linesOf } from "../scene/lines.ts";
 import type { AzureSpeech } from "./azure.ts";
+import { directedSsml } from "./direct.ts";
 import { spokenText, ssmlOf } from "./text.ts";
 
 /** Next to the database, as an absolute path, which sendFile needs. */
@@ -56,10 +59,35 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       )
       .run(monthOf(new Date()), chars);
 
-  async function read(message: Message, voice: string, text: string, hash: string): Promise<Spoken> {
-    const audio = await azure.synthesize(ssmlOf(text, voice));
+  /** The voice's own styles, from Azure's list; none when the list can't be had. */
+  async function stylesOf(voice: string): Promise<string[]> {
+    try {
+      return (await voices()).find((one) => one.id === voice)?.styles ?? [];
+    } catch {
+      return [];
+    }
+  }
+
+  /** Every voice Azure offers, asked once a day. A failed ask is tried again next time. */
+  function voices(): Promise<Voice[]> {
+    if (!voiceList || Date.now() - voiceList.at > VOICES_MS) {
+      const asked = azure.voices();
+      voiceList = { at: Date.now(), voices: asked };
+      asked.catch(() => {
+        if (voiceList?.voices === asked) voiceList = null;
+      });
+    }
+    return voiceList.voices;
+  }
+
+  /** The SSML for `lines` in `voice`: each said its way, or the words plainly when no line has a way. */
+  async function ssmlFor(voice: string, lines: readonly SceneLine[] | null, text: string): Promise<string> {
+    return lines ? directedSsml(lines, voice, await stylesOf(voice)) : ssmlOf(text, voice);
+  }
+
+  async function read(message: Message, voice: string, ssml: string, chars: number, hash: string): Promise<Spoken> {
+    const audio = await azure.synthesize(ssml);
     const file = files.write(`${message.id}-${hash.slice(0, 16)}`, "mp3", audio);
-    const chars = [...text].length;
     let replaced: string[];
     try {
       replaced = transaction(db, () => {
@@ -87,14 +115,20 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
     voice: serverVoice,
 
     /**
-     * The kept audio of a reply, read now in `voice` if it isn't kept yet. Whose message it is,
-     * and that it is still there, is the caller's to check.
+     * The kept audio of a reply, read now in `voice` if it isn't kept yet: with `lines`, each said
+     * the way the scene says (direct.ts), otherwise plainly. Another way of saying it is another
+     * reading. Whose message it is, and that it is still there, is the caller's to check.
      */
-    async of(message: Message, voice: string = serverVoice): Promise<Spoken> {
+    async of(
+      message: Message,
+      voice: string = serverVoice,
+      lines: readonly SceneLine[] | null = null,
+    ): Promise<Spoken> {
       if (message.role !== "assistant") invalid("Only a companion's replies are read aloud");
       const text = spokenText(message.content.map(blockText).join(""));
       if (!text) invalid("This reply has nothing to read aloud");
-      const hash = createHash("sha256").update(`${voice}\n${text}`).digest("hex");
+      const how = lines ? `\n${JSON.stringify(lines.map((line) => [line.text, line.feeling, line.strength]))}` : "";
+      const hash = createHash("sha256").update(`${voice}\n${text}${how}`).digest("hex");
 
       const kept = db
         .prepare("SELECT file FROM speech WHERE message_id = ? AND voice = ? AND text_hash = ?")
@@ -104,43 +138,37 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       const key = `${message.id}:${hash}`;
       let reading = underway.get(key);
       if (!reading) {
-        reading = read(message, voice, text, hash).finally(() => underway.delete(key));
+        const chars = lines ? lines.reduce((sum, line) => sum + [...line.text].length, 0) : [...text].length;
+        reading = ssmlFor(voice, lines, text)
+          .then((ssml) => read(message, voice, ssml, chars, hash))
+          .finally(() => underway.delete(key));
         underway.set(key, reading);
       }
       return reading;
     },
 
-    /** Every voice Azure offers, asked once a day. A failed ask is tried again next time. */
-    voices(): Promise<Voice[]> {
-      if (!voiceList || Date.now() - voiceList.at > VOICES_MS) {
-        const voices = azure.voices();
-        voiceList = { at: Date.now(), voices };
-        voices.catch(() => {
-          if (voiceList?.voices === voices) voiceList = null;
-        });
-      }
-      return voiceList.voices;
-    },
+    voices,
 
     /**
-     * `text` read in `voice`, to hear it before choosing it. Not kept as a file: the last few are
-     * kept in memory, and the characters count like any other reading.
+     * `text` read in `voice`, to hear it before choosing it: plainly, or every line with `feeling`.
+     * Not kept as a file: the last few are kept in memory, and the characters count like any other
+     * reading.
      */
-    sample(voice: string, text: string): Promise<Uint8Array> {
+    sample(voice: string, text: string, feeling: Feeling | null = null): Promise<Uint8Array> {
       const spoken = spokenText(text);
       if (!spoken) invalid("Write something for the voice to read");
       const key = createHash("sha256")
-        .update(
-          `${voice}
-${spoken}`,
-        )
+        .update(`${voice}\n${feeling ?? ""}\n${spoken}`)
         .digest("hex");
       let audio = samples.get(key);
       if (!audio) {
-        audio = azure.synthesize(ssmlOf(spoken, voice)).then((bytes) => {
-          count([...spoken].length);
-          return bytes;
-        });
+        const lines = feeling ? linesOf(text).map((line) => ({ ...line, feeling, strength: 2 as const })) : null;
+        audio = ssmlFor(voice, lines, spoken)
+          .then((ssml) => azure.synthesize(ssml))
+          .then((bytes) => {
+            count([...spoken].length);
+            return bytes;
+          });
         audio.catch(() => samples.delete(key));
         samples.set(key, audio);
         while (samples.size > SAMPLES_KEPT) samples.delete(samples.keys().next().value!);

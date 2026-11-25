@@ -24,6 +24,7 @@ interface Row {
   settings: string;
   prompts: string;
   voice: string | null;
+  voice_feeling: number;
   created_at: string;
   updated_at: string;
 }
@@ -35,11 +36,12 @@ export const companionOf = (row: Row): Companion => ({
   settings: JSON.parse(row.settings) as Settings,
   prompts: JSON.parse(row.prompts) as Companion["prompts"],
   voice: row.voice,
+  voiceFeeling: row.voice_feeling === 1,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
 
-const COLUMNS = "id, name, profile, settings, prompts, voice, created_at, updated_at";
+const COLUMNS = "id, name, profile, settings, prompts, voice, voice_feeling, created_at, updated_at";
 
 /** One person's companions. `defaults` fills in settings a request leaves out. */
 export function createCompanions(db: DatabaseSync, owner: string, defaults: Settings) {
@@ -67,26 +69,29 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       const settings = checkSettings(fields.settings, defaults);
       const prompts = checkPrompts(fields.prompts);
       const voice = checkVoice(fields.voice);
+      // On unless said otherwise.
+      const voiceFeeling = fields.voiceFeeling === false ? 0 : 1;
       const now = new Date().toISOString();
 
       const existing = db.prepare("SELECT owner FROM companions WHERE id = ?").get(id) as { owner: string } | undefined;
       if (existing && existing.owner !== owner) notFound("companion");
       if (existing) {
         db.prepare(
-          "UPDATE companions SET name = ?, profile = ?, settings = ?, prompts = ?, voice = ?, updated_at = ? WHERE id = ?",
-        ).run(name, profile, JSON.stringify(settings), JSON.stringify(prompts), voice, now, id);
+          "UPDATE companions SET name = ?, profile = ?, settings = ?, prompts = ?, voice = ?, voice_feeling = ?, updated_at = ? WHERE id = ?",
+        ).run(name, profile, JSON.stringify(settings), JSON.stringify(prompts), voice, voiceFeeling, now, id);
       } else {
         const { count } = db.prepare("SELECT count(*) AS count FROM companions WHERE owner = ?").get(owner) as {
           count: number;
         };
         if (count >= LIMITS.companions) tooMany(`Valhalla 2 keeps ${LIMITS.companions} companions at most`);
-        db.prepare(`INSERT INTO companions (${COLUMNS}, owner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT INTO companions (${COLUMNS}, owner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           id,
           name,
           profile,
           JSON.stringify(settings),
           JSON.stringify(prompts),
           voice,
+          voiceFeeling,
           now,
           now,
           owner,

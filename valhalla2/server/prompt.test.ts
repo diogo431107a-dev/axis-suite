@@ -10,6 +10,7 @@ const companion: Companion = {
   settings: { ...DEFAULT_SETTINGS, cacheTtl: "5m" },
   prompts: {},
   voice: null,
+  voiceFeeling: true,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };

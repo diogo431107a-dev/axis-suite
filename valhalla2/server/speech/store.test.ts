@@ -8,6 +8,7 @@ import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { StoreError } from "../errors.ts";
 import { createFileStore } from "../files.ts";
+import { linesOf } from "../scene/lines.ts";
 import type { AzureSpeech } from "./azure.ts";
 import {
   charsThisMonth,
@@ -32,6 +33,7 @@ const VOICE: Voice = {
   language: "Portuguese (Brazil)",
   gender: "Female",
   multilingual: false,
+  styles: ["calm"],
 };
 
 function setup(voice = "en-US-AvaMultilingualNeural") {
@@ -123,6 +125,26 @@ describe("reading aloud", () => {
     expect(read[1]).toContain('<voice name="en-US-AvaMultilingualNeural">');
   });
 
+  it("reads each line the way the scene says, in the voice's own style where it has one", async () => {
+    const { tree, hello, read, speech } = setup();
+    const lines = linesOf("*Waves.* Hello.").map((line, at) => ({
+      ...line,
+      feeling: at === 0 ? ("narration" as const) : ("calm" as const),
+      strength: 2 as const,
+    }));
+    const felt = await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural", lines);
+    const ssml = read.find((what) => what.startsWith("<speak"))!;
+    expect(ssml).toContain('<prosody rate="-6%" pitch="-3%" volume="-10%">Waves.</prosody>');
+    expect(ssml).toContain('<mstts:express-as style="calm" styledegree="1.2">Hello.</mstts:express-as>');
+    expect(felt.read).toBe("Waves.Hello.".length);
+
+    // The same way of saying it is kept; another is read again; plainly is another reading too.
+    expect((await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural", lines)).read).toBe(0);
+    const sadder = lines.map((line) => ({ ...line, feeling: "sad" as const }));
+    expect((await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural", sadder)).file).not.toBe(felt.file);
+    expect((await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural")).read).toBeGreaterThan(0);
+  });
+
   it("asks Azure for its voices once, not every time", async () => {
     const { read, speech } = setup();
     expect(await speech.voices()).toEqual([VOICE]);
@@ -141,6 +163,15 @@ describe("reading aloud", () => {
     // Nothing is kept on disk.
     expect(readdirSync(dir)).toEqual([]);
     expect(() => speech.sample("pt-BR-FranciscaNeural", " * ")).toThrow(/Write something/);
+  });
+
+  it("reads a sample with a feeling, as another sample", async () => {
+    const { read, speech } = setup();
+    await speech.sample("pt-BR-FranciscaNeural", "Olá!");
+    await speech.sample("pt-BR-FranciscaNeural", "Olá!", "whispering");
+    const ssml = read.filter((what) => what.startsWith("<speak"));
+    expect(ssml).toHaveLength(2);
+    expect(ssml[1]).toContain('<prosody rate="-8%" pitch="-4%" volume="-40%">Olá!</prosody>');
   });
 
   it("reads only a companion's replies, and only ones with words", async () => {
