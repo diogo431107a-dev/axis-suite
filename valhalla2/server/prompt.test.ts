@@ -9,6 +9,7 @@ const companion: Companion = {
   profile: "<personality>Proud.</personality>\n<user_persona>Eadric, a cup-bearer.</user_persona>",
   settings: { ...DEFAULT_SETTINGS, cacheTtl: "5m" },
   prompts: {},
+  voice: null,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };

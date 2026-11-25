@@ -1,11 +1,12 @@
 // Replies read aloud. A reply is read by Azure the first time it is asked for, and the MP3 is kept
 // as a file (in its own folder, see files.ts), so playing it again
 // is instant and costs nothing. An edited reply, or another voice, is read again, and the old
-// audio is deleted.
+// audio is deleted. Each companion may have its own voice; one that names none is read in the
+// server's.
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { blockText, type Message } from "../../shared/protocol.ts";
+import { blockText, type Message, type Voice } from "../../shared/protocol.ts";
 import { STATE_DIR, transaction } from "../db.ts";
 import { invalid, notFound } from "../errors.ts";
 import type { FileStore } from "../files.ts";
@@ -31,15 +32,31 @@ export interface SpeechOptions {
   db: DatabaseSync;
   azure: AzureSpeech;
   files: FileStore;
-  /** The voice every reply is read in. */
+  /** The voice a reply is read in when its companion names none. */
   voice: string;
 }
 
-export function createSpeech({ db, azure, files, voice }: SpeechOptions) {
+/** How long the list of voices is kept before Azure is asked again. */
+const VOICES_MS = 24 * 60 * 60_000;
+/** How many tried voices are kept in memory, so trying the same one again costs nothing. */
+const SAMPLES_KEPT = 20;
+
+export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOptions) {
   /** Readings under way, so asking twice for the same one pays once. */
   const underway = new Map<string, Promise<Spoken>>();
+  let voiceList: { at: number; voices: Promise<Voice[]> } | null = null;
+  const samples = new Map<string, Promise<Uint8Array>>();
 
-  async function read(message: Message, text: string, hash: string): Promise<Spoken> {
+  /** Adds what Azure was asked to read to this month's count. */
+  const count = (chars: number) =>
+    db
+      .prepare(
+        `INSERT INTO speech_usage (month, chars) VALUES (?, ?)
+         ON CONFLICT (month) DO UPDATE SET chars = chars + excluded.chars`,
+      )
+      .run(monthOf(new Date()), chars);
+
+  async function read(message: Message, voice: string, text: string, hash: string): Promise<Spoken> {
     const audio = await azure.synthesize(ssmlOf(text, voice));
     const file = files.write(`${message.id}-${hash.slice(0, 16)}`, "mp3", audio);
     const chars = [...text].length;
@@ -53,10 +70,7 @@ export function createSpeech({ db, azure, files, voice }: SpeechOptions) {
           `INSERT INTO speech (message_id, voice, text_hash, file, bytes, chars, created_at)
            VALUES (?, ?, ?, ?, ?, ?, ?)`,
         ).run(message.id, voice, hash, file, audio.length, chars, new Date().toISOString());
-        db.prepare(
-          `INSERT INTO speech_usage (month, chars) VALUES (?, ?)
-           ON CONFLICT (month) DO UPDATE SET chars = chars + excluded.chars`,
-        ).run(monthOf(new Date()), chars);
+        count(chars);
         return old.map((row) => row.file).filter((name) => name !== file);
       });
     } catch (err) {
@@ -70,13 +84,13 @@ export function createSpeech({ db, azure, files, voice }: SpeechOptions) {
   }
 
   return {
-    voice,
+    voice: serverVoice,
 
     /**
-     * The kept audio of a reply, read now if it isn't kept yet. Whose message it is, and that it
-     * is still there, is the caller's to check.
+     * The kept audio of a reply, read now in `voice` if it isn't kept yet. Whose message it is,
+     * and that it is still there, is the caller's to check.
      */
-    async of(message: Message): Promise<Spoken> {
+    async of(message: Message, voice: string = serverVoice): Promise<Spoken> {
       if (message.role !== "assistant") invalid("Only a companion's replies are read aloud");
       const text = spokenText(message.content.map(blockText).join(""));
       if (!text) invalid("This reply has nothing to read aloud");
@@ -90,10 +104,48 @@ export function createSpeech({ db, azure, files, voice }: SpeechOptions) {
       const key = `${message.id}:${hash}`;
       let reading = underway.get(key);
       if (!reading) {
-        reading = read(message, text, hash).finally(() => underway.delete(key));
+        reading = read(message, voice, text, hash).finally(() => underway.delete(key));
         underway.set(key, reading);
       }
       return reading;
+    },
+
+    /** Every voice Azure offers, asked once a day. A failed ask is tried again next time. */
+    voices(): Promise<Voice[]> {
+      if (!voiceList || Date.now() - voiceList.at > VOICES_MS) {
+        const voices = azure.voices();
+        voiceList = { at: Date.now(), voices };
+        voices.catch(() => {
+          if (voiceList?.voices === voices) voiceList = null;
+        });
+      }
+      return voiceList.voices;
+    },
+
+    /**
+     * `text` read in `voice`, to hear it before choosing it. Not kept as a file: the last few are
+     * kept in memory, and the characters count like any other reading.
+     */
+    sample(voice: string, text: string): Promise<Uint8Array> {
+      const spoken = spokenText(text);
+      if (!spoken) invalid("Write something for the voice to read");
+      const key = createHash("sha256")
+        .update(
+          `${voice}
+${spoken}`,
+        )
+        .digest("hex");
+      let audio = samples.get(key);
+      if (!audio) {
+        audio = azure.synthesize(ssmlOf(spoken, voice)).then((bytes) => {
+          count([...spoken].length);
+          return bytes;
+        });
+        audio.catch(() => samples.delete(key));
+        samples.set(key, audio);
+        while (samples.size > SAMPLES_KEPT) samples.delete(samples.keys().next().value!);
+      }
+      return audio;
     },
   };
 }

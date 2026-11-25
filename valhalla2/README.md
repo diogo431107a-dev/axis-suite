@@ -194,10 +194,17 @@ CivitAI key Valhalla 2 works as before and offers no new pictures.
 
 ## Reading aloud
 
-A companion's replies can be read aloud, by Azure AI Speech's neural voices. For now every
-companion is read by the same voice, Ava (`en-US-AvaMultilingualNeural`), which is multilingual: it
-reads Portuguese, Spanish and most other languages too, telling them from the text.
+A companion's replies can be read aloud, by Azure AI Speech's neural voices.
 
+- **Each companion has its own voice.** Under **Voice** on a companion's page you can choose any
+  of the voices Azure offers in the server's region (over five hundred, in some 150 languages),
+  and find one by name, language or gender. **Hear it** reads a line you can change, so you hear
+  a voice before choosing it; that counts toward the month's characters like a reply, and hearing
+  the same words again is free. A companion that chooses none is read in the server's voice, Ava
+  (`en-US-AvaMultilingualNeural`) unless `SPEECH_VOICE` says otherwise. A voice marked
+  multilingual also reads other languages, telling them from the text; any other voice reads in
+  its own language. Changing the voice reads a reply again, in the new voice, the next time you
+  play it.
 - **As replies arrive.** The speaker switch in a chat's header (**Aloud** / **Silent**) says whether
   each new reply, version or greeting is read as soon as it is written. It is remembered by the
   browser, not the companion — on at home, off on the phone in public — and starts on.
@@ -210,7 +217,7 @@ button under the reply always works.
 
 **Each reply is read once.** The first time it is asked for, Azure reads it and the MP3 is kept on
 the server, about 0.4 MB a minute; playing it again is instant and costs nothing. An edited reply is
-read again, and the old audio deleted. Under the composer, after the first reading in a visit, is how
+read again, and the old audio deleted; so is a reply whose companion changed voice. Under the composer, after the first reading in a visit, is how
 many characters Azure has read this month for the whole server. Azure's free tier (F0) includes
 500,000 characters a month; the paid tier (S0) bills per million characters. Everyone who can sign in
 to Heimdall reads on the server's key.
@@ -330,7 +337,7 @@ default.
 | `PICTURE_PROMPT_MODEL`       | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                         |
 | `VALHALLA_PICTURE_MESSAGES`  | `20`                                             | How many messages it reads, up to the one being pictured.         |
 | `SPEECH_REGION`              | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.       |
-| `SPEECH_VOICE`               | `en-US-AvaMultilingualNeural`                    | The voice that reads replies aloud.                               |
+| `SPEECH_VOICE`               | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none of its own.           |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 

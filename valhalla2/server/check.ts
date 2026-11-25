@@ -70,6 +70,17 @@ export function messageId(value: unknown): number {
   return n;
 }
 
+/**
+ * An Azure voice name, or null (nothing chosen: the server's voice). Like a model id, any name is
+ * taken, not only those in the list: Azure says whether it knows it when it is asked to read.
+ */
+export function voice(value: unknown): string | null {
+  if (value === undefined || value === null || value === "") return null;
+  const name = required(value, LIMITS.voice, "The voice");
+  if (!/^[A-Za-z0-9:_-]+$/.test(name)) invalid("That voice name isn't valid");
+  return name;
+}
+
 /** A row id from a URL (a memory version, a pin): a positive whole number. */
 export function rowId(value: unknown, what: string): number {
   const n = typeof value === "string" && /^[0-9]{1,15}$/.test(value) ? Number(value) : NaN;

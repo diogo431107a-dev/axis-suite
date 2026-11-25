@@ -245,6 +245,10 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       CREATE INDEX likes_chat ON likes (chat_id);
     `);
   },
+  // v7: the Azure voice a companion's replies are read aloud in. NULL: the server's own voice.
+  (db) => {
+    db.exec(`ALTER TABLE companions ADD COLUMN voice TEXT;`);
+  },
 ];
 
 /**

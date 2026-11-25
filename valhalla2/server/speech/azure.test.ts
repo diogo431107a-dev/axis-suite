@@ -54,3 +54,54 @@ describe("Azure Speech", () => {
     await expect(azure.synthesize("<speak/>")).rejects.toThrow(/no audio/);
   });
 });
+
+describe("Azure's voices", () => {
+  const list = [
+    {
+      ShortName: "pt-BR-FranciscaNeural",
+      DisplayName: "Francisca",
+      Locale: "pt-BR",
+      LocaleName: "Portuguese (Brazil)",
+      Gender: "Female",
+    },
+    {
+      ShortName: "en-US-AvaMultilingualNeural",
+      DisplayName: "Ava Multilingual",
+      Locale: "en-US",
+      LocaleName: "English (United States)",
+      Gender: "Female",
+      SecondaryLocaleList: ["pt-BR"],
+    },
+    { DisplayName: "No name" },
+  ];
+
+  it("asks the region's list with the key, and lists them by language", async () => {
+    const { calls, azure } = fake(() => Response.json(list));
+    const voices = await azure.voices();
+    expect(calls[0]!.url).toBe("https://brazilsouth.tts.speech.microsoft.com/cognitiveservices/voices/list");
+    expect(calls[0]!.init.headers).toMatchObject({ "Ocp-Apim-Subscription-Key": "k-123" });
+    expect(voices).toEqual([
+      {
+        id: "en-US-AvaMultilingualNeural",
+        name: "Ava Multilingual",
+        locale: "en-US",
+        language: "English (United States)",
+        gender: "Female",
+        multilingual: true,
+      },
+      {
+        id: "pt-BR-FranciscaNeural",
+        name: "Francisca",
+        locale: "pt-BR",
+        language: "Portuguese (Brazil)",
+        gender: "Female",
+        multilingual: false,
+      },
+    ]);
+  });
+
+  it("says when the key is refused, or the answer isn't a list", async () => {
+    await expect(fake(() => new Response("", { status: 401 })).azure.voices()).rejects.toThrow(/refused/);
+    await expect(fake(() => Response.json({ error: 1 })).azure.voices()).rejects.toThrow(/no list/);
+  });
+});

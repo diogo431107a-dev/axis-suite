@@ -10,6 +10,7 @@ const companion: Companion = {
   profile: "<appearance>Gold hair, green eyes.</appearance>",
   settings: DEFAULT_SETTINGS,
   prompts: {},
+  voice: null,
   createdAt: "",
   updatedAt: "",
 };

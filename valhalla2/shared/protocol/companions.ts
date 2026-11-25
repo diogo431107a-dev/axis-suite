@@ -28,6 +28,8 @@ export interface Companion {
   profile: string;
   settings: Settings;
   prompts: Prompts;
+  /** The Azure voice its replies are read aloud in; null for the server's own. */
+  voice: string | null;
   createdAt: string;
   updatedAt: string;
 }

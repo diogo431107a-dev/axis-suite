@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_SETTINGS } from "../../shared/protocol.ts";
+import { DEFAULT_SETTINGS, type Voice } from "../../shared/protocol.ts";
 import { createChats } from "../chat/chats.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
@@ -25,6 +25,14 @@ afterEach(() => {
 });
 
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 4, 0, 0]);
+const VOICE: Voice = {
+  id: "pt-BR-FranciscaNeural",
+  name: "Francisca",
+  locale: "pt-BR",
+  language: "Portuguese (Brazil)",
+  gender: "Female",
+  multilingual: false,
+};
 
 function setup(voice = "en-US-AvaMultilingualNeural") {
   const db = openDatabase(":memory:");
@@ -45,6 +53,10 @@ function setup(voice = "en-US-AvaMultilingualNeural") {
     synthesize: async (ssml: string) => {
       read.push(ssml);
       return MP3;
+    },
+    voices: async () => {
+      read.push("voices");
+      return [VOICE];
     },
   };
   return { db, chats, tree, hello, mine, dir, files, read, speech: createSpeech({ db, azure, files, voice }) };
@@ -90,7 +102,7 @@ describe("reading aloud", () => {
     const kept = await first.speech.of(first.tree.get(first.hello.id));
     const other = createSpeech({
       db: first.db,
-      azure: { synthesize: async () => MP3 },
+      azure: { synthesize: async () => MP3, voices: async () => [] },
       files: first.files,
       voice: "pt-BR-FranciscaNeural",
     });
@@ -98,6 +110,37 @@ describe("reading aloud", () => {
     expect(changed.read).toBeGreaterThan(0);
     expect(changed.file).not.toBe(kept.file);
     expect(existsSync(join(first.dir, kept.file))).toBe(false);
+  });
+
+  it("reads in the companion's own voice when it has one", async () => {
+    const { tree, hello, read, speech } = setup("en-US-AvaMultilingualNeural");
+    const own = await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural");
+    expect(read[0]).toContain('<voice name="pt-BR-FranciscaNeural">');
+    expect(read[0]).toContain('xml:lang="pt-BR"');
+    // The server's voice is another reading, which replaces it.
+    const server = await speech.of(tree.get(hello.id));
+    expect(server.file).not.toBe(own.file);
+    expect(read[1]).toContain('<voice name="en-US-AvaMultilingualNeural">');
+  });
+
+  it("asks Azure for its voices once, not every time", async () => {
+    const { read, speech } = setup();
+    expect(await speech.voices()).toEqual([VOICE]);
+    expect(await speech.voices()).toEqual([VOICE]);
+    expect(read.filter((what) => what === "voices")).toHaveLength(1);
+  });
+
+  it("reads a sample to try a voice, counts it, and keeps it for asking again", async () => {
+    const { db, dir, read, speech } = setup();
+    expect(await speech.sample("pt-BR-FranciscaNeural", "*Smiles.* Olá!")).toEqual(MP3);
+    expect(read[0]).toContain('<voice name="pt-BR-FranciscaNeural">Smiles. Olá!</voice>');
+    expect(charsThisMonth(db)).toBe("Smiles. Olá!".length);
+    await speech.sample("pt-BR-FranciscaNeural", "*Smiles.* Olá!");
+    expect(read).toHaveLength(1);
+    expect(charsThisMonth(db)).toBe("Smiles. Olá!".length);
+    // Nothing is kept on disk.
+    expect(readdirSync(dir)).toEqual([]);
+    expect(() => speech.sample("pt-BR-FranciscaNeural", " * ")).toThrow(/Write something/);
   });
 
   it("reads only a companion's replies, and only ones with words", async () => {
@@ -111,7 +154,7 @@ describe("reading aloud", () => {
     const { db, tree, hello, dir, files } = setup();
     const failing = createSpeech({
       db,
-      azure: { synthesize: () => Promise.reject(new Error("down")) },
+      azure: { synthesize: () => Promise.reject(new Error("down")), voices: async () => [] },
       files,
       voice: "v",
     });
