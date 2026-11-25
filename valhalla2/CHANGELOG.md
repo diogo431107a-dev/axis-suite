@@ -11,6 +11,14 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
   an empty box. A box you change says "Your own words" and offers "Back to the default"; one you
   leave as the default keeps following it when a later version improves it. Emptying a box still
   means the default is used, and the box now says so.
+- **Each companion has its own voice.** A new **Voice** section on a companion's page lists every
+  voice Azure offers (over five hundred, in some 150 languages). Type a name, a language or
+  "female" to narrow it down, and **Hear it** to listen before choosing; that sample counts
+  toward the month's characters like a reply, and hearing the same words again is free. A
+  companion that chooses none keeps the server's voice, Ava, as before. After a change, a reply
+  already read is read again in the new voice the next time you play it.
+- **Clearer reading-aloud errors.** When Azure fails to read a reply, the chat now shows what
+  Azure said instead of "Something went wrong".
 
 ## 0.0.12 — 2026-11-17
 

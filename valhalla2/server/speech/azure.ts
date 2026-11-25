@@ -1,7 +1,9 @@
 // The one place Valhalla 2 talks to Azure AI Speech, which reads replies aloud.
 //
 // It uses Azure's REST endpoint for text to speech: one POST of SSML, one MP3 back. It is the same
-// service the Speech SDK talks to, without the SDK's websockets and dependencies.
+// service the Speech SDK talks to, without the SDK's websockets and dependencies. The voices a
+// companion can choose from come from the same region's voice list.
+import type { Voice } from "../../shared/protocol.ts";
 
 /** What Azure is asked for: MP3, 24 kHz mono at 48 kbit/s, which every browser plays. */
 export const AUDIO_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
@@ -22,7 +24,9 @@ export interface AzureSpeechOptions {
 
 export function createAzureSpeech(options: AzureSpeechOptions) {
   const { key, region, fetch: get = globalThis.fetch, requestMs = 60_000, maxBytes = 30 * 1024 * 1024 } = options;
-  const url = `https://${encodeURIComponent(region)}.tts.speech.microsoft.com/cognitiveservices/v1`;
+  const host = `https://${encodeURIComponent(region)}.tts.speech.microsoft.com/cognitiveservices`;
+  const url = `${host}/v1`;
+  const listUrl = `${host}/voices/list`;
 
   return {
     /** Reads SSML aloud and returns the MP3. */
@@ -61,7 +65,49 @@ export function createAzureSpeech(options: AzureSpeechOptions) {
       if (bytes.length > maxBytes) throw new SpeechError("The audio is larger than Valhalla 2 keeps");
       return bytes;
     },
+
+    /** Every voice the region offers, by language and then name. Asking costs nothing. */
+    async voices(): Promise<Voice[]> {
+      let res: Response;
+      try {
+        res = await get(listUrl, {
+          headers: { "Ocp-Apim-Subscription-Key": key, "User-Agent": "valhalla2" },
+          signal: AbortSignal.timeout(requestMs),
+        });
+      } catch (err) {
+        const reason = (err as Error).name === "TimeoutError" ? "it took too long to answer" : (err as Error).message;
+        throw new SpeechError(`Azure Speech can't be reached: ${reason}`);
+      }
+      if (res.status === 401 || res.status === 403) {
+        throw new SpeechError(
+          "Azure Speech refused the server's key. Whoever runs this Valhalla 2 needs to check the key and its region.",
+        );
+      }
+      if (!res.ok) throw new SpeechError(`Azure Speech answered ${res.status} when asked for its voices`);
+      const raw = (await res.json().catch(() => null)) as unknown;
+      if (!Array.isArray(raw)) throw new SpeechError("Azure Speech sent back no list of voices");
+      return raw.flatMap(voiceOf).sort((a, b) => a.language.localeCompare(b.language) || a.name.localeCompare(b.name));
+    },
   };
+}
+
+/** One entry of Azure's voice list as Valhalla 2 lists it, or nothing if it isn't one. */
+export function voiceOf(entry: unknown): Voice[] {
+  const fields = (entry ?? {}) as Record<string, unknown>;
+  const str = (value: unknown): string => (typeof value === "string" ? value : "");
+  const id = str(fields.ShortName);
+  if (!id) return [];
+  const secondary = Array.isArray(fields.SecondaryLocaleList) ? fields.SecondaryLocaleList : [];
+  return [
+    {
+      id,
+      name: str(fields.DisplayName) || id,
+      locale: str(fields.Locale),
+      language: str(fields.LocaleName) || str(fields.Locale),
+      gender: str(fields.Gender),
+      multilingual: secondary.length > 0 || id.includes("Multilingual"),
+    },
+  ];
 }
 
 export type AzureSpeech = ReturnType<typeof createAzureSpeech>;

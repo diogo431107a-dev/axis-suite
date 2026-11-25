@@ -1,10 +1,18 @@
 // The companions one person talks to.
 //
 // A companion is a name for the list, one profile text box the model reads as written (the user
-// persona goes inside it), its settings, and its own versions of Valhalla 2's prompt texts.
+// persona goes inside it), its settings, its own versions of Valhalla 2's prompt texts, and the
+// voice its replies are read aloud in.
 import type { DatabaseSync } from "node:sqlite";
 import { LIMITS, type Companion, type Settings } from "../shared/protocol.ts";
-import { object, prompts as checkPrompts, required, settings as checkSettings, text } from "./check.ts";
+import {
+  object,
+  prompts as checkPrompts,
+  required,
+  settings as checkSettings,
+  text,
+  voice as checkVoice,
+} from "./check.ts";
 import { config } from "./config.ts";
 import { notFound, tooMany } from "./errors.ts";
 import { createMemory } from "./memory/store.ts";
@@ -15,6 +23,7 @@ interface Row {
   profile: string;
   settings: string;
   prompts: string;
+  voice: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -25,11 +34,12 @@ export const companionOf = (row: Row): Companion => ({
   profile: row.profile,
   settings: JSON.parse(row.settings) as Settings,
   prompts: JSON.parse(row.prompts) as Companion["prompts"],
+  voice: row.voice,
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
 
-const COLUMNS = "id, name, profile, settings, prompts, created_at, updated_at";
+const COLUMNS = "id, name, profile, settings, prompts, voice, created_at, updated_at";
 
 /** One person's companions. `defaults` fills in settings a request leaves out. */
 export function createCompanions(db: DatabaseSync, owner: string, defaults: Settings) {
@@ -56,25 +66,27 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       const profile = text(fields.profile ?? "", LIMITS.profile, "The profile");
       const settings = checkSettings(fields.settings, defaults);
       const prompts = checkPrompts(fields.prompts);
+      const voice = checkVoice(fields.voice);
       const now = new Date().toISOString();
 
       const existing = db.prepare("SELECT owner FROM companions WHERE id = ?").get(id) as { owner: string } | undefined;
       if (existing && existing.owner !== owner) notFound("companion");
       if (existing) {
         db.prepare(
-          "UPDATE companions SET name = ?, profile = ?, settings = ?, prompts = ?, updated_at = ? WHERE id = ?",
-        ).run(name, profile, JSON.stringify(settings), JSON.stringify(prompts), now, id);
+          "UPDATE companions SET name = ?, profile = ?, settings = ?, prompts = ?, voice = ?, updated_at = ? WHERE id = ?",
+        ).run(name, profile, JSON.stringify(settings), JSON.stringify(prompts), voice, now, id);
       } else {
         const { count } = db.prepare("SELECT count(*) AS count FROM companions WHERE owner = ?").get(owner) as {
           count: number;
         };
         if (count >= LIMITS.companions) tooMany(`Valhalla 2 keeps ${LIMITS.companions} companions at most`);
-        db.prepare(`INSERT INTO companions (${COLUMNS}, owner) VALUES (?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT INTO companions (${COLUMNS}, owner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
           id,
           name,
           profile,
           JSON.stringify(settings),
           JSON.stringify(prompts),
+          voice,
           now,
           now,
           owner,

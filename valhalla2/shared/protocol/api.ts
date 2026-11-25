@@ -1,4 +1,4 @@
-// What the server says about itself, a reply read aloud, and how errors come back.
+// What the server says about itself, and how errors come back.
 import type { Settings } from "./models.ts";
 
 export interface Health {
@@ -8,15 +8,10 @@ export interface Health {
   pictures: boolean;
   /** Whether the server has an Azure Speech key, so replies can be read aloud. */
   speech: boolean;
+  /** The voice a companion that names none of its own is read in; null without Azure Speech. */
+  voice: string | null;
   /** What a new companion starts from. */
   defaults: Settings;
-}
-
-/** A reply read aloud: where its audio is, and how much Azure has read this month. */
-export interface SpeechReply {
-  url: string;
-  /** Characters Azure was asked to read this calendar month (UTC), by everyone on this server. */
-  monthChars: number;
 }
 
 export const ERROR_CODES = ["invalid", "not-found", "conflict", "too-many", "no-credential", "api", "busy"] as const;

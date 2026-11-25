@@ -68,4 +68,15 @@ describe("a companion", () => {
     companions.remove("comp-0001");
     expect(db.prepare("SELECT count(*) AS n FROM chats").get()).toEqual({ n: 0 });
   });
+
+  it("keeps the voice it is read aloud in, or none for the server's", () => {
+    const companions = createCompanions(openDatabase(":memory:"), "odin", DEFAULT_SETTINGS);
+    expect(companions.save("comp-0001", { name: "Freya" }).voice).toBeNull();
+    expect(companions.save("comp-0001", { name: "Freya", voice: "pt-BR-FranciscaNeural" }).voice).toBe(
+      "pt-BR-FranciscaNeural",
+    );
+    expect(companions.list()[0]!.voice).toBe("pt-BR-FranciscaNeural");
+    expect(companions.save("comp-0001", { name: "Freya", voice: "" }).voice).toBeNull();
+    expect(() => companions.save("comp-0001", { name: "Freya", voice: "<voice/>" })).toThrow(/voice name/);
+  });
 });

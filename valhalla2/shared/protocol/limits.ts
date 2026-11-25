@@ -38,4 +38,8 @@ export const LIMITS = {
   pins: 30,
   /** What you say you liked about a reply. */
   likeComment: 1_000,
+  /** An Azure voice name, such as en-US-AvaMultilingualNeural. */
+  voice: 100,
+  /** What a voice reads when you try it. */
+  voiceSample: 300,
 } as const;

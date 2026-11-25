@@ -54,6 +54,11 @@ export async function api<T>(path: string, options: ApiOptions = {}): Promise<T>
   return (await res.json()) as T;
 }
 
+/** POSTs `body` and answers with the bytes that come back, such as a voice's sample. */
+export async function apiBlob(path: string, body: unknown): Promise<Blob> {
+  return (await request(path, "POST", body)).blob();
+}
+
 /** A sentence for an error from api(), for a notice on the page. */
 export function describeError(err: unknown): string {
   if (err instanceof ApiFailure) return err.message;

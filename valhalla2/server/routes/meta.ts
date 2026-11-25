@@ -15,6 +15,7 @@ export function metaRoutes(s: Services): Router {
       apiKey: hasApiKey(),
       pictures: s.painter !== null,
       speech: s.speech !== null,
+      voice: s.speech?.voice ?? null,
       defaults: config.defaults,
     } satisfies Health);
   });

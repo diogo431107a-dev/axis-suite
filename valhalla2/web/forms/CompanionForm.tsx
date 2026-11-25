@@ -12,6 +12,7 @@ import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
 import { usePage } from "../page.ts";
 import { SettingsForm } from "./SettingsForm.tsx";
+import { VoicePicker } from "./VoicePicker.tsx";
 import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 import { useSave } from "../ui/useSave.ts";
 
@@ -62,6 +63,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const [profile, setProfile] = useState(companion?.profile ?? SUGGESTED_PROFILE);
   const [settings, setSettings] = useState<Settings>(companion?.settings ?? { ...health.defaults });
   const [prompts, setPrompts] = useState(() => promptTexts(companion?.prompts ?? {}));
+  const [voice, setVoice] = useState<string | null>(companion?.voice ?? null);
   const [confirming, setConfirming] = useState(false);
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
@@ -71,7 +73,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       const id = companion?.id ?? crypto.randomUUID();
       await api(`/api/companions/${id}`, {
         method: "PUT",
-        body: { name, profile, settings, prompts: ownPrompts(prompts) },
+        body: { name, profile, settings, prompts: ownPrompts(prompts), voice },
       });
       await reload();
       open({ kind: "companion", id });
@@ -124,6 +126,8 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       </Field>
 
       <SettingsForm settings={settings} onChange={setSettings} note="Every chat with this companion uses these." />
+
+      {health.speech ? <VoicePicker value={voice} onChange={setVoice} /> : null}
 
       <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
         <div>
