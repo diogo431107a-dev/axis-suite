@@ -1,6 +1,13 @@
 import { useState } from "react";
 import { Brain, Images } from "lucide-react";
-import { LIMITS, PROMPT_KEYS, type Companion, type Prompts, type Settings } from "../../shared/protocol.ts";
+import {
+  LIMITS,
+  PROMPT_KEYS,
+  type Companion,
+  type PromptKey,
+  type Prompts,
+  type Settings,
+} from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
 import { usePage } from "../page.ts";
@@ -30,13 +37,31 @@ Who you are when you talk to her.
 
 const area = `${inputStyle} resize-y font-body leading-relaxed`;
 
+/** Every prompt text as the form shows it: the companion's own words, or the default, to edit. */
+const promptTexts = (own: Prompts): Record<PromptKey, string> =>
+  Object.fromEntries(PROMPT_KEYS.map((key) => [key, own[key] ?? DEFAULT_PROMPTS[key]])) as Record<PromptKey, string>;
+
+const isDefault = (key: PromptKey, text: string): boolean => text.trim() === DEFAULT_PROMPTS[key].trim();
+
+/**
+ * What is saved: only the texts you changed. One left as the default (or emptied) isn't stored, so
+ * the companion keeps following the default, including when a later version improves it.
+ */
+const ownPrompts = (texts: Record<PromptKey, string>): Prompts =>
+  Object.fromEntries(
+    PROMPT_KEYS.filter((key) => texts[key].trim() !== "" && !isDefault(key, texts[key])).map((key) => [
+      key,
+      texts[key],
+    ]),
+  );
+
 export function CompanionForm({ companion }: { companion: Companion | null }) {
   const { health, chats, reload, open } = usePage();
   const { error, saving, run } = useSave();
   const [name, setName] = useState(companion?.name ?? "");
   const [profile, setProfile] = useState(companion?.profile ?? SUGGESTED_PROFILE);
   const [settings, setSettings] = useState<Settings>(companion?.settings ?? { ...health.defaults });
-  const [prompts, setPrompts] = useState<Prompts>(companion?.prompts ?? {});
+  const [prompts, setPrompts] = useState(() => promptTexts(companion?.prompts ?? {}));
   const [confirming, setConfirming] = useState(false);
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
@@ -44,7 +69,10 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const save = () =>
     run(async () => {
       const id = companion?.id ?? crypto.randomUUID();
-      await api(`/api/companions/${id}`, { method: "PUT", body: { name, profile, settings, prompts } });
+      await api(`/api/companions/${id}`, {
+        method: "PUT",
+        body: { name, profile, settings, prompts: ownPrompts(prompts) },
+      });
       await reload();
       open({ kind: "companion", id });
     });
@@ -101,28 +129,35 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
         <div>
           <h2 className="font-display text-lg">Valhalla 2's own words</h2>
           <p className="mt-1 text-xs text-faint">
-            The only text Valhalla 2 adds besides your profile and the chat. Leave one empty to use the default shown in
-            it. Inspect, in a chat, shows each one where it goes out.
+            The only text Valhalla 2 adds besides your profile and the chat. Each box starts with the default: change it
+            as you like. One left as the default keeps following it when a later version of Valhalla 2 improves it.
+            Inspect, in a chat, shows each one where it goes out.
           </p>
         </div>
         {PROMPT_KEYS.map((key) => (
           <Field key={key} label={PROMPT_LABELS[key].label} hint={PROMPT_LABELS[key].hint}>
             <textarea
               className={`${area} min-h-24`}
-              value={prompts[key] ?? ""}
+              value={prompts[key]}
               maxLength={LIMITS.prompt}
-              placeholder={DEFAULT_PROMPTS[key]}
               onChange={(e) => setPrompts({ ...prompts, [key]: e.target.value })}
             />
-            {prompts[key]?.trim() ? (
-              <button
-                type="button"
-                className="mt-1 text-xs text-faint hover:text-accent"
-                onClick={() => setPrompts({ ...prompts, [key]: "" })}
-              >
-                Back to the default
-              </button>
-            ) : null}
+            {isDefault(key, prompts[key]) ? null : (
+              <span className="mt-1 flex flex-wrap items-center gap-x-3 text-xs text-faint">
+                {prompts[key].trim() === "" ? (
+                  <span>Empty, so the default is used.</span>
+                ) : (
+                  <span>Your own words.</span>
+                )}
+                <button
+                  type="button"
+                  className="hover:text-accent"
+                  onClick={() => setPrompts({ ...prompts, [key]: DEFAULT_PROMPTS[key] })}
+                >
+                  Back to the default
+                </button>
+              </span>
+            )}
           </Field>
         ))}
       </section>
