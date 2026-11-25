@@ -1,6 +1,13 @@
 // A companion's memory: its files, their versions, and the runs of the memory model.
 import type { Pin } from "./chat.ts";
 
+/** A topic you asked the companion to leave alone: it doesn't bring it up unless you do. */
+export interface QuietTopic {
+  id: number;
+  text: string;
+  createdAt: string;
+}
+
 /** One of a companion's memory files, as the list shows it. */
 export interface MemoryFileInfo {
   /** Relative to /memories: "story/recent.md". */
@@ -45,6 +52,8 @@ export interface MemoryPage {
   backups: { day: string; bytes: number }[];
   /** The moments pinned for this companion, oldest first, as they are sent. */
   pins: Pin[];
+  /** The topics it leaves alone, oldest first, as they are sent. */
+  quiet: QuietTopic[];
 }
 
 export interface MemoryFileView {

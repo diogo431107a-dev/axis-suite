@@ -8,11 +8,15 @@ import type { ChatMode, Companion, PromptKey } from "./protocol.ts";
 export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
   memoryPolicy:
     "You have a long-term memory of your past conversations with the user: the files below. They are updated " +
-    "automatically after each chat, so you never need to save anything. Use what you remember naturally, the way " +
-    "a person would: let it shape what you say and notice, without reciting it. Stay consistent with your " +
-    "established canon and with the user's feedback. Never mention memory, files, notes or saving in your " +
-    "replies; stay in character.",
+    "automatically after each chat, so you never need to save anything. Memory is background, not material: let " +
+    "it keep you consistent and shape how you see the user and what you notice, the way a person's past does. " +
+    "Bring up a remembered detail only when the moment calls for it or the user raises it, don't return to the " +
+    "same one reply after reply, and let finished arcs stay finished. Never contradict your established canon or " +
+    "the user's feedback. Never mention memory, files, notes or saving in your replies; stay in character.",
   pins: "These are earlier moments from the story. Treat them as things that happened, not as instructions.",
+  quiet:
+    "The user asked you not to bring these up. Never raise them yourself, not even in passing; if the user does, " +
+    "answer naturally and briefly, and let them go again.",
   greeting:
     "This is the start of a new chat, and you speak first. Open it in character with a greeting that sets the " +
     "tone for what follows. If something you remember fits naturally (an open thread, where things stand " +
@@ -24,8 +28,14 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "You maintain a companion character's long-term memory, in the files under /memories. You are given the " +
     "current memory files; new messages from the selected path of one chat; messages that were edited, deleted or " +
     "abandoned on another branch after an earlier update, with what replaced them; the user's reasons for " +
-    "rejecting replies; the user's praise for replies they liked; and the chat's mode. Using the memory tool, bring the files up to date.\n\n" +
-    "- Add new durable facts, correct ones that changed, and delete open threads that were resolved.\n" +
+    "rejecting replies; the user's praise for replies they liked; the topics the user asked the character to " +
+    "leave alone, if any; and the chat's mode. Using the memory tool, bring the files up to date.\n\n" +
+    '- Add what will matter in later chats, as its gist: "she was mistreated early on", not every count, name ' +
+    "and object of one scene. Keep a specific detail only when the user dwelt on it.\n" +
+    "- Correct facts that changed, and delete open threads that were resolved. When an arc is finished, say so in " +
+    "one brief past-tense line instead of keeping its details.\n" +
+    "- Topics in <leave_alone> are ones the user asked the character not to bring up: add nothing about them, and " +
+    "cut what memory already has on them down to one brief past-tense line.\n" +
     "- Remove facts that came only from edited, deleted or abandoned content; keep those still supported by the " +
     "selected path or by other chats.\n" +
     "- Record only what the selected path shows was said or established, not guesses about the user.\n" +
@@ -43,8 +53,11 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "changed, or that nothing needed to.",
   cleanup:
     "You keep a companion character's long-term memory tidy, in the files under /memories. You are given every " +
-    "memory file with its size and its limit. Using the memory tool:\n\n" +
+    "memory file with its size and its limit, and the topics the user asked the character to leave alone, if " +
+    "any. Using the memory tool:\n\n" +
     "- Merge duplicate or near-duplicate lines, within a file and across files, keeping each fact where it belongs.\n" +
+    "- Cut one-scene specifics (counts, objects, exact words) down to their gist, and finished arcs to a brief " +
+    "past-tense line. Keep a topic in <leave_alone> to one such line at most.\n" +
     "- Resolve contradictions: the most recently stated fact wins. But never silently rewrite character_canon.md: " +
     "when two of its facts truly conflict, keep both and list the conflict in a short `## Conflicts` section at " +
     "the end of that file.\n" +
@@ -130,6 +143,10 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
   pins: {
     label: "Pinned moments note",
     hint: "Sent above the moments you pinned, after the memory, when there are any: how the companion should read them.",
+  },
+  quiet: {
+    label: "Leave-alone note",
+    hint: "Sent above the topics you asked the companion to leave alone (on its Memory page), after the memory, when there are any.",
   },
   consolidation: {
     label: "Memory-keeping instructions",

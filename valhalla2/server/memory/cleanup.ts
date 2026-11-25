@@ -11,6 +11,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { Companion, RunOutcome } from "../../shared/protocol.ts";
 import { promptOf } from "../../shared/prompts.ts";
 import { transaction } from "../db.ts";
+import { quietBlock, quietOf } from "../quiet.ts";
 import { withMemoryLock } from "./lock.ts";
 import { finishRun, runStep, type RunDeps } from "./run.ts";
 import { byImportance, bytesOf, humanSize } from "./store.ts";
@@ -66,7 +67,7 @@ export function cleanup(deps: RunDeps, companion: Companion): Promise<RunOutcome
       source: "cleanup",
       mode: "canon",
       system: promptOf(companion, "cleanup"),
-      prompt: `<current_memory>\n${shown}\n</current_memory>`,
+      prompt: [`<current_memory>\n${shown}\n</current_memory>`, ...quietBlock(quietOf(db, companion.id))].join("\n\n"),
     });
     if (!step.ok) {
       memory.drop(scratch, companion.id);

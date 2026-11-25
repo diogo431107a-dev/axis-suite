@@ -7,6 +7,7 @@ import { id as checkId, object, rowId } from "../check.ts";
 import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { pinsOf } from "../pins.ts";
+import { quietOf } from "../quiet.ts";
 import type { Services } from "../services.ts";
 
 export function memoryRoutes(s: Services): Router {
@@ -17,6 +18,7 @@ export function memoryRoutes(s: Services): Router {
     rebuilding: s.scheduler.rebuilding(companion.id),
     backups: backups(s.backupDir).map(({ day, bytes }) => ({ day, bytes })),
     pins: pinsOf(s.db, companion.id),
+    quiet: quietOf(s.db, companion.id),
   });
 
   routes.get("/companions/:id/memory", (req: Request, res: Response) => {
@@ -86,6 +88,22 @@ export function memoryRoutes(s: Services): Router {
     const my = s.ownedBy(req);
     const companion = my.companions.get(checkId(req.params.id));
     my.pins.remove(companion.id, rowId(req.params.pinId, "That pin"));
+    res.json(memoryPage(companion));
+  });
+
+  /** Asks the companion to leave a topic alone, `{ text }`. Every chat with it sees that on its next turn. */
+  routes.post("/companions/:id/quiet", (req: Request, res: Response) => {
+    const my = s.ownedBy(req);
+    const companion = my.companions.get(checkId(req.params.id));
+    my.quiet.add(companion.id, req.body);
+    res.status(201).json(memoryPage(companion));
+  });
+
+  /** Lets the companion bring a topic up again. */
+  routes.delete("/companions/:id/quiet/:quietId", (req: Request, res: Response) => {
+    const my = s.ownedBy(req);
+    const companion = my.companions.get(checkId(req.params.id));
+    my.quiet.remove(companion.id, rowId(req.params.quietId, "That topic"));
     res.json(memoryPage(companion));
   });
 

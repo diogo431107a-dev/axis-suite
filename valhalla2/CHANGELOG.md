@@ -4,6 +4,20 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Memory stays in the background.** A companion was bringing the same old details up in reply
+  after reply. Its memory instructions now say to raise a remembered detail only when the moment
+  calls for it or you do, and to let finished arcs stay finished; the memory model keeps the gist of
+  a scene instead of every count and object, and writes a finished arc as one short line. A new
+  companion's canon file no longer calls its facts "highest priority". **By hand:** in an existing
+  companion's `character_canon.md`, on its Memory page, change "Highest priority: never contradict
+  these." to "Never contradict these, but they are background: don't bring them up unprompted.", and
+  trim any detail it keeps repeating. If you rewrote a companion's **Memory policy**,
+  **Memory-keeping instructions** or **Tidy-up instructions**, they keep your text.
+- **Leave alone.** A new list on the Memory page for topics the companion keeps bringing up that
+  you'd rather it didn't. Every chat with it is told not to raise them unless you do, from its next
+  turn, and the memory model adds nothing more about them. The note above the list is one of the
+  companion's own texts, **Leave-alone note**.
+
 - **Pictures keep track of the story.** Before a picture of a moment, Claude now works out the
   scene from the companion's memory and much more of the chat than before: the place, the time, the
   weather and what it has done (still soaked from the rain thirty messages ago), and everyone's

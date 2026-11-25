@@ -268,6 +268,19 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE companions ADD COLUMN voice_feeling INTEGER NOT NULL DEFAULT 1;
     `);
   },
+  // v9: topics a companion leaves alone (quiet.ts): it doesn't bring them up unless you do, and the
+  // memory model keeps them brief.
+  (db) => {
+    db.exec(`
+      CREATE TABLE quiet_topics (
+        id           INTEGER PRIMARY KEY,
+        companion_id TEXT NOT NULL REFERENCES companions(id) ON DELETE CASCADE,
+        text         TEXT NOT NULL,
+        created_at   TEXT NOT NULL
+      );
+      CREATE INDEX quiet_topics_companion ON quiet_topics (companion_id, id);
+    `);
+  },
 ];
 
 /**

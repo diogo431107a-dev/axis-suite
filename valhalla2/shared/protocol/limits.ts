@@ -36,6 +36,9 @@ export const LIMITS = {
   pinSpeaker: 80,
   /** How many moments one companion keeps pinned. Every one is sent in every chat. */
   pins: 30,
+  /** A topic for the companion to leave alone, and how many it keeps. Every one is sent in every chat. */
+  quietText: 200,
+  quiet: 30,
   /** What you say you liked about a reply. */
   likeComment: 1_000,
   /** One field of a scene you correct (the place, someone's clothes…), and how many people it has. */

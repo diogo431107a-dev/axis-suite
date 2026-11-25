@@ -90,7 +90,7 @@ export function createMemoryService(db: DatabaseSync, memory: Memory, limits: Me
 
   return {
     /** The Memory page, but for what only the server's other parts know (rebuilding, backups). */
-    page(companion: Companion): Omit<MemoryPage, "rebuilding" | "backups" | "pins"> {
+    page(companion: Companion): Omit<MemoryPage, "rebuilding" | "backups" | "pins" | "quiet"> {
       return {
         companionId: companion.id,
         files: memory

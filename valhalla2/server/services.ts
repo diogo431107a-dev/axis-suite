@@ -22,6 +22,7 @@ import { runMemoryModel } from "./claude/memory.ts";
 import { startPictures } from "./pictures/feature.ts";
 import { createPictures } from "./pictures/store.ts";
 import { createPins, pinsOf } from "./pins.ts";
+import { createQuiet } from "./quiet.ts";
 import { readScene } from "./claude/scene.ts";
 import type { Remembered } from "./scene/context.ts";
 import { createScenes, momentRequest } from "./scene/sheet.ts";
@@ -68,6 +69,7 @@ export function createServices(db: DatabaseSync) {
       pictures: createPictures(db, username),
       pins: createPins(db, username, chats),
       likes: createLikes(db, chats),
+      quiet: createQuiet(db, companions),
     };
   }
 

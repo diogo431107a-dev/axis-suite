@@ -15,11 +15,19 @@
 // a run that fails, is declined or runs out of steps changes nothing and can run again. With
 // nothing new it does nothing at all, so running it twice is the same as running it once.
 import type { DatabaseSync } from "node:sqlite";
-import { blockText, type ChatMode, type Companion, type Message, type RunOutcome } from "../../shared/protocol.ts";
+import {
+  blockText,
+  type ChatMode,
+  type Companion,
+  type Message,
+  type QuietTopic,
+  type RunOutcome,
+} from "../../shared/protocol.ts";
 import { CONSOLIDATION_MODES, promptOf } from "../../shared/prompts.ts";
 import { transaction } from "../db.ts";
 import { createTree } from "../chat/tree.ts";
 import { markFiled, praiseFor, type Praise } from "../likes.ts";
+import { quietBlock, quietOf } from "../quiet.ts";
 import { renderFiles } from "./render.ts";
 import { withMemoryLock } from "./lock.ts";
 import type { Memory } from "./store.ts";
@@ -158,6 +166,7 @@ export function promptFor(
   companion: Companion,
   files: ReturnType<Memory["files"]>,
   pending: NonNullable<ReturnType<typeof pendingFor>>,
+  quiet: QuietTopic[] = [],
 ): string {
   const { chat, path, fresh, corrections, feedback, praise, modeChanged } = pending;
   const who = (role: Message["role"]) => (role === "user" ? "USER" : companion.name.toUpperCase());
@@ -204,6 +213,7 @@ export function promptFor(
     parts.push(`<rejection_reasons>\n${lines.join("\n")}\n</rejection_reasons>`);
   }
   parts.push(...praiseBlocks(praise));
+  parts.push(...quietBlock(quiet));
   return parts.join("\n\n");
 }
 
@@ -237,7 +247,7 @@ export function consolidate(deps: ConsolidateDeps, chatId: string, companion: Co
       system: `${promptOf(companion, "consolidation")}
 
 ${CONSOLIDATION_MODES[pending.chat.mode]}`,
-      prompt: promptFor(companion, memory.files(companion.id), pending),
+      prompt: promptFor(companion, memory.files(companion.id), pending, quietOf(deps.db, companion.id)),
     });
     if (!step.ok) {
       memory.drop(scratch, companion.id);

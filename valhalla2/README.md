@@ -39,7 +39,8 @@ In practice that means:
 - **Valhalla 2's own words are few, and yours to rewrite.** A chat needs a little text you didn't
   write: the memory policy that comes with the companion's memory, the instruction that has it open
   the chat, the note that passes on why you rejected a reply, the instructions the memory model
-  works by, and those Claude reads a scene and writes a picture's prompt by. Each companion has its own copy of every one of them, which you can rewrite or leave on
+  works by, those Claude reads a scene and writes a picture's prompt by, and the notes above your
+  pins and the topics to leave alone. Each companion has its own copy of every one of them, which you can rewrite or leave on
   the default. The **Inspect** panel in a chat shows the exact request that goes out, built
   by the same code that sends it, with every hidden part marked.
 - **Nothing is softened on the way back.** If the API declines a turn, that turn is stored and
@@ -149,6 +150,23 @@ its pins behind. The chat you pinned from takes a fresh look at memory on its ne
 with a cold cache, as after a mode change — and other chats see the pin when they next look. Pins
 are listed, and unpinned, on the Memory page; 30 at most, of 500 characters each, since every one
 is sent every turn.
+
+**Memory is background, not material.** Everything in memory goes out with every turn, and a model
+tends to use what it is shown: a vivid detail from one old scene can turn up in reply after reply.
+So the memory policy tells the companion to bring a remembered detail up only when the moment calls
+for it or you raise it, never the same one turn after turn, and to let finished arcs stay finished.
+The memory model is told to keep the gist of a scene ("she was mistreated early on") rather than
+its every count and object, and to write a finished arc as one brief line in the past tense; tidy-ups
+cut one-scene specifics down the same way.
+
+**Leave alone.** When the companion still keeps returning to something, add it under **Leave alone**
+on the Memory page ("the old debt", "the cellar"). Every chat with the companion gets the list in a
+`<leave_alone>` block after its memory and pins, under a short note (**Leave-alone note**), telling
+it not to raise those topics unless you do; each chat takes a fresh look on its next turn. The memory
+model is shown the list too, adds nothing about those topics, and cuts what memory has on them to a
+brief line, and so does a rebuild. Taking one off the list lets the companion bring it up again; 30
+at most, of 200 characters each. Editing the memory files works as well, and takes effect the same
+way: what the files say now is what is sent, and their history is only kept for putting things back.
 
 Every change to every file is kept, with where it came from (a chat, your edit, a revert). The
 Memory page shows a file's history as a line-by-line diff, and **puts back** any earlier version as
@@ -456,6 +474,7 @@ One module holding both halves, like the rest of the suite.
 | `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation, tidy-ups and rebuilds (`consolidate.ts`, `cleanup.ts`, `rebuild.ts`, `run.ts`) and when they run (`scheduler.ts`) |
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
 | `server/pins.ts`       | pinned moments: kept word for word, sent after memory, and the chats that must look again                                                                                                                                                                                |
+| `server/quiet.ts`      | topics to leave alone: sent after memory and pins, shown to the memory model, and every chat looks again                                                                                                                                                                 |
 | `server/likes.ts`      | liked replies: the words as they were liked, and the praise memory hasn't heard of yet, or must take back                                                                                                                                                                |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |

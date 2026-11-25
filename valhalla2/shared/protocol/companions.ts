@@ -8,6 +8,7 @@ import type { Settings } from "./models.ts";
 export const PROMPT_KEYS = [
   "memoryPolicy",
   "pins",
+  "quiet",
   "greeting",
   "rejection",
   "consolidation",
