@@ -4,6 +4,30 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.194 — 2026-11-25
+
+Valhalla 2 0.0.20: a voice for each companion. A new Voice section on a companion's page lists every voice Azure offers, finds one by name, language or gender, and reads a line so you can hear it before choosing; a companion that chooses none keeps the server's voice. The boxes under "Valhalla 2's own words" now open holding the default text, ready to edit, and the code behind Valhalla 2 is reorganised into smaller parts with nothing changing in use. The other modules are unchanged.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.1.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla   | 0.0.6   |
+| Valhalla 2 | 0.0.20  |
+
 ## 0.0.186 — 2026-11-17
 
 Valhalla 2 0.0.12: like a reply. A heart under each of the companion's replies likes it and asks, optionally, what made it good. With a comment, the memory model reads it at its next run and keeps what you liked in the companion's feedback memory, so later chats do more of it; without one, the like is just for you. A like never goes into the chat itself, and memory is told when praise it already has is taken back. The other modules are unchanged.
