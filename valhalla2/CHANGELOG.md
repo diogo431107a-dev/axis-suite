@@ -4,6 +4,15 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Cheaper by default.** A new companion now starts on Haiku 5.5 at high effort: about forty
+  times cheaper per token than Opus 5.5, and it holds a character well. Memory and picture prompts
+  stay on Sonnet 5.5. Companions you already have keep their own settings: to move one, pick
+  Haiku 5.5 and effort high in its settings. Switching a new companion to Grok now sets its effort
+  to low, where Grok is quicker and cheaper.
+- **Memory costs less to keep.** Each step of a memory update now reads the earlier steps from the
+  cache instead of paying full price for them again, so memory updates and tidy-ups cost less with
+  no change to what they do.
+
 ## 0.0.33 — 2026-11-26
 
 - **A voice's speed, pitch and speaking style.** On a companion's page, under **Voice**, two new

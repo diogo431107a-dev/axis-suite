@@ -40,6 +40,10 @@ export async function runMemoryModel(request: MemoryRunRequest): Promise<MemoryR
     system: [{ type: "text", text: request.system }],
     messages: [{ role: "user", content: request.prompt }],
     tools: [request.tool],
+    // Each step re-sends everything before it; this breakpoint follows the run as it grows, so
+    // each step reads the earlier ones from the cache instead of paying for them again. The run
+    // takes seconds, so the 5-minute cache is plenty and costs least to write.
+    cache_control: { type: "ephemeral" },
     max_iterations: request.maxIterations,
     // The whole history goes out each step: no message thread kept on the server.
     thread: false,

@@ -104,7 +104,7 @@ describe("the request that goes to Grok", () => {
   });
 
   it("always sends effort, sends max as xhigh, and keeps nothing on xAI", () => {
-    expect(requestFor(system, messages, grokSettings).reasoning).toEqual({ effort: "low" });
+    expect(requestFor(system, messages, { ...grokSettings, effort: "low" }).reasoning).toEqual({ effort: "low" });
     const request = requestFor(system, messages, { ...grokSettings, effort: "max", maxTokens: 2048 }, "chat-1");
     expect(request.reasoning).toEqual({ effort: "xhigh" });
     expect(request.max_output_tokens).toBe(2048);
