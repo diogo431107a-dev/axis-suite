@@ -1,5 +1,6 @@
 import { idleEndsAt, type Session } from "./state.ts";
 import { VERSIONS } from "./versions.ts";
+import { OUTSIDE_LINKS, moduleInfo, type ModuleInfo } from "./modules.ts";
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c] ?? c);
@@ -64,9 +65,37 @@ border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.45)}
 .versions dt{color:var(--muted)}
 .versions dd{margin:0;font-variant-numeric:tabular-nums}
 .about .small{margin-top:12px;font-size:12px}
+.actions{display:grid;gap:10px}
+.button{display:block;padding:11px;border-radius:8px;background:var(--text);color:var(--bg);font-weight:600;text-align:center;text-decoration:none}
+.button:hover{background:#fff}
+.button:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.card.wide{max-width:560px;overflow:visible}
+.card.wide::before{border-radius:14px 14px 0 0}
+.section{margin:28px 0 8px;font-size:12px;font-weight:500;color:var(--muted);text-transform:uppercase;letter-spacing:.08em}
+.section:first-of-type{margin-top:0}
+.section-note{margin:-4px 0 10px;font-size:13px}
+.modules{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.row{position:relative;display:flex;align-items:stretch;border:1px solid var(--line);border-radius:10px;background:var(--field)}
+.row:hover,.row:focus-within{border-color:#34405a}
+.row .go{flex:1;min-width:0;display:grid;grid-template-columns:1fr auto;align-items:baseline;gap:2px 16px;padding:12px 14px;color:var(--text);text-decoration:none;border-radius:10px 0 0 10px}
+.row .go:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.row .name{font-weight:600}
+.row .what{grid-column:1;color:var(--muted);font-size:13px}
+.row .host{grid-column:2;grid-row:1/3;align-self:center;color:var(--muted);font:12px ui-monospace,SFMono-Regular,Consolas,monospace;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:200px}
+.row .info{width:auto;flex:none;padding:0 14px;background:transparent;color:var(--muted);border-left:1px solid var(--line);border-radius:0 10px 10px 0;font-weight:400}
+.row .info:hover{background:#1a2233;color:var(--text)}
+.row .hint{position:absolute;z-index:2;left:12px;right:12px;top:calc(100% + 6px);padding:10px 12px;background:#1a2233;border:1px solid var(--line);border-radius:8px;
+box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:13px;pointer-events:none;opacity:0;visibility:hidden;transition:opacity .12s,visibility .12s}
+.row:hover .hint,.row:focus-within .hint{opacity:1;visibility:visible;transition-delay:.35s}
+.about .explain{margin-top:10px}
+.about .open{margin-top:16px}
+.back{display:block;margin-top:24px;text-align:center;color:var(--muted)}
+.back:hover{color:var(--text)}
+@media (max-width:480px){.card{padding:28px 20px 24px}.row .go{grid-template-columns:1fr}.row .what{order:1}.row .host{order:2;grid-column:1;grid-row:auto;max-width:none}}
+@media (hover:none){.row .hint{display:none}}
 `;
 
-function page(nonce: string, title: string, body: string, script = ""): string {
+function page(nonce: string, title: string, body: string, script = "", wide = false): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -77,7 +106,7 @@ function page(nonce: string, title: string, body: string, script = ""): string {
 <style nonce="${nonce}">${CSS}</style>
 </head>
 <body>
-<main class="card">
+<main class="card${wide ? " wide" : ""}">
 ${body}
 </main>
 ${ABOUT}
@@ -175,10 +204,13 @@ ${notice ? `<p class="alert" role="alert">${esc(notice)}</p>` : ""}
 <dt>Ends if unused</dt><dd class="ts" data-ts="${idleEndsAt(session)}">${new Date(idleEndsAt(session)).toLocaleString("en-GB")}</dd>
 <dt>Sign-in required by</dt><dd class="ts" data-ts="${session.expiresAt}">${new Date(session.expiresAt).toLocaleString("en-GB")}</dd>
 </dl>
+<div class="actions">
+<a class="button" href="/bifrost">Open Bifrost</a>
 <form method="post" action="/logout">
 <input type="hidden" name="user" value="${esc(session.username)}">
 <button class="secondary" type="submit">Close session</button>
-</form>`;
+</form>
+</div>`;
 
   // Replace the server-rendered fallback with a live clock in the viewer's local time.
   const script = `
@@ -196,4 +228,63 @@ document.querySelectorAll(".ts").forEach(function (el) {
 });`;
 
   return page(nonce, "Heimdall", body, script);
+}
+
+// One row of Bifrost: the link, a tooltip on hover or keyboard focus, and an info button that opens
+// the same explanation as a popover, for touch screens where there is no hover.
+function bifrostRow(id: string, href: string, info: ModuleInfo, host: string): { row: string; popover: string } {
+  const hint = info.about ? `<span class="hint" aria-hidden="true">${esc(info.about)}</span>` : "";
+  const row = `<li class="row">
+<a class="go" href="${esc(href)}"${info.about ? ` aria-describedby="about-${id}"` : ""}><span class="name">${esc(info.name)}</span><span class="host">${esc(host)}</span>${info.what ? `<span class="what">${esc(info.what)}</span>` : ""}</a>
+${info.about ? `<button type="button" class="info" popovertarget="about-${id}" aria-label="About ${esc(info.name)}">?</button>` : ""}
+${hint}
+</li>`;
+  const popover = info.about
+    ? `<div id="about-${id}" class="about" popover>
+<div class="about-head"><h2>${esc(info.name)}</h2><button type="button" class="close" popovertarget="about-${id}" popovertargetaction="hide" aria-label="Close">×</button></div>
+${info.what ? `<p class="muted">${esc(info.what)}</p>` : ""}
+<p class="explain">${esc(info.about)}</p>
+<a class="button open" href="${esc(href)}">Open ${esc(info.name)}</a>
+</div>`
+    : "";
+  return { row, popover };
+}
+
+function hostOf(url: string): string {
+  try {
+    return new URL(url).host;
+  } catch {
+    return url;
+  }
+}
+
+export function renderBifrost({
+  nonce,
+  modules,
+  visits,
+}: {
+  nonce: string;
+  /** Every registered module and its origin. */
+  modules: ReadonlyMap<string, string>;
+  /** How often this user opened each module from here. */
+  visits: Readonly<Record<string, number>>;
+}): string {
+  const ordered = [...modules.keys()]
+    .map((key) => ({ key, info: moduleInfo(key), count: visits[key] ?? 0 }))
+    .sort((a, b) => b.count - a.count || a.info.name.localeCompare(b.info.name));
+  const own = ordered.map(({ key, info }) =>
+    bifrostRow(`m-${key}`, `/bifrost/go/${encodeURIComponent(key)}`, info, hostOf(modules.get(key) ?? "")),
+  );
+  const outside = OUTSIDE_LINKS.map((link, i) => bifrostRow(`o-${i}`, link.url, link, hostOf(link.url)));
+
+  const body = `${brand("Bifrost: every module of the Axis Suite")}
+<h2 class="section">Modules</h2>
+${own.length > 0 ? `<ul class="modules">${own.map((r) => r.row).join("")}</ul>` : `<p class="muted">No modules are installed yet.</p>`}
+<h2 class="section">Also on this server</h2>
+<p class="muted section-note">These have sign-ins of their own.</p>
+<ul class="modules">${outside.map((r) => r.row).join("")}</ul>
+<a class="back" href="/">Back to Heimdall</a>
+${[...own, ...outside].map((r) => r.popover).join("")}`;
+
+  return page(nonce, "Bifrost · Heimdall", body, "", true);
 }
