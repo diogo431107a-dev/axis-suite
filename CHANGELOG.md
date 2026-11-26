@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.209 — 2026-11-26
+
+Valhalla 2 0.0.35: cheaper by default. A new companion starts on Haiku 5.5 at high effort, about forty times cheaper per token than Opus 5.5; memory and picture prompts stay on Sonnet 5.5, and existing companions keep their settings. Memory updates now read their earlier steps from the cache, so they cost less. The other modules are unchanged.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.1.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla 2 | 0.0.35  |
+
 ## 0.0.207 — 2026-11-26
 
 Valhalla 2 0.0.33: a voice's speed, pitch and speaking style. Each companion keeps, along with its voice, how fast and how high its replies are read and, for voices with styles of their own, a style to speak in; Hear it tries them before saving, and feelings are read on top of them.

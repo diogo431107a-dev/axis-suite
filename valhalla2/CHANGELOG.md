@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.35 — 2026-11-26
+
 - **Cheaper by default.** A new companion now starts on Haiku 5.5 at high effort: about forty
   times cheaper per token than Opus 5.5, and it holds a character well. Memory and picture prompts
   stay on Sonnet 5.5. Companions you already have keep their own settings: to move one, pick
