@@ -1,16 +1,19 @@
 # Heimdall
 
-The suite's sign-in service. Users sign in with hardcoded credentials. After signing in they see the current time and their name, and can close the session to sign in as someone else. Three wrong attempts lock that client out for 5 minutes. The other modules ask Heimdall who is signed in, so they need no login of their own.
+The suite's sign-in service. Users sign in with hardcoded credentials. After signing in they see the current time and their name, can open Bifrost to go to any module, and can close the session to sign in as someone else. Three wrong attempts lock that client out for 5 minutes. The other modules ask Heimdall who is signed in, so they need no login of their own.
 
 - **Stack:** TypeScript on Node's built-in `http` module, with no runtime dependencies. Caddy sits in front and handles HTTPS.
 - **Security:** passwords are stored as scrypt hashes, never in plain text. The session cookie is HttpOnly and SameSite. A strict nonce-based Content-Security-Policy is applied. Response timing is the same for known and unknown usernames, so it doesn't reveal which accounts exist. Parallel guesses can't get past the attempt limit.
 
 ```
 server/
-  index.ts          HTTP routes: GET /, POST /login, POST /logout, GET /whoami, GET /online, GET /healthz
+  index.ts          HTTP routes: GET /, POST /login, POST /logout, GET /bifrost, GET /bifrost/go/<module>,
+                    GET /whoami, GET /online, GET /healthz
   users.ts          ← the hardcoded accounts live here
   state.ts          sessions (48 h idle / 14 days, saved to disk) + 3-strikes / 5-minute lockout
-  views.ts          HTML pages (login, dashboard)
+  views.ts          HTML pages (login, dashboard, Bifrost)
+  modules.ts        what Bifrost says about each module, and the links to Saga and Roundcube
+  bifrost.ts        how often each user opened each module from Bifrost, saved to disk
   password.ts       scrypt hashing
   hash-password.ts  CLI to create a hash for a new password
   list-users.ts     prints every username, for the installer (modules delete everyone else's data)
@@ -28,7 +31,15 @@ From the suite's root, `pnpm dev` starts Heimdall with every other module. For H
 pnpm --filter heimdall dev
 ```
 
-Open http://127.0.0.1:3000. The demo accounts are `odin` / `allfather-demo`, `freya` / `folkvangr-demo` and `john` / `john-demo`. Sessions are saved in `./data/`.
+Open http://127.0.0.1:3000. The demo accounts are `odin` / `allfather-demo`, `freya` / `folkvangr-demo` and `john` / `john-demo`. Sessions and Bifrost's counts are saved in `./data/`.
+
+## Bifrost
+
+Bifrost (`/bifrost`, the **Open Bifrost** button) lists every installed module with its address, a few words on what it is, and a longer explanation on hover or behind its **?** button. Clicking one goes through `/bifrost/go/<module>`, which counts the visit and sends the browser on, so each user's most-opened modules come first; ties are in alphabetical order.
+
+- **Which modules, at what address:** the `RETURN_ORIGIN_<MODULE>` variables the installer gives Heimdall, so only installed modules appear. A module not described in `server/modules.ts` is listed under its plain name.
+- **The counts:** `bifrost.json` next to the sessions (`/var/lib/heimdall/` on a server), per user. A removed user's counts are dropped when Heimdall starts. Deleting the file only resets everyone's order.
+- **Also on this server:** Habits Saga and Roundcube, which have sign-ins of their own, at the addresses written in `server/modules.ts`. They are not counted. Saga registers with Heimdall like every module, so it is listed here instead of among the modules, at the address it registered (its own copy on a test install).
 
 ## Users and passwords
 

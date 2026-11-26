@@ -13,7 +13,9 @@ import {
   recordFailure,
   touchSession,
 } from "./state.ts";
-import { formatCountdown, renderDashboard, renderLogin } from "./views.ts";
+import { formatCountdown, renderBifrost, renderDashboard, renderLogin } from "./views.ts";
+import { recordVisit, visitCounts } from "./bifrost.ts";
+import { OUTSIDE_MODULES } from "./modules.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -25,11 +27,18 @@ const COOKIE_SECURE = process.env.COOKIE_SECURE === "1";
 const COOKIE_DOMAIN = process.env.COOKIE_DOMAIN?.trim() || undefined;
 // Origins (e.g. https://loggbok.example.com) that may send users here with ?next= and get them
 // back after signing in. Anything else is ignored, so this can't be an open redirect. Each module
-// adds its own RETURN_ORIGIN_<MODULE> (the installer writes one systemd drop-in per module).
-const RETURN_ORIGINS = Object.entries(process.env)
-  .filter(([key]) => key.startsWith("RETURN_ORIGIN_"))
-  .map(([, value]) => (value ?? "").trim())
-  .filter(Boolean);
+// adds its own RETURN_ORIGIN_<MODULE> (the installer writes one systemd drop-in per module), which
+// is also how Bifrost knows the modules and their addresses.
+const MODULE_ORIGINS = new Map(
+  Object.entries(process.env)
+    .filter(([key]) => key.startsWith("RETURN_ORIGIN_"))
+    .map(([key, value]): [string, string] => [
+      key.slice("RETURN_ORIGIN_".length).toLowerCase().replaceAll("_", "-"),
+      (value ?? "").trim(),
+    ])
+    .filter(([, origin]) => origin),
+);
+const RETURN_ORIGINS = [...MODULE_ORIGINS.values()];
 const COOKIE_NAME = "heimdall_sid";
 const MAX_BODY_BYTES = 4096;
 
@@ -165,6 +174,36 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
         nonce,
         renderLogin({ nonce, error: lockedMs > 0 ? lockMessage(lockedMs) : undefined, lockedMs, next }),
       );
+    }
+    return;
+  }
+
+  // Bifrost: every installed module, the ones this user opens most often first.
+  if (pathname === "/bifrost" && (req.method === "GET" || req.method === "HEAD")) {
+    const session = getSession(sid);
+    if (!session) {
+      redirect(res, "/");
+      return;
+    }
+    touchSession(sid);
+    sendHtml(res, 200, nonce, renderBifrost({ nonce, modules: MODULE_ORIGINS, visits: visitCounts(session.username) }));
+    return;
+  }
+
+  // A module opened from Bifrost: count it, then go there. Only ever to a registered origin.
+  if (pathname.startsWith("/bifrost/go/") && req.method === "GET") {
+    const module = pathname.slice("/bifrost/go/".length);
+    const origin = OUTSIDE_MODULES.has(module) ? undefined : MODULE_ORIGINS.get(module);
+    const session = getSession(sid);
+    if (!session) {
+      redirect(res, "/");
+    } else if (!origin) {
+      res.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });
+      res.end("Not found");
+    } else {
+      touchSession(sid);
+      recordVisit(session.username, module);
+      redirect(res, origin);
     }
     return;
   }
