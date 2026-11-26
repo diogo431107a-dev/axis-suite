@@ -1,6 +1,6 @@
 import { idleEndsAt, type Session } from "./state.ts";
 import { VERSIONS } from "./versions.ts";
-import { OUTSIDE_LINKS, moduleInfo, type ModuleInfo } from "./modules.ts";
+import { OUTSIDE_LINKS, OUTSIDE_MODULES, moduleInfo, type ModuleInfo } from "./modules.ts";
 
 const ESCAPES: Record<string, string> = { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" };
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ESCAPES[c] ?? c);
@@ -270,12 +270,16 @@ export function renderBifrost({
   visits: Readonly<Record<string, number>>;
 }): string {
   const ordered = [...modules.keys()]
+    .filter((key) => !OUTSIDE_MODULES.has(key))
     .map((key) => ({ key, info: moduleInfo(key), count: visits[key] ?? 0 }))
     .sort((a, b) => b.count - a.count || a.info.name.localeCompare(b.info.name));
   const own = ordered.map(({ key, info }) =>
     bifrostRow(`m-${key}`, `/bifrost/go/${encodeURIComponent(key)}`, info, hostOf(modules.get(key) ?? "")),
   );
-  const outside = OUTSIDE_LINKS.map((link, i) => bifrostRow(`o-${i}`, link.url, link, hostOf(link.url)));
+  const outside = OUTSIDE_LINKS.map((link, i) => {
+    const url = (link.module && modules.get(link.module)) || link.url;
+    return bifrostRow(`o-${i}`, url, link, hostOf(url));
+  });
 
   const body = `${brand("Bifrost: every module of the Axis Suite")}
 <h2 class="section">Modules</h2>

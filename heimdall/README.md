@@ -39,7 +39,7 @@ Bifrost (`/bifrost`, the **Open Bifrost** button) lists every installed module w
 
 - **Which modules, at what address:** the `RETURN_ORIGIN_<MODULE>` variables the installer gives Heimdall, so only installed modules appear. A module not described in `server/modules.ts` is listed under its plain name.
 - **The counts:** `bifrost.json` next to the sessions (`/var/lib/heimdall/` on a server), per user. A removed user's counts are dropped when Heimdall starts. Deleting the file only resets everyone's order.
-- **Also on this server:** Habits Saga and Roundcube, which have sign-ins of their own, at the addresses written in `server/modules.ts`. They are not counted.
+- **Also on this server:** Habits Saga and Roundcube, which have sign-ins of their own, at the addresses written in `server/modules.ts`. They are not counted. Saga registers with Heimdall like every module, so it is listed here instead of among the modules, at the address it registered (its own copy on a test install).
 
 ## Users and passwords
 

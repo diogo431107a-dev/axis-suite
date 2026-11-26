@@ -15,6 +15,7 @@ import {
 } from "./state.ts";
 import { formatCountdown, renderBifrost, renderDashboard, renderLogin } from "./views.ts";
 import { recordVisit, visitCounts } from "./bifrost.ts";
+import { OUTSIDE_MODULES } from "./modules.ts";
 
 const HOST = process.env.HOST ?? "127.0.0.1";
 const PORT = Number(process.env.PORT ?? 3000);
@@ -192,7 +193,7 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   // A module opened from Bifrost: count it, then go there. Only ever to a registered origin.
   if (pathname.startsWith("/bifrost/go/") && req.method === "GET") {
     const module = pathname.slice("/bifrost/go/".length);
-    const origin = MODULE_ORIGINS.get(module);
+    const origin = OUTSIDE_MODULES.has(module) ? undefined : MODULE_ORIGINS.get(module);
     const session = getSession(sid);
     if (!session) {
       redirect(res, "/");

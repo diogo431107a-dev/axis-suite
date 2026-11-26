@@ -101,7 +101,11 @@ export function moduleInfo(key: string): ModuleInfo {
 }
 
 export interface OutsideLink extends ModuleInfo {
+  /** Where it is on the VPS. */
   url: string;
+  /** A module that registers with Heimdall without signing in through it: listed only here, at
+   *  the address it registered, so a test install links to its own copy. */
+  module?: string;
 }
 
 /** What else runs on the server without signing in through Heimdall, in the order shown. */
@@ -112,6 +116,7 @@ export const OUTSIDE_LINKS: readonly OutsideLink[] = [
     about:
       "A habit tracker played as a pixel-art fantasy game, with a public Hall of Fame. It has its own players, who join with an invite code.",
     url: "https://saga.gansoazul.com.br",
+    module: "saga",
   },
   {
     name: "Roundcube",
@@ -120,3 +125,6 @@ export const OUTSIDE_LINKS: readonly OutsideLink[] = [
     url: "https://roundcube.gansoazul.com.br",
   },
 ];
+
+/** Registered modules that Bifrost lists only among the outside links, and doesn't count. */
+export const OUTSIDE_MODULES: ReadonlySet<string> = new Set(OUTSIDE_LINKS.flatMap((link) => link.module ?? []));
