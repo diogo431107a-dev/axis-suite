@@ -4,6 +4,30 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.201 — 2026-11-25
+
+Valhalla 2 0.0.27: scenes, feeling and quieter memory. Before a picture of a moment, or a reply read aloud, Claude works out the scene from the companion's memory and the chat around it: the place, the weather and what it has done, who is there and in what state, and how each line is said. Pictures are drawn from it, replies are read with each line's feeling, and a clapperboard under any message shows it for correcting. Memory now stays in the background, keeping a scene's gist rather than its every detail, and a new Leave alone list on the Memory page stops a companion bringing up chosen topics. The other modules are unchanged.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.1.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla   | 0.0.6   |
+| Valhalla 2 | 0.0.27  |
+
 ## 0.0.194 — 2026-11-25
 
 Valhalla 2 0.0.20: a voice for each companion. A new Voice section on a companion's page lists every voice Azure offers, finds one by name, language or gender, and reads a line so you can hear it before choosing; a companion that chooses none keeps the server's voice. The boxes under "Valhalla 2's own words" now open holding the default text, ready to edit, and the code behind Valhalla 2 is reorganised into smaller parts with nothing changing in use. The other modules are unchanged.

@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.27 — 2026-11-25
+
 - **Memory stays in the background.** A companion was bringing the same old details up in reply
   after reply. Its memory instructions now say to raise a remembered detail only when the moment
   calls for it or you do, and to let finished arcs stay finished; the memory model keeps the gist of
