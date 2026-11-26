@@ -4,6 +4,11 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+- **Valhalla is retired.** The original companions module is removed from the suite, in favour of
+  Valhalla 2: its folder, its place in `deploy/modules.conf` and the workspace, and its mentions in
+  the README. It was already stopped and removed from the VPS by hand. Later versions' tables no
+  longer list it.
+
 ## 0.0.204 — 2026-11-25
 
 Valhalla 2 0.0.30: Grok companions, and companions without memory. A new companion is now either Claude or Grok (Grok 4.7, through the xAI API, when the server has an xAI key), chosen once when it is created; nothing a Grok companion says ever goes to Claude, or the other way round. A Grok companion has no memory: every chat is sent whole with its pins, pictures are drawn from the chosen message, and replies are read aloud as written. A new Claude companion can be made the same way, without memory, or with memory as before. Grok companions have a temperature setting. The other modules are unchanged.
