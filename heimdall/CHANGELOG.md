@@ -4,6 +4,10 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+- Bifrost has a look of its own: the rainbow bridge over snowy plains, with snow falling (it stays still if your device is set to reduce motion).
+- Every link in Bifrost opens in a new tab, so Bifrost stays open in its own.
+- Opening Bifrost while signed out shows the sign-in page, and signing in brings you back to Bifrost instead of Heimdall's page. Useful for a bookmark, or an address that sends people straight to Bifrost.
+
 ## 0.0.31 — 2026-11-26
 
 - Heimdall's page has an **Open Bifrost** button. Bifrost lists every installed module with its address and what it is for (hover over a module, or tap its **?**, to read more), and puts the ones you open most often from there first. Each user has their own order. Below them, links to Habits Saga and to Roundcube, the webmail, which have sign-ins of their own.

@@ -69,9 +69,10 @@ function sessionCookie(value: string, maxAgeSeconds: number): string {
   return `${COOKIE_NAME}=${value}; Path=/; HttpOnly; SameSite=Lax; Max-Age=${maxAgeSeconds}${COOKIE_DOMAIN ? `; Domain=${COOKIE_DOMAIN}` : ""}${COOKIE_SECURE ? "; Secure" : ""}`;
 }
 
-/** The URL to send the user back to, if it belongs to an allowed app. */
+/** The URL to send the user back to, if it belongs to an allowed app or is Bifrost. */
 function returnTo(next: string | null | undefined): string | undefined {
   if (!next) return undefined;
+  if (next === "/bifrost") return next;
   try {
     return RETURN_ORIGINS.includes(new URL(next).origin) ? next : undefined;
   } catch {
@@ -182,7 +183,8 @@ async function handle(req: IncomingMessage, res: ServerResponse): Promise<void> 
   if (pathname === "/bifrost" && (req.method === "GET" || req.method === "HEAD")) {
     const session = getSession(sid);
     if (!session) {
-      redirect(res, "/");
+      // Signing in brings them back here.
+      redirect(res, "/?next=/bifrost");
       return;
     }
     touchSession(sid);
