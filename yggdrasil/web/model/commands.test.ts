@@ -361,6 +361,59 @@ describe("moving", () => {
   });
 });
 
+describe("moveInto", () => {
+  it("puts the bullets first inside the target, in order, with their children", () => {
+    const store = build(TREE);
+    check(
+      store,
+      cmd.moveInto(ctxOf(store), ["D", "E"], "B"),
+      `
+      A
+        B
+          D
+          E
+          C
+    `,
+    );
+  });
+
+  it("leaves a collapsed target collapsed", () => {
+    const store = build("A\n  B [+]\n    C\nE");
+    check(
+      store,
+      cmd.moveInto(ctxOf(store), ["E"], "B"),
+      `
+      A
+        B [+]
+          E
+          C
+    `,
+    );
+  });
+
+  it("moves to the top of the top level", () => {
+    const store = build(TREE);
+    check(
+      store,
+      cmd.moveInto(ctxOf(store), ["C"], null),
+      `
+      C
+      A
+        B
+        D
+      E
+    `,
+    );
+  });
+
+  it("never moves a bullet into itself or under it", () => {
+    const store = build(TREE);
+    expect(cmd.moveInto(ctxOf(store), ["A"], "A")).toBeNull();
+    expect(cmd.moveInto(ctxOf(store), ["A"], "C")).toBeNull();
+    expect(cmd.moveInto(ctxOf(store), [], "E")).toBeNull();
+  });
+});
+
 describe("other commands", () => {
   it("removes bullets and puts the caret above", () => {
     const store = build(TREE);

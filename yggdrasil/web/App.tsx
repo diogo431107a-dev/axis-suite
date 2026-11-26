@@ -9,6 +9,7 @@ import { Outliner } from "./model/outliner.ts";
 import { ExportDialog } from "./outline/ExportDialog.tsx";
 import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./outline/hooks.ts";
 import { focusSearch, zoomFromLocation } from "./outline/nav.ts";
+import { MoveDialog } from "./outline/MoveDialog.tsx";
 import { Outline } from "./outline/Outline.tsx";
 import { SearchBox } from "./outline/SearchBox.tsx";
 import { ShareDialog } from "./outline/ShareDialog.tsx";
@@ -220,6 +221,7 @@ function Page({ me, notice }: { me: Me; notice: string }) {
       <UploadProgress />
       {dialog?.kind === "export" && <ExportDialog root={dialog.root} onClose={closeDialog} />}
       {dialog?.kind === "share" && <ShareDialog id={dialog.id} onClose={closeDialog} />}
+      {dialog?.kind === "move" && <MoveDialog ids={dialog.ids} before={dialog.before} onClose={closeDialog} />}
     </div>
   );
 }

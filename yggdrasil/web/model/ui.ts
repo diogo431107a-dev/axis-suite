@@ -2,6 +2,7 @@
 // caret should go), the block selection, the zoomed-in bullet and the view settings. Bullets
 // subscribe to their own id, so moving the caret re-renders two bullets, not all of them.
 import type { Node } from "../../shared/protocol.ts";
+import type { Focus } from "./undo.ts";
 
 type Listener = () => void;
 
@@ -38,8 +39,14 @@ export interface View {
   highlight: RegExp | null;
 }
 
-/** A dialog over the page. */
-export type Dialog = { kind: "export"; root: string | null } | { kind: "share"; id: string };
+/**
+ * A dialog over the page. Move to… keeps the caret or selection the user had, which the dialog
+ * takes the focus from, to give it back.
+ */
+export type Dialog =
+  | { kind: "export"; root: string | null }
+  | { kind: "share"; id: string }
+  | { kind: "move"; ids: string[]; before: Focus };
 
 const SHOW_COMPLETED_KEY = "yggdrasil.showCompleted";
 

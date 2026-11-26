@@ -1,18 +1,25 @@
 // Drag and drop with pointer events on a bullet's dot (no HTML5 drag and drop). A line shows
-// where the bullets will land; its depth follows the pointer's x. A click without dragging zooms
-// into the bullet instead.
+// where the bullets will land; its depth follows the pointer's x. Over a bullet in the sidebar,
+// that bullet lights up instead and the dragged ones go first inside it; held over a folded one,
+// it unfolds. A click without dragging zooms into the bullet instead.
 import type { PointerEvent as ReactPointerEvent } from "react";
 import type { Node } from "../../shared/protocol.ts";
 import * as cmd from "../model/commands.ts";
 import type { Outliner } from "../model/outliner.ts";
 import { INDENT } from "./layout.ts";
+import { moveBullets } from "./move.ts";
 import { zoomTo } from "./nav.ts";
+import { exists, sidebarFolds } from "./sidebarFolds.ts";
 
 /** Pixels to move before a press becomes a drag; more for a finger, which wobbles as it taps. */
 const DRAG_THRESHOLD = 5;
 const TOUCH_DRAG_THRESHOLD = 10;
 /** Scroll when the pointer is this close to the top or bottom of the window. */
 const SCROLL_EDGE = 60;
+/** How long the pointer rests on a folded bullet in the sidebar before it unfolds. */
+const UNFOLD_MS = 700;
+/** How a bullet in the sidebar looks while bullets would drop into it. */
+const TARGET_LOOK = ["bg-sky-100", "ring-1", "ring-sky-300"];
 
 interface Drop {
   parentId: string | null;
@@ -20,6 +27,24 @@ interface Drop {
   /** Where the line starts and sits. */
   x: number;
   y: number;
+}
+
+/**
+ * The sidebar bullet under (x, y) the dragged bullets may go into, if any: its element, and the
+ * bullet (null: the top level).
+ */
+function sidebarTarget(
+  o: Outliner,
+  dragged: ReadonlySet<string>,
+  x: number,
+  y: number,
+): { el: HTMLElement; id: string | null } | null {
+  const el = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-move-target]");
+  if (!el || el.dataset.moveReadonly !== undefined) return null;
+  const id = el.dataset.moveTarget || null;
+  const ctx = o.ctx();
+  if (id !== null && [...dragged].some((d) => cmd.isAncestorOrSelf(ctx, d, id))) return null;
+  return { el, id };
 }
 
 const dotLeft = (row: HTMLElement) => row.querySelector("[data-dot]")!.getBoundingClientRect().left;
@@ -89,6 +114,8 @@ export function onDotPointerDown(o: Outliner, id: string, e: ReactPointerEvent<H
   const dragged = new Set(ids);
   let dragging = false;
   let drop: Drop | null = null;
+  let into: { el: HTMLElement; id: string | null } | null = null;
+  let unfoldTimer: ReturnType<typeof setTimeout> | undefined;
   let line: HTMLDivElement | null = null;
   const faded: HTMLElement[] = [];
   dot.setPointerCapture(e.pointerId);
@@ -114,9 +141,25 @@ export function onDotPointerDown(o: Outliner, id: string, e: ReactPointerEvent<H
       if (Math.hypot(ev.clientX - startX, ev.clientY - startY) < threshold) return;
       begin();
     }
-    if (ev.clientY < SCROLL_EDGE) window.scrollBy(0, -12);
-    else if (ev.clientY > window.innerHeight - SCROLL_EDGE) window.scrollBy(0, 12);
-    drop = findDrop(o, dragged, ev.clientX - grab, ev.clientY);
+    // Near the top or bottom, the page scrolls; over the sidebar, the sidebar does.
+    const sidebar = document
+      .elementFromPoint(ev.clientX, ev.clientY)
+      ?.closest("nav[aria-label=Sidebar]")?.parentElement;
+    const scroller = sidebar ?? window;
+    const box = sidebar?.getBoundingClientRect() ?? { top: 0, bottom: window.innerHeight };
+    if (ev.clientY < box.top + SCROLL_EDGE) scroller.scrollBy(0, -12);
+    else if (ev.clientY > box.bottom - SCROLL_EDGE) scroller.scrollBy(0, 12);
+    const over = sidebarTarget(o, dragged, ev.clientX, ev.clientY);
+    if (over?.el !== into?.el) {
+      into?.el.classList.remove(...TARGET_LOOK);
+      over?.el.classList.add(...TARGET_LOOK);
+      clearTimeout(unfoldTimer);
+      const id = over?.id;
+      if (id) unfoldTimer = setTimeout(() => sidebarFolds.open([id], exists(o)), UNFOLD_MS);
+    }
+    into = over;
+    // Over the sidebar the line is never shown: a drop there goes into a bullet or nowhere.
+    drop = into || sidebar ? null : findDrop(o, dragged, ev.clientX - grab, ev.clientY);
     if (!line) return;
     line.style.display = drop ? "block" : "none";
     if (drop) {
@@ -132,12 +175,18 @@ export function onDotPointerDown(o: Outliner, id: string, e: ReactPointerEvent<H
     dot.removeEventListener("pointerup", end);
     dot.removeEventListener("pointercancel", end);
     line?.remove();
+    clearTimeout(unfoldTimer);
+    into?.el.classList.remove(...TARGET_LOOK);
     document.body.classList.remove("cursor-grabbing", "select-none");
     for (const el of faded) el.style.opacity = "";
     if (ev.type === "pointercancel") return;
     if (!dragging) {
       zoomTo(o, id);
       o.ui.clearCaret();
+      return;
+    }
+    if (into) {
+      moveBullets(o, ids, into.id);
       return;
     }
     const target = drop;
