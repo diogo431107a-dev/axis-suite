@@ -3,7 +3,7 @@
 /**
  * How much effort the model puts into a reply. This replaces the temperature slider other
  * companion apps have: the current models reject `temperature`, `top_p` and `top_k` outright.
- * Dialogue usually wants "low" — it answers sooner and stays in voice.
+ * On Haiku, "high" holds a character well and still costs little; a dearer model often needs less.
  */
 export const EFFORTS = ["low", "medium", "high", "xhigh", "max"] as const;
 export type Effort = (typeof EFFORTS)[number];
@@ -83,12 +83,15 @@ export const PRICES: Readonly<Record<string, Price>> = {
 /**
  * What a new companion starts from when the server names no models of its own. The server's
  * CHAT_MODEL and MEMORY_MODEL replace the two models; /api/health hands the result to the page.
+ *
+ * The economical choice: Haiku at high effort answers in character well for a fraction of what
+ * Sonnet or Opus cost. Memory stays on Sonnet, which keeps it more carefully.
  */
 export const DEFAULT_SETTINGS: Settings = {
-  model: "claude-opus-5-5",
+  model: "claude-haiku-5-5",
   memoryModel: "claude-sonnet-5-5",
   maxTokens: 4096,
-  effort: "low",
+  effort: "high",
   stopSequences: [],
   cacheTtl: "1h",
   fallbacks: true,

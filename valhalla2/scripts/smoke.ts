@@ -32,7 +32,7 @@ const settings = {
   model,
   memoryModel: grok ? model : DEFAULT_SETTINGS.memoryModel,
   maxTokens: 512,
-  effort: "low" as const,
+  effort: "high" as const,
 };
 
 const filler = (what: string) =>

@@ -441,7 +441,7 @@ default.
 
 | Variable                     | Default                                          | What it does                                                      |
 | ---------------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
-| `CHAT_MODEL`                 | `claude-opus-5-5`                                | The model a new companion answers with. Each can change it.       |
+| `CHAT_MODEL`                 | `claude-haiku-5-5`                               | The model a new companion answers with. Each can change it.       |
 | `MEMORY_MODEL`               | `claude-sonnet-5-5`                              | The model a new companion keeps its memory with. Each can change. |
 | `VALHALLA_SWIPE_ASK`         | `5`                                              | Swipes on one reply before asking why they aren't working.        |
 | `VALHALLA_WINDOW_TOKENS`     | `20000`                                          | About how many tokens of a chat are sent each turn.               |
@@ -485,8 +485,8 @@ These surprise people coming from other companion apps. They are not choices mad
 them produces errors.
 
 - **There is no temperature.** `temperature`, `top_p` and `top_k` are rejected by the current
-  models. `effort` is the dial that replaced them: `low` for dialogue, higher when you want the
-  model to think before it speaks.
+  models. `effort` is the dial that replaced them: how long the model thinks before it speaks,
+  and so how many tokens a reply costs. Haiku holds a character well on `high`.
 - **The first message must be yours.** The API takes no conversation that starts with the
   companion. So a greeting answers a fixed, hidden first message — `[The chat begins.]` — followed by
   the greeting instruction. Both are stored with the greeting and sent again, unchanged, on every
@@ -515,6 +515,12 @@ model that tried a declined turn added up. It is an estimate; the Claude Console
 
 The cache keeps a chat for 5 minutes or an hour, your choice per companion. An hour is the default
 because people pause, and a cold cache costs twenty times a warm one.
+
+**Economical defaults.** A new companion answers on Haiku 5.5 at high effort: forty times cheaper
+than Opus 5.5 per token, and it holds a character well. Memory stays on Sonnet 5.5, and picture
+prompts too, because those are judgement work done once per chat or picture. Each memory run makes
+several requests in a row, and each re-reads the one before it from the cache, so only what is new
+in a step costs full price. Any companion can still be moved to a dearer model in its settings.
 
 ## Not here yet
 

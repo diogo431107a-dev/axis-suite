@@ -53,7 +53,7 @@ const message = (over: Partial<Anthropic.Beta.BetaMessage> = {}): Anthropic.Beta
 describe("the request that goes out", () => {
   it("sends the system blocks, the messages and the chosen settings", () => {
     const request = requestFor(system, [said, answered], { ...DEFAULT_SETTINGS, maxTokens: 2048, effort: "medium" });
-    expect(request.model).toBe("claude-opus-5-5");
+    expect(request.model).toBe("claude-haiku-5-5");
     expect(request.max_tokens).toBe(2048);
     expect(request.output_config).toEqual({ effort: "medium" });
     expect(request.system).toBe(system);

@@ -104,13 +104,17 @@ export function SettingsForm({
   /**
    * A new chat model. A Grok companion's memory model, which nothing uses, follows it; moving a new
    * companion back to Claude gives it the server's memory model again. A temperature is Grok's only.
+   * Moving between Claude and Grok resets effort to what is economical there: Grok's high is slow
+   * and dear for dialogue, so it starts low; Claude starts on the server's default (high, on Haiku).
    */
   const chooseModel = (model: string) => {
     const grok = providerOf(model) === "xai";
+    const moved = grok !== onGrok;
     onChange({
       ...settings,
       model,
       memoryModel: grok ? model : onGrok ? health.defaults.memoryModel : settings.memoryModel,
+      effort: moved ? (grok ? "low" : health.defaults.effort) : settings.effort,
       temperature: grok ? settings.temperature : null,
     });
   };
@@ -152,7 +156,7 @@ export function SettingsForm({
           hint={
             onGrok
               ? "How much thinking goes into a reply. Grok has no max: max is sent as xhigh."
-              : "How much thinking goes into a reply. Dialogue usually wants low."
+              : "How much thinking goes into a reply, and so what it costs. Haiku does well on high; a dearer model often needs less."
           }
         >
           <select
