@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.214 — 2026-11-26
+
+Yggdrasil 1.2.0: moving bullets is much easier. The sidebar shows the whole outline as a tree you can unfold and fold, and a bullet dragged onto any bullet there moves inside it. Alt+Shift+M, or **Move to…** in a bullet's menu, asks where to move it: type part of a name and press Enter. Ctrl+/, or the small ? at the top, lists the keyboard shortcuts. The other modules are unchanged.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.2.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.1.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla 2 | 0.0.37  |
+
 ## 0.0.211 — 2026-11-26
 
 Valhalla 2 0.0.37: long chats without memory no longer get stuck. A Grok companion, or a Claude one without memory, used to send the whole chat every turn until the model refused it; now its oldest turns stop being sent at about 160K tokens, a line in the chat shows where, and no Grok request reaches the 200K tokens where xAI charges twice the rate. The other modules are unchanged.
