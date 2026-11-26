@@ -1,7 +1,8 @@
-// The file pane: starred bullets, top-level bullets, the bullets shared with the user and those
-// they share, and the tags inside the zoomed-in bullet with their counts. Built from the whole
-// tree, so it updates a moment after typing (useDeferredValue) rather than on every key.
-import { useDeferredValue, useMemo, useRef, type ReactNode } from "react";
+// The file pane: starred bullets, the whole outline as a tree to unfold (SidebarTree), the bullets
+// shared with the user and those they share, and the tags inside the zoomed-in bullet with their
+// counts. Built from the whole tree, so it updates a moment after typing (useDeferredValue)
+// rather than on every key. Every bullet listed is also a place to drop dragged bullets.
+import { useCallback, useDeferredValue, useMemo, useRef, type ReactNode } from "react";
 import { Download, Hash, Star, Upload, Users, X } from "lucide-react";
 import type { Node } from "../../shared/protocol.ts";
 import { importFile } from "../io/importer.ts";
@@ -11,10 +12,11 @@ import { tagCounts } from "../search/run.ts";
 import { plainText } from "../text/plain.ts";
 import { useOutliner, useTreeVersion, useView } from "./hooks.ts";
 import { pathOf, zoomTo } from "./nav.ts";
+import { useRevealZoom } from "./sidebarFolds.ts";
+import { HomeRow, TreeRow } from "./SidebarTree.tsx";
 
 interface Overview {
   starred: Node[];
-  top: Node[];
   /** The bullets shared with the user, with their owners, by owner. */
   withMe: { node: Node; owner: string }[];
   /** The user's bullets they share, in the order of their tree. */
@@ -37,16 +39,12 @@ function overview(store: Store): Overview {
   walk(store.children(null));
   const shared = store.sharedRoots().filter((id) => store.get(id)?.deletedAt === null);
   walk(shared);
-  const top = store
-    .children(null)
-    .map((id) => store.get(id)!)
-    .filter((n) => n.deletedAt === null);
   const withMe = shared
     .map((id) => ({ node: store.get(id)!, owner: store.sharedWithMe(id)?.owner ?? "" }))
     .sort(
       (a, b) => a.owner.localeCompare(b.owner) || plainText(a.node.content).localeCompare(plainText(b.node.content)),
     );
-  return { starred, top, withMe, byMe };
+  return { starred, withMe, byMe };
 }
 
 export function Sidebar({ onPick }: { onPick?: () => void }) {
@@ -61,6 +59,15 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
   // oxlint-disable-next-line react-hooks/exhaustive-deps
   const tags = useMemo(() => tagCounts(o.store, zoom, showCompleted), [o, version, zoom, showCompleted]);
   const zoomName = zoom && (plainText(o.store.get(zoom)?.content ?? "") || "Untitled");
+  const top = o.store
+    .children(null)
+    .map((id) => o.store.get(id)!)
+    .filter((n) => n.deletedAt === null && (showCompleted || n.completedAt === null));
+  useRevealZoom(zoom);
+  // The same function from one render to the next, so the tree's rows aren't drawn again for it.
+  const onPickRef = useRef(onPick);
+  onPickRef.current = onPick;
+  const pick = useCallback(() => onPickRef.current?.(), []);
 
   // Takes a bullet someone shares with the user off their list: the sharing stops for them.
   const leave = async (id: string) => {
@@ -76,10 +83,12 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
     zoomTo(o, id);
     onPick?.();
   };
-  const link = (node: Node, icon?: ReactNode, detail?: string, after?: ReactNode) => (
-    <li key={node.id} className="group relative">
+  const link = (node: Node, icon: ReactNode) => (
+    <li key={node.id}>
       <a
         href={pathOf(node.id)}
+        data-move-target={node.id}
+        data-move-readonly={o.store.roleOf(node.id) === "viewer" || undefined}
         onClick={(e) => {
           if (e.ctrlKey || e.metaKey || e.shiftKey) return;
           e.preventDefault();
@@ -91,9 +100,7 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
       >
         {icon}
         <span className="truncate">{plainText(node.content) || "Untitled"}</span>
-        {detail && <span className="ml-auto shrink-0 pl-1 text-xs text-gray-400">{detail}</span>}
       </a>
-      {after}
     </li>
   );
 
@@ -104,27 +111,50 @@ export function Sidebar({ onPick }: { onPick?: () => void }) {
           {data.starred.map((n) => link(n, <Star className="h-3.5 w-3.5 shrink-0 fill-amber-300 text-amber-400" />))}
         </Section>
       )}
-      <Section title="Top level">
-        {data.top.length > 0 ? data.top.map((n) => link(n)) : <li className="px-2 text-gray-400">Nothing yet</li>}
+      <Section title="Outline">
+        <HomeRow zoom={zoom} onPick={pick} />
+        {top.length > 0 ? (
+          top.map((n) => (
+            <TreeRow
+              key={n.id}
+              node={n}
+              version={version}
+              depth={0}
+              zoom={zoom}
+              showCompleted={showCompleted}
+              onPick={pick}
+            />
+          ))
+        ) : (
+          <li className="px-2 text-gray-400">Nothing yet</li>
+        )}
       </Section>
       {data.withMe.length > 0 && (
         <Section title="Shared with me">
-          {data.withMe.map(({ node, owner }) =>
-            link(
-              node,
-              <Users className="h-3.5 w-3.5 shrink-0 text-sky-600" />,
-              owner,
-              <button
-                type="button"
-                title="Remove from my list"
-                aria-label={`Remove ${plainText(node.content) || "Untitled"} from my list`}
-                onClick={() => void leave(node.id)}
-                className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded bg-gray-100 p-0.5 text-gray-400 hover:text-red-600 group-hover:block focus:block"
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>,
-            ),
-          )}
+          {data.withMe.map(({ node, owner }) => (
+            <TreeRow
+              key={node.id}
+              node={node}
+              version={version}
+              depth={0}
+              zoom={zoom}
+              showCompleted={showCompleted}
+              onPick={pick}
+              icon={<Users className="h-3.5 w-3.5 shrink-0 text-sky-600" />}
+              detail={owner}
+              after={
+                <button
+                  type="button"
+                  title="Remove from my list"
+                  aria-label={`Remove ${plainText(node.content) || "Untitled"} from my list`}
+                  onClick={() => void leave(node.id)}
+                  className="absolute right-1 top-1/2 hidden -translate-y-1/2 rounded bg-gray-100 p-0.5 text-gray-400 hover:text-red-600 group-hover:block focus:block"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
+              }
+            />
+          ))}
         </Section>
       )}
       {data.byMe.length > 0 && (

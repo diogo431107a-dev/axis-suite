@@ -1,12 +1,14 @@
 // The menu of a bullet's dot (right-click the dot, or the ⋯ button on the row). It offers only
 // what the user may do: a bullet shared with them to read can only be zoomed into, starred, exported or linked.
-// Starring is also Alt+S, duplicating Alt+M. Zoom in is here for phones, where the dot is hard to tap.
+// Starring is also Alt+S, duplicating Alt+M, moving Alt+Shift+M. Zoom in is here for phones, where
+// the dot is hard to tap. Move to… and Duplicate act on the selected bullets when this is one of them.
 // (The top of a bullet shared with them is never a row: it is taken off their list in the sidebar.)
 import { useEffect, useRef, type ReactNode } from "react";
-import { Check, Copy, Download, Link, Paperclip, Share2, Star, Trash2, ZoomIn } from "lucide-react";
+import { Check, Copy, CornerDownRight, Download, Link, Paperclip, Share2, Star, Trash2, ZoomIn } from "lucide-react";
 import { attachFiles, pickFiles } from "../files/upload.ts";
 import * as cmd from "../model/commands.ts";
 import { useNode, useOutliner } from "./hooks.ts";
+import { askWhereToMove } from "./move.ts";
 import { pathOf, zoomTo } from "./nav.ts";
 
 interface Props {
@@ -37,6 +39,8 @@ export function BulletMenu({ id, onClose }: Props) {
     onClose();
   };
   const role = o.store.roleOf(id);
+  // The selected bullets, when this is one of them.
+  const targets = o.ui.isSelected(id) && o.ui.selection ? o.ui.selection.ids : [id];
 
   return (
     <div
@@ -70,8 +74,13 @@ export function BulletMenu({ id, onClose }: Props) {
         </Item>
       )}
       {role !== "viewer" && (
-        <Item icon={<Copy className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.duplicate(ctx, [id])))}>
+        <Item icon={<Copy className="h-4 w-4" />} onClick={act(() => o.run((ctx) => cmd.duplicate(ctx, targets)))}>
           Duplicate
+        </Item>
+      )}
+      {role !== "viewer" && (
+        <Item icon={<CornerDownRight className="h-4 w-4" />} onClick={act(() => askWhereToMove(o, targets))}>
+          Move to…
         </Item>
       )}
       {role === "owner" && (

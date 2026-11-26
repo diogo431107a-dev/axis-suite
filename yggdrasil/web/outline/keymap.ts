@@ -6,6 +6,7 @@ import type { Field } from "../model/ui.ts";
 import { localDate } from "../text/dates.ts";
 import { makeLink, toggleWrap, type Edit } from "../text/format.ts";
 import { caretClientX, onFirstLine, onLastLine, sourceOffsetOnLine } from "./caret.ts";
+import { askWhereToMove } from "./move.ts";
 import { zoomTo } from "./nav.ts";
 
 type Keys = Pick<KeyboardEvent, "key" | "code" | "ctrlKey" | "metaKey" | "shiftKey" | "altKey" | "preventDefault">;
@@ -208,9 +209,11 @@ export function editorKeyDown(o: Outliner, e: Keys, ta: HTMLTextAreaElement, id:
       return handled();
 
     case "m":
+      if (!e.altKey || mod) return;
+      // Alt+Shift+M: asks where to move the bullet, with everything under it.
+      if (e.shiftKey) askWhereToMove(o, [id]);
       // Alt+M: a copy of the bullet, with everything under it, right below it.
-      if (!e.altKey || mod || e.shiftKey) return;
-      o.run((ctx) => cmd.duplicate(ctx, [id]));
+      else o.run((ctx) => cmd.duplicate(ctx, [id]));
       return handled();
 
     case "Escape":
@@ -277,8 +280,12 @@ export function selectionKeyDown(o: Outliner, e: Keys): void {
       return handled();
 
     case "m": {
+      if (!e.altKey || mod) return;
+      if (e.shiftKey) {
+        askWhereToMove(o, ids);
+        return handled();
+      }
       // Alt+M: the copies come right after the selection, and are selected instead.
-      if (!e.altKey || mod || e.shiftKey) return;
       const copies = cmd.duplicate(o.ctx(), ids);
       if (copies && o.commit({ ops: copies.ops }, { after: { kind: "blocks", ids: copies.ids } })) {
         o.ui.select({ parentId: sel.parentId, anchor: copies.ids[0]!, head: copies.ids.at(-1)! }, copies.ids);

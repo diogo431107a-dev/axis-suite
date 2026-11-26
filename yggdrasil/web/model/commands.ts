@@ -259,6 +259,16 @@ export function moveTo(
   };
 }
 
+/**
+ * Move to (the dialog, or a drop on the sidebar): the bullets become the first children of
+ * `parentId` (null: the top level), in their order. The target is far away, so unlike a drop in
+ * the outline it stays collapsed if it was.
+ */
+export function moveInto(ctx: Ctx, ids: readonly string[], parentId: string | null): Result | null {
+  if (ids.length === 0 || ids.some((id) => isAncestorOrSelf(ctx, id, parentId))) return null;
+  return { ops: moveAll(ids, parentId, ranksAfter(ctx, parentId, null, ids.length, new Set(ids))) };
+}
+
 /** Deletes the bullets (and so everything under them). The caret goes to the bullet above. */
 export function remove(ctx: Ctx, ids: readonly string[]): Result | null {
   const targets = ids.filter((id) => id !== ctx.root);

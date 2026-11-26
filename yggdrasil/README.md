@@ -46,7 +46,7 @@ deploy/
 
 ## Using it
 
-Click any text to edit it; the caret lands on the character you clicked. A bullet's dot zooms into it (drag the dot to move the bullet; right-click it for its menu). The menu is also the ⋯ at the row's right, which appears on hover, and is always shown on a phone: its **Zoom in** is the easy way there, and **Duplicate** copies the bullet with everything under it (Alt+M). The URL of a zoomed-in bullet is `/n/<id>`, so Back and Forward work and links to bullets can be shared with yourself.
+Click any text to edit it; the caret lands on the character you clicked. A bullet's dot zooms into it (drag the dot to move the bullet; right-click it for its menu). The menu is also the ⋯ at the row's right, which appears on hover, and is always shown on a phone: its **Zoom in** is the easy way there, **Duplicate** copies the bullet with everything under it (Alt+M), and **Move to…** (Alt+Shift+M) asks where to move it: type part of a bullet's name, pick it with ↑/↓ and Enter, and the bullet goes first inside it, with everything under it. The URL of a zoomed-in bullet is `/n/<id>`, so Back and Forward work and links to bullets can be shared with yourself.
 
 | Keys                                | Action                                                                              |
 | ----------------------------------- | ----------------------------------------------------------------------------------- |
@@ -67,12 +67,15 @@ Click any text to edit it; the caret lands on the character you clicked. A bulle
 | Alt+D                               | Insert today's date                                                                 |
 | Alt+S                               | Star / unstar (also on bullets selected with Esc)                                   |
 | Alt+M                               | Duplicate, with everything under it (also on bullets selected with Esc)             |
+| Alt+Shift+M                         | Move to…, with everything under it (also on bullets selected with Esc)              |
 
 **Text.** The syntax is Dynalist's: `**bold**`, `__italic__`, `~~strike~~`, `` `code` ``, `[text](url)` and bare URLs, `#tags`, `@mentions`, and dates as `!(2026-10-11)` or `!(2026-10-11 14:30)`. Dates show as chips (Today, Tomorrow, a weekday; red when overdue) and open a date picker when clicked. Links only ever point to `http(s):` or `mailto:` addresses, or to a file uploaded to Yggdrasil.
 
 **Search** (Ctrl+F) looks inside the zoomed-in bullet and combines: words (all must match, ignoring case and accents), `"exact phrases"`, `-word` to exclude, `#tag`, `@who`, `is:completed`, `has:note`, `has:date`, `has:image`, `has:file`, `date:today`, `date:tomorrow`, `date:overdue`, `before:YYYY-MM-DD` and `after:YYYY-MM-DD`.
 
-The sidebar's **Tags** list follows the same scope: it shows the tags inside the zoomed-in bullet (collapsed bullets included, completed ones only while they are shown), with how many bullets carry each, and clicking one searches for it. Zoom out to Home for every tag in the tree. Starred and top-level bullets are always listed.
+The sidebar's **Tags** list follows the same scope: it shows the tags inside the zoomed-in bullet (collapsed bullets included, completed ones only while they are shown), with how many bullets carry each, and clicking one searches for it. Zoom out to Home for every tag in the tree.
+
+The sidebar's **Outline** is the whole tree, starting at Home: the arrow beside a bullet unfolds or folds it there, without collapsing or expanding it in the outline. What is unfolded is remembered in this browser, and the bullets above the zoomed-in one are unfolded to show where it is. Completed bullets are listed only while they are shown; a search doesn't change the list. Drag a bullet's dot onto any bullet in the sidebar (or onto Home) to move it there, first inside it; hold it over a folded one to unfold it. Starred bullets are always listed above.
 
 **OPML.** Import an OPML file from the sidebar, or drop it on the outline. Everything lands under a new bullet "Imported <file> <date>" in the zoomed-in bullet, as one undo step. Dynalist exports keep their markdown; Workflowy's HTML formatting becomes markdown. Export (sidebar, or a bullet's menu) writes a bullet or the whole tree as OPML 2.0, plain indented text or Markdown.
 
