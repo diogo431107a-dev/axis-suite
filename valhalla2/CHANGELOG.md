@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.33 — 2026-11-26
+
 - **A voice's speed, pitch and speaking style.** On a companion's page, under **Voice**, two new
   sliders set how fast (half to twice the usual) and how high (up to half lower or higher) its
   replies are read, and a voice with styles of its own (chat, friendly, calm…) can be given one to
