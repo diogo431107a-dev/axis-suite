@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.37 — 2026-11-26
+
 - **Long chats without memory no longer get stuck.** A Grok companion, or a Claude one without
   memory, used to send the whole chat every turn, until the chat grew too big for the model and
   every new message was refused. Now, at about 160K tokens, its oldest turns stop being sent, and a
