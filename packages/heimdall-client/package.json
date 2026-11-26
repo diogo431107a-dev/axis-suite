@@ -5,7 +5,7 @@
   "description": "How a module of the suite learns who is signed in to Heimdall",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

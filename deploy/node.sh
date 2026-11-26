@@ -3,7 +3,7 @@
 # AXIS_NODE_MAJOR here, in .node-version, and the "engines" fields; then re-run the installer
 # for every module.
 
-AXIS_NODE_MAJOR=22
+AXIS_NODE_MAJOR=24
 
 # Installs Node.js $AXIS_NODE_MAJOR from NodeSource unless /usr/bin/node is already
 # that version or newer. NodeSource's nodejs includes npm; on a server that has

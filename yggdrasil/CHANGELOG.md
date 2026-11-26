@@ -4,6 +4,8 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 
 ## Unreleased
 
+- **Fix:** Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 1.2.0 — 2026-11-26
 
 - **Minor:** The sidebar shows your whole outline, not only the top level: click the arrow beside a bullet to unfold or fold it there. This doesn't collapse or expand anything in the outline itself. The sidebar remembers what you unfolded in this browser, and opens the way to the bullet you are zoomed into.

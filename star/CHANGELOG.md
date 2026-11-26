@@ -4,6 +4,8 @@ What changed in Star, newest first. Each version is tagged in git as `star-v<ver
 
 ## Unreleased
 
+- Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 0.0.4 — 2026-10-30
 
 - Every Man is a Star: the people you know and their families, charted as a night sky at `star.<domain>`. Sign in with Heimdall; each user has their own private sky, saved in Star's own database.

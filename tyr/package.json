@@ -5,7 +5,7 @@
   "description": "Tyr — a dossier of people: what was said, when, and where",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

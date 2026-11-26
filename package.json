@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "pnpm@11.28.5",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "scripts": {
     "dev": "pnpm --recursive --parallel dev",

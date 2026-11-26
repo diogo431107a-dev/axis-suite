@@ -27,7 +27,7 @@ Shared code lives in `packages/`:
 | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | [@axis-suite/heimdall-client](packages/heimdall-client/README.md) | How a module learns who is signed in (server middleware) and sends people to sign in (browser helpers). |
 
-Every module is TypeScript on Node.js 22, built with pnpm, installed by the same installer and run the same way. The ports are registered in [`deploy/modules.conf`](deploy/modules.conf).
+Every module is TypeScript on Node.js 24, built with pnpm, installed by the same installer and run the same way. The ports are registered in [`deploy/modules.conf`](deploy/modules.conf).
 
 ## How the modules connect
 
@@ -118,7 +118,7 @@ Code is formatted by Prettier and linted by oxlint, with one config for the whol
 
 ## Development
 
-Requires Node.js 22.18 or newer and pnpm (`npm install -g pnpm`; the version in `package.json` is used automatically).
+Requires Node.js 24.11 or newer and pnpm (`npm install -g pnpm`; the version in `package.json` is used automatically).
 
 ```bash
 pnpm install
@@ -316,6 +316,6 @@ Make sure the service that uses the certificate reloads after a renewal. For Pos
 
 ## Runtime
 
-The whole suite runs on **one Node.js version**, because a server has a single `/usr/bin/node`. It is set in [`deploy/node.sh`](deploy/node.sh) (currently 22, from NodeSource, which `node:sqlite` needs), along with `.node-version` and the `engines` fields. To move to a newer Node, change all three and re-run the installer for every module. pnpm's version is the `packageManager` field of the root `package.json`. Node 22 is supported until April 2027.
+The whole suite runs on **one Node.js version**, because a server has a single `/usr/bin/node`. It is set in [`deploy/node.sh`](deploy/node.sh) (currently 24, from NodeSource, which `node:sqlite` needs), along with `.node-version` and the `engines` fields. To move to a newer Node, change all three and re-run the installer for every module. pnpm's version is the `packageManager` field of the root `package.json`. Node 24 is supported until April 2028.
 
 This repository is public, and so is `heimdall/server/users.ts` with every account's username and password hash.

@@ -5,7 +5,7 @@
   "description": "Yggdrasil — an outliner, one tree per signed-in user",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

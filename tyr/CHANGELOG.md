@@ -4,6 +4,8 @@ What changed in Tyr, newest first. Each version is tagged in git as `tyr-v<versi
 
 ## Unreleased
 
+- Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 0.0.8 — 2026-10-31
 
 - Handle with care, first on every file: what to do, not the story behind it, with levels, a date that is hard for them, and notes you can change, confirm or retire.

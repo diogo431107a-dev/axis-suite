@@ -5,7 +5,7 @@
   "description": "Heimdall — the suite's sign-in service",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"
