@@ -4,6 +4,8 @@ What changed in Papyrus, newest first. Each version is tagged in git as `papyrus
 
 ## Unreleased
 
+## 0.0.9 — 2026-11-26
+
 - Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
 
 ## 0.0.7 — 2026-10-25

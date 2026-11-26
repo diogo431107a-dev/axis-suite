@@ -4,6 +4,8 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+## 0.0.28 — 2026-11-26
+
 - Development only: signing in on the development server (`pnpm dev`) can send you back to Star's, at 127.0.0.1:5184. Nothing changes on a server, so this alone needs no new install.
 - Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
 

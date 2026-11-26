@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.39 — 2026-11-26
+
 - Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
 
 ## 0.0.37 — 2026-11-26

@@ -1,6 +1,6 @@
 {
   "name": "yggdrasil",
-  "version": "1.2.0",
+  "version": "1.2.1",
   "private": true,
   "description": "Yggdrasil — an outliner, one tree per signed-in user",
   "type": "module",

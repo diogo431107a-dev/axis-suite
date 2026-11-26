@@ -4,6 +4,8 @@ What changed in Urd, newest first. Each version is tagged in git as `urd-v<versi
 
 ## Unreleased
 
+## 2.1.1 — 2026-11-26
+
 - **Fix:** Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
 
 ## 2.1.0 — 2026-10-25

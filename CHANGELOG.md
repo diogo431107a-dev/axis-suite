@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.217 — 2026-11-26
+
+Every module now runs on Node.js 24 instead of 22; Node.js 24 is supported until April 2028. The installer upgrades Node.js on a server by itself the first time it runs, so there is nothing to do by hand. Heimdall 0.0.28 also lets the development server send you back to Star's after signing in. Nothing else changes for whoever uses the modules.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.28  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.39  |
+
 ## 0.0.214 — 2026-11-26
 
 Yggdrasil 1.2.0: moving bullets is much easier. The sidebar shows the whole outline as a tree you can unfold and fold, and a bullet dragged onto any bullet there moves inside it. Alt+Shift+M, or **Move to…** in a bullet's menu, asks where to move it: type part of a name and press Enter. Ctrl+/, or the small ? at the top, lists the keyboard shortcuts. The other modules are unchanged.
