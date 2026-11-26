@@ -2,9 +2,8 @@
 import { Router, type Request, type Response } from "express";
 import { LIMITS, type StreamEvent } from "../../shared/protocol.ts";
 import { generate, prepare, send, type TurnContext } from "../chat/turn.ts";
-import { apiError, tokensFor, writeReply } from "../chat/write.ts";
+import { apiError, chatWindow, tokensFor, writeReply } from "../chat/write.ts";
 import { id as checkId, messageId, object, required } from "../check.ts";
-import { config } from "../config.ts";
 import { stream } from "../http/stream.ts";
 import { memoryBusy, withMemoryLock } from "../memory/lock.ts";
 import { asParams, promptView } from "../prompt.ts";
@@ -44,7 +43,7 @@ export function chatRoutes(s: Services): Router {
   });
 
   /** The parts of a request that don't stream: the chat, its companion, its tree, and how to prepare it. */
-  function chatParts(req: Request) {
+  async function chatParts(req: Request) {
     const my = s.ownedBy(req);
     const chat = my.chats.get(checkId(req.params.id));
     const companion = my.companions.get(chat.companionId);
@@ -54,22 +53,22 @@ export function chatRoutes(s: Services): Router {
       chatId: chat.id,
       companion,
       memory: s.memory,
-      window: { tokens: config.windowTokens, chunk: config.windowChunk },
+      window: await chatWindow(companion),
       onSlide: () => s.scheduler.soon(chat.id),
     };
     return { my, chat, companion, tree, base };
   }
 
   // The request exactly as it will be sent. Nothing is assembled out of sight.
-  routes.get("/chats/:id/prompt", (req: Request, res: Response) => {
-    const { companion, tree, base } = chatParts(req);
+  routes.get("/chats/:id/prompt", async (req: Request, res: Response) => {
+    const { companion, tree, base } = await chatParts(req);
     const { system, messages } = prepare(base, tree.activePath(), undefined, false);
     res.json(promptView(companion, system, messages));
   });
 
   // What this chat would send, against the model's context window.
   routes.get("/chats/:id/tokens", async (req: Request, res: Response) => {
-    const { companion, tree, base } = chatParts(req);
+    const { companion, tree, base } = await chatParts(req);
     const { system, messages } = prepare(base, tree.activePath(), undefined, false);
     try {
       res.json(await tokensFor(system, asParams(messages), companion.settings, companion.provider));
@@ -79,8 +78,8 @@ export function chatRoutes(s: Services): Router {
   });
 
   /** What a streamed reply needs, checked and claimed before the stream starts. */
-  function turnFor(req: Request) {
-    const { my, chat, companion, tree, base } = chatParts(req);
+  async function turnFor(req: Request) {
+    const { my, chat, companion, tree, base } = await chatParts(req);
     const release = s.busy.claim(my.username, chat.id);
     const context = (onEvent: (event: StreamEvent) => void): TurnContext => ({
       ...base,
@@ -94,7 +93,7 @@ export function chatRoutes(s: Services): Router {
   /** Says something at the end of the selected path and streams the answer. */
   routes.post("/chats/:id/send", async (req: Request, res: Response) => {
     const said = required(object(req.body).text, LIMITS.message, "The message");
-    const { release, context } = turnFor(req);
+    const { release, context } = await turnFor(req);
     await stream(res, release, async (tell) => {
       const answered = await send(context(tell), said);
       tell({ type: "done", message: answered });
@@ -108,7 +107,7 @@ export function chatRoutes(s: Services): Router {
   routes.post("/chats/:id/generate", async (req: Request, res: Response) => {
     const body = object(req.body);
     const parentId = body.parentId === null || body.parentId === undefined ? null : messageId(body.parentId);
-    const { tree, companion, release, context } = turnFor(req);
+    const { tree, companion, release, context } = await turnFor(req);
     try {
       if (parentId !== null) tree.get(parentId);
     } catch (err) {
@@ -128,7 +127,7 @@ export function chatRoutes(s: Services): Router {
 
   /** Folds the chat into the companion's memory now, and says how that went. */
   routes.post("/chats/:id/consolidate", async (req: Request, res: Response) => {
-    const { my, chat } = chatParts(req);
+    const { my, chat } = await chatParts(req);
     const outcome = await s.scheduler.now(chat.id);
     res.json({ outcome, page: my.chats.page(chat.id) });
   });

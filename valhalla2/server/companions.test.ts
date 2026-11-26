@@ -10,6 +10,7 @@ import { createCompanions, needMemory } from "./companions.ts";
 import { openDatabase } from "./db.ts";
 import { StoreError } from "./errors.ts";
 import { grokDraftOf, pictureRequestFor } from "./grok/pictures.ts";
+import { tokensOf, windowWithout } from "./memory/history.ts";
 import { runStep } from "./memory/run.ts";
 import { createScheduler } from "./memory/scheduler.ts";
 import { createMemory } from "./memory/store.ts";
@@ -157,19 +158,83 @@ describe("a chat without memory", () => {
       chatId: "chat-0001",
       companion,
       memory: createMemory(db, LIMITS),
-      // A window far smaller than the chat: with memory, most of it would slide out.
-      window: { tokens: 1_000, chunk: 2 },
+      // About 10K tokens of chat, well inside a window sized as chatWindow sizes it.
+      window: { tokens: 100_000, chunk: 2, slideTo: 75_000 },
     };
     return { db, companions, chats, tree, path, base, companion };
   }
 
-  it("sends the whole chat, after the profile alone", () => {
+  const windowStart = (db: ReturnType<typeof setup>["db"]) =>
+    (db.prepare("SELECT window_start FROM chats WHERE id = 'chat-0001'").get() as { window_start: number | null })
+      .window_start;
+  const said = (messages: { content: unknown; hidden: boolean }[]) =>
+    messages.filter((message) => !message.hidden).map((message) => JSON.stringify(message.content));
+
+  it("sends the whole chat, after the profile alone, while it fits the window", () => {
     const { db, path, base } = chatWithout(grok);
     const { system, messages } = prepare(base, path, undefined, true);
     expect(system.map((block) => block.text)).toEqual(["<personality>Hungry.</personality>"]);
     expect(messages.filter((message) => !message.hidden)).toHaveLength(40);
-    // Nothing slid out, and nothing was asked to fold it into memory.
-    expect(db.prepare("SELECT window_start FROM chats WHERE id = 'chat-0001'").get()).toEqual({ window_start: null });
+    expect(windowStart(db)).toBeNull();
+  });
+
+  it("slides its oldest turns out once over the window, down to slideTo, telling nobody", () => {
+    const { db, path, base } = chatWithout(grok);
+    let slides = 0;
+    const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 }, onSlide: () => slides++ };
+    const { messages } = prepare(small, path, undefined, true);
+    const sent = path.slice(path.findIndex((message) => message.id === windowStart(db)));
+    expect(sent[0]!.role).toBe("user");
+    expect(said(messages)).toEqual(sent.map((message) => JSON.stringify(message.content)));
+    // Down to slideTo, not just under the budget: the next slide is many turns away.
+    expect(sent.reduce((sum, message) => sum + tokensOf(message), 0)).toBeLessThanOrEqual(4_000);
+    expect(sent.length).toBeLessThan(40);
+    // No memory to fold what slid out into.
+    expect(slides).toBe(0);
+  });
+
+  it("starts in the same place on the next turns, until it is over the window again", () => {
+    const { db, tree, path, base } = chatWithout(grok);
+    const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 } };
+    prepare(small, path, undefined, true);
+    const first = windowStart(db);
+    let parent = path.at(-1)!.id;
+    for (let n = 0; n < 4; n++) {
+      const message = tree.add({
+        parentId: parent,
+        role: n % 2 === 0 ? "assistant" : "user",
+        content: [{ type: "text", text: `More ${n}: ${"word ".repeat(200)}` }],
+      });
+      path.push(message);
+      parent = message.id;
+    }
+    prepare(small, path, undefined, true);
+    expect(windowStart(db)).toBe(first);
+    for (let n = 0; n < 30; n++) {
+      const message = tree.add({
+        parentId: parent,
+        role: n % 2 === 0 ? "assistant" : "user",
+        content: [{ type: "text", text: `Later ${n}: ${"word ".repeat(200)}` }],
+      });
+      path.push(message);
+      parent = message.id;
+    }
+    prepare(small, path, undefined, true);
+    expect(windowStart(db)).not.toBe(first);
+  });
+
+  it("keeps nothing when only looked at (Inspect, the token count)", () => {
+    const { db, path, base } = chatWithout(grok);
+    const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 } };
+    const looked = prepare(small, path, undefined, false);
+    expect(windowStart(db)).toBeNull();
+    expect(said(looked.messages)).toEqual(said(prepare(small, path, undefined, true).messages));
+  });
+
+  it("is sized under 200K tokens, or under a smaller model window less the reply", () => {
+    expect(windowWithout(500_000, 16_000)).toEqual({ tokens: 160_000, slideTo: 120_000 });
+    expect(windowWithout(null, 16_000)).toEqual({ tokens: 160_000, slideTo: 120_000 });
+    expect(windowWithout(128_000, 8_000)).toEqual({ tokens: 96_000, slideTo: 72_000 });
   });
 
   it("sends the pins after the profile, from the next turn", () => {
