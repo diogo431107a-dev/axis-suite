@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.30 — 2026-11-25
+
 - **Grok companions, and companions without memory.** A new companion is now either Claude or Grok
   (Grok 4.7, from xAI, when the server has an xAI key), and that can't change later; nothing a Grok
   companion says ever goes to Claude, or the other way round. A Grok companion has no memory: every

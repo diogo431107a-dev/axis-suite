@@ -4,6 +4,30 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.204 — 2026-11-25
+
+Valhalla 2 0.0.30: Grok companions, and companions without memory. A new companion is now either Claude or Grok (Grok 4.7, through the xAI API, when the server has an xAI key), chosen once when it is created; nothing a Grok companion says ever goes to Claude, or the other way round. A Grok companion has no memory: every chat is sent whole with its pins, pictures are drawn from the chosen message, and replies are read aloud as written. A new Claude companion can be made the same way, without memory, or with memory as before. Grok companions have a temperature setting. The other modules are unchanged.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.21  |
+| Loggbok    | 0.0.16  |
+| Yggdrasil  | 1.1.0   |
+| Janus      | 0.0.7   |
+| Papyrus    | 0.0.7   |
+| Vinr       | 0.0.6   |
+| Chronos    | 0.0.7   |
+| Valkyrie   | 0.0.6   |
+| Althing    | 0.0.4   |
+| Mimir      | 0.0.6   |
+| Urd        | 2.1.0   |
+| Saga       | 1.1.0   |
+| Star       | 0.0.4   |
+| Fafnir     | 2.0.0   |
+| Tyr        | 0.0.8   |
+| Valhalla   | 0.0.6   |
+| Valhalla 2 | 0.0.30  |
+
 ## 0.0.201 — 2026-11-25
 
 Valhalla 2 0.0.27: scenes, feeling and quieter memory. Before a picture of a moment, or a reply read aloud, Claude works out the scene from the companion's memory and the chat around it: the place, the weather and what it has done, who is there and in what state, and how each line is said. Pictures are drawn from it, replies are read with each line's feeling, and a clapperboard under any message shows it for correcting. Memory now stays in the background, keeping a scene's gist rather than its every detail, and a new Leave alone list on the Memory page stops a companion bringing up chosen topics. The other modules are unchanged.

@@ -1,6 +1,6 @@
 {
   "name": "valhalla2",
-  "version": "0.0.27",
+  "version": "0.0.30",
   "private": true,
   "description": "Valhalla 2 — companions you define, through the Claude API",
   "type": "module",
