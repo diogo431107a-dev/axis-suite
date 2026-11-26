@@ -2,6 +2,7 @@
 import { Router } from "express";
 import type { Health } from "../../shared/protocol.ts";
 import { hasApiKey } from "../claude/client.ts";
+import { hasGrokKey } from "../grok/client.ts";
 import { config } from "../config.ts";
 import type { Services } from "../services.ts";
 
@@ -13,6 +14,7 @@ export function metaRoutes(s: Services): Router {
   routes.get("/health", (_req, res) => {
     res.json({
       apiKey: hasApiKey(),
+      grok: hasGrokKey(),
       pictures: s.painter !== null,
       speech: s.speech !== null,
       voice: s.speech?.voice ?? null,

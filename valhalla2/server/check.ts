@@ -5,7 +5,9 @@ import {
   EFFORTS,
   LIMITS,
   PROMPT_KEYS,
+  providerOf,
   type CacheTtl,
+  type Provider,
   type Effort,
   type Prompts,
   type Settings,
@@ -55,6 +57,19 @@ export function model(value: unknown): string {
   return name;
 }
 
+/**
+ * A temperature for a Grok companion: from 0 to 1 in steps of 0.05, or null for Grok's own default.
+ * Grok samples at most at 1, so nothing above it is offered. Claude's models take none at all.
+ */
+export function temperature(value: unknown, provider: Provider): number | null {
+  if (value === undefined || value === null) return null;
+  if (provider !== "xai") invalid("Claude's models don't take a temperature");
+  if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
+    invalid("The temperature has to be between 0 and 1");
+  }
+  return Math.round(value * 20) / 20;
+}
+
 export function stopSequences(value: unknown): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) invalid("The stop sequences aren't valid");
@@ -87,18 +102,27 @@ export function rowId(value: unknown, what: string): number {
   return Number.isSafeInteger(n) && n > 0 ? n : invalid(`${what} isn't valid`);
 }
 
-/** Settings from the page, anything left out taken from `defaults`. */
+/**
+ * Settings from the page, anything left out taken from `defaults`. Both models are on the same API:
+ * a Grok companion's memory model, which nothing uses, is its chat model.
+ */
 export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS): Settings {
   if (value === undefined || value === null) return { ...defaults };
   const body = object(value);
+  const chatModel = model(body.model ?? defaults.model);
+  const provider = providerOf(chatModel);
+  // A Grok companion has no memory, so whatever memory model came with it is replaced, never sent.
+  const memory = provider === "xai" ? chatModel : model(body.memoryModel ?? defaults.memoryModel);
+  if (providerOf(memory) !== provider) invalid("The memory model has to be a Claude model");
   return {
-    model: model(body.model ?? defaults.model),
-    memoryModel: model(body.memoryModel ?? defaults.memoryModel),
+    model: chatModel,
+    memoryModel: memory,
     maxTokens: whole(body.maxTokens ?? defaults.maxTokens, LIMITS.minTokens, LIMITS.maxTokens, "Reply length"),
     effort: oneOf<Effort>(body.effort ?? defaults.effort, EFFORTS, "The effort"),
     stopSequences: stopSequences(body.stopSequences),
     cacheTtl: oneOf<CacheTtl>(body.cacheTtl ?? defaults.cacheTtl, CACHE_TTLS, "The cache setting"),
     fallbacks: body.fallbacks === undefined ? defaults.fallbacks : body.fallbacks === true,
+    temperature: temperature(body.temperature, provider),
   };
 }
 

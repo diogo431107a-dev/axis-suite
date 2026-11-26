@@ -116,7 +116,8 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
         <div className="min-w-0 flex-1">
           <h1 className="truncate font-display text-lg">{chat.title}</h1>
           <p className="truncate text-xs text-faint">
-            {companion.name} · {MODE_LABELS[chat.mode].label.toLowerCase()} · {companion.settings.model}
+            {companion.name}
+            {companion.memory ? ` · ${MODE_LABELS[chat.mode].label.toLowerCase()}` : ""} · {companion.settings.model}
           </p>
         </div>
         {health.speech ? (
@@ -136,27 +137,29 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             <span className="hidden sm:inline">{readAloud ? "Aloud" : "Silent"}</span>
           </Button>
         ) : null}
-        <Button
-          kind="plain"
-          onClick={() => void rememberNow()}
-          disabled={filing || busy || !page.memoryPending}
-          title={
-            page.memoryPending
-              ? "Update the companion's memory from this chat now, instead of when it goes quiet"
-              : "Memory already has everything in this chat"
-          }
-        >
-          <BookmarkCheck size={15} />{" "}
-          <span className="hidden sm:inline">
-            {filing ? "Remembering…" : page.memoryPending ? "Remember now" : "Remembered"}
-          </span>
-        </Button>
+        {companion.memory ? (
+          <Button
+            kind="plain"
+            onClick={() => void rememberNow()}
+            disabled={filing || busy || !page.memoryPending}
+            title={
+              page.memoryPending
+                ? "Update the companion's memory from this chat now, instead of when it goes quiet"
+                : "Memory already has everything in this chat"
+            }
+          >
+            <BookmarkCheck size={15} />{" "}
+            <span className="hidden sm:inline">
+              {filing ? "Remembering…" : page.memoryPending ? "Remember now" : "Remembered"}
+            </span>
+          </Button>
+        ) : null}
         <Button
           kind="plain"
           onClick={() => open({ kind: "memory", companionId: companion.id })}
-          title={`What ${companion.name} remembers`}
+          title={companion.memory ? `What ${companion.name} remembers` : `What you pinned for ${companion.name}`}
         >
-          <Brain size={15} /> <span className="hidden sm:inline">Memory</span>
+          <Brain size={15} /> <span className="hidden sm:inline">{companion.memory ? "Memory" : "Pins"}</span>
         </Button>
         <Button kind="plain" onClick={() => setShowPrompt(true)} title="What gets sent">
           <Eye size={15} /> <span className="hidden sm:inline">Inspect</span>
@@ -207,6 +210,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
                 onPin={setPinning}
                 onPicture={(messageId) => setPicturing({ messageId })}
                 onScene={setScening}
+                memory={companion.memory}
                 onView={setViewing}
               />
             </Fragment>
@@ -305,6 +309,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             loadTokens();
           }}
           onMemory={() => open({ kind: "memory", companionId: companion.id })}
+          memory={companion.memory}
           chatId={chat.id}
         />
       ) : null}
@@ -312,6 +317,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
         open={showSettings}
         onClose={() => setShowSettings(false)}
         chat={chat}
+        memory={companion.memory}
         onSaved={(changed) => setPage((at) => (at ? { ...at, chat: changed } : at))}
         onCompanion={() => open({ kind: "companion", id: companion.id })}
       />

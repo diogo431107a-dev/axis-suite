@@ -281,6 +281,14 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       CREATE INDEX quiet_topics_companion ON quiet_topics (companion_id, id);
     `);
   },
+  // v10: the API a companion talks to and whether it has memory, both chosen when it is created.
+  // Every companion before this was Claude, with memory.
+  (db) => {
+    db.exec(`
+      ALTER TABLE companions ADD COLUMN provider TEXT NOT NULL DEFAULT 'anthropic';
+      ALTER TABLE companions ADD COLUMN memory INTEGER NOT NULL DEFAULT 1;
+    `);
+  },
 ];
 
 /**

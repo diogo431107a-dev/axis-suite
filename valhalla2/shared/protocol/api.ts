@@ -4,6 +4,8 @@ import type { Settings } from "./models.ts";
 export interface Health {
   /** Whether the server has a Claude API key to send with. */
   apiKey: boolean;
+  /** Whether the server has an xAI key, so a companion can answer on Grok. */
+  grok: boolean;
   /** Whether the server has a CivitAI key, so pictures can be made. */
   pictures: boolean;
   /** Whether the server has an Azure Speech key, so replies can be read aloud. */

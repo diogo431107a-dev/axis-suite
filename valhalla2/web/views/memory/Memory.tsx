@@ -48,14 +48,22 @@ export function Memory({ companion }: { companion: Companion }) {
         <Button kind="quiet" onClick={() => open({ kind: "companion", id: companion.id })}>
           <ArrowLeft size={15} /> {companion.name}
         </Button>
-        <h1 className="font-display text-2xl">{companion.name}'s memory</h1>
+        <h1 className="font-display text-2xl">
+          {companion.name}'s {companion.memory ? "memory" : "pins"}
+        </h1>
         <span className="ml-auto">
           <Button kind="plain" onClick={() => void load()}>
             <RefreshCw size={14} /> Refresh
           </Button>
         </span>
       </div>
-      <p className="text-sm text-faint">
+      {companion.memory ? null : (
+        <p className="text-sm text-faint">
+          {companion.name} has no memory: every chat is sent whole each turn, and the moments you pin here go out with
+          every chat, after the profile.
+        </p>
+      )}
+      <p className={companion.memory ? "text-sm text-faint" : "hidden"}>
         What {companion.name} remembers across chats. After a chat goes quiet (or when you press "Remember now" in it),
         the memory model updates these files from what was said on the path you selected. Each chat reads them as they
         were when it last looked, and the whole set goes out with every message.
@@ -68,7 +76,7 @@ export function Memory({ companion }: { companion: Companion }) {
         </Notice>
       ) : null}
       <Notice>{error}</Notice>
-      {page ? (
+      {page && companion.memory ? (
         <Upkeep
           base={base}
           page={page}
@@ -79,7 +87,7 @@ export function Memory({ companion }: { companion: Companion }) {
         />
       ) : null}
 
-      {page ? (
+      {page && companion.memory ? (
         <div className="grid gap-5 md:grid-cols-[16rem_1fr]">
           <FileList page={page} chosen={chosen} onChoose={setChosen} />
           <div className="min-w-0">
@@ -109,9 +117,11 @@ export function Memory({ companion }: { companion: Companion }) {
 
       {page ? <Pins companion={companion} page={page} onPage={setPage} onError={setError} /> : null}
 
-      {page ? <Quiet companion={companion} page={page} onPage={setPage} onError={setError} /> : null}
+      {page && companion.memory ? (
+        <Quiet companion={companion} page={page} onPage={setPage} onError={setError} />
+      ) : null}
 
-      {page ? <Runs page={page} /> : null}
+      {page && companion.memory ? <Runs page={page} /> : null}
     </div>
   );
 }

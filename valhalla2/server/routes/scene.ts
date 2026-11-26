@@ -3,6 +3,7 @@
 // can correct it (PUT).
 import { Router, type Request, type Response } from "express";
 import { id as checkId, messageId } from "../check.ts";
+import { needMemory } from "../companions.ts";
 import type { Services } from "../services.ts";
 
 export function sceneRoutes(s: Services): Router {
@@ -12,7 +13,8 @@ export function sceneRoutes(s: Services): Router {
   function momentOf(req: Request) {
     const my = s.ownedBy(req);
     const chat = my.chats.get(checkId(req.params.id));
-    const companion = my.companions.get(chat.companionId);
+    // The scene is read from the memory and much of the chat: only a companion with memory has one.
+    const companion = needMemory(my.companions.get(chat.companionId));
     const tree = my.chats.tree(chat.id);
     const at = messageId(req.params.messageId);
     tree.get(at);

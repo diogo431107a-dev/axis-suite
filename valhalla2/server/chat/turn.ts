@@ -11,8 +11,9 @@ import type { Writer } from "../claude/reply.ts";
 import { transaction } from "../db.ts";
 import { invalid } from "../errors.ts";
 import { windowFor } from "../memory/history.ts";
-import { peekSnapshot, refreshSnapshot, snapshotFor } from "../memory/inject.ts";
+import { peekSnapshot, refreshSnapshot, renderPins, snapshotFor } from "../memory/inject.ts";
 import type { Memory } from "../memory/store.ts";
+import { pinsOf } from "../pins.ts";
 import { asParams, buildSystem, outgoing, type Outgoing, type SystemBlock } from "../prompt.ts";
 import type { Tree } from "./tree.ts";
 
@@ -57,6 +58,9 @@ export interface Prepared {
  * The request for `path`: the system prompt with the chat's memory, and the part of the path the
  * window holds. With `keep`, a slide of the window is kept, memory is looked at afresh with it,
  * and `onSlide` is told; without, nothing is changed (for Inspect and the token count).
+ *
+ * A companion without memory sends the whole path, after its profile and its pins: there is no
+ * memory to slide turns out into, and the prompt cache is what keeps that affordable.
  */
 export function prepare(
   context: Pick<TurnContext, "db" | "chatId" | "companion" | "memory" | "window" | "onSlide">,
@@ -65,6 +69,13 @@ export function prepare(
   keep: boolean,
 ): Prepared {
   const { db, chatId, companion, memory, window } = context;
+  if (!companion.memory) {
+    const pins = pinsOf(db, companion.id);
+    return {
+      system: buildSystem(companion, pins.length > 0 ? renderPins(companion, pins) : null),
+      messages: outgoing(path, next),
+    };
+  }
   const { window_start: stored } = db.prepare("SELECT window_start FROM chats WHERE id = ?").get(chatId) as {
     window_start: number | null;
   };
@@ -85,9 +96,12 @@ export function prepare(
 
 /** Writes a reply to `path` and returns what to store, reporting it as it is written. */
 async function reply(context: TurnContext, path: Message[], instruction: string | null) {
-  const { companion, write, onEvent } = context;
+  const { companion, write, onEvent, chatId } = context;
   const { system, messages } = prepare(context, path, { instruction }, true);
-  return write(system, asParams(messages), companion.settings, onEvent);
+  return write(system, asParams(messages), companion.settings, onEvent, {
+    cacheKey: chatId,
+    provider: companion.provider,
+  });
 }
 
 /** Says something at the end of the selected path, and gets the companion's answer. */

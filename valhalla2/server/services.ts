@@ -29,6 +29,7 @@ import { createScenes, momentRequest } from "./scene/sheet.ts";
 import { startSpeech } from "./speech/feature.ts";
 import type { Companion, Message } from "../shared/protocol.ts";
 import { closeCutShortRuns, removeGoneUsers } from "./startup.ts";
+import { needMemory } from "./companions.ts";
 
 export function createServices(db: DatabaseSync) {
   closeCutShortRuns(db);
@@ -79,9 +80,9 @@ export function createServices(db: DatabaseSync) {
     pins: pinsOf(db, companionId),
   });
 
-  /** What is asked about the moment at the end of `path`. */
+  /** What is asked about the moment at the end of `path`. Only a companion with memory has a scene. */
   const moment = (companion: Companion, path: readonly Message[]) =>
-    momentRequest(companion, remembered(companion.id), path, config.scene.tokens);
+    momentRequest(needMemory(companion), remembered(companion.id), path, config.scene.tokens);
 
   /** The signed-in person's companion named by `:id` in the path. */
   const companionOf = (req: Request) => ownedBy(req).companions.get(checkId(req.params.id));

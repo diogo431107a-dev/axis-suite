@@ -14,7 +14,7 @@
 // No cron, no daemon: one timer in this process. A chat whose last run failed (declined, say) is
 // not retried by the timer until something in it changes; the buttons always try.
 import type { Companion, RunOutcome } from "../../shared/protocol.ts";
-import { companionOf } from "../companions.ts";
+import { companionColumns, companionOf } from "../companions.ts";
 import { cleanup, cleanupDue, type CleanupRule } from "./cleanup.ts";
 import { consolidate, hasPending } from "./consolidate.ts";
 import { rebuild } from "./rebuild.ts";
@@ -27,7 +27,9 @@ export interface SchedulerDeps extends RunDeps {
   partTokens: number;
 }
 
-const COMPANION = `SELECT p.id, p.name, p.profile, p.settings, p.prompts, p.voice, p.voice_feeling, p.created_at, p.updated_at FROM companions p`;
+// Only a companion with memory: for one without, every run below finds nothing to do.
+const COMPANION = `SELECT ${companionColumns("p")} FROM companions p`;
+const NO_MEMORY = { kind: "nothing", reason: "This companion has no memory" } as const;
 
 export function createScheduler(deps: SchedulerDeps) {
   const { db } = deps;
@@ -60,6 +62,7 @@ export function createScheduler(deps: SchedulerDeps) {
   function tidy(companionId: string): Promise<RunOutcome> {
     const companion = companionById(companionId);
     if (!companion) return Promise.resolve({ kind: "nothing", reason: "No such companion" });
+    if (!companion.memory) return Promise.resolve(NO_MEMORY);
     return once(`tidy:${companionId}`, () => cleanup(deps, companion));
   }
 
@@ -73,6 +76,7 @@ export function createScheduler(deps: SchedulerDeps) {
   function now(chatId: string): Promise<RunOutcome> {
     const companion = companionOfChat(chatId);
     if (!companion) return Promise.resolve({ kind: "nothing", reason: "No such chat" });
+    if (!companion.memory) return Promise.resolve(NO_MEMORY);
     return once(chatId, async () => {
       const outcome = await consolidate(deps, chatId, companion);
       if (outcome.kind === "done") tidyIfDue(companion.id);
@@ -88,7 +92,9 @@ export function createScheduler(deps: SchedulerDeps) {
   /** Starts on every other chat of the companion that memory hasn't caught up with. */
   function othersOf(companionId: string, exceptChatId: string): void {
     const ids = db
-      .prepare("SELECT id FROM chats WHERE companion_id = ? AND id != ?")
+      .prepare(
+        "SELECT c.id FROM chats c JOIN companions p ON p.id = c.companion_id WHERE c.companion_id = ? AND c.id != ? AND p.memory = 1",
+      )
       .all(companionId, exceptChatId) as { id: string }[];
     for (const { id } of ids) if (hasPending(db, id)) soon(id);
   }
@@ -98,8 +104,8 @@ export function createScheduler(deps: SchedulerDeps) {
     const cutoff = new Date(at - deps.idleMinutes * 60_000).toISOString();
     const rows = db
       .prepare(
-        `SELECT c.id FROM chats c
-         WHERE c.last_activity_at < ?
+        `SELECT c.id FROM chats c JOIN companions p ON p.id = c.companion_id
+         WHERE c.last_activity_at < ? AND p.memory = 1
            AND NOT EXISTS (
              SELECT 1 FROM memory_runs r
              WHERE r.chat_id = c.id AND r.kind = 'consolidate' AND r.ok = 0 AND r.started_at > c.last_activity_at
@@ -113,7 +119,9 @@ export function createScheduler(deps: SchedulerDeps) {
       started.push(id);
     }
     // The weekly tidy-up, for companions whose memory changed but not often enough to trigger one.
-    for (const { id } of db.prepare("SELECT id FROM companions").all() as { id: string }[]) tidyIfDue(id);
+    for (const { id } of db.prepare("SELECT id FROM companions WHERE memory = 1").all() as { id: string }[]) {
+      tidyIfDue(id);
+    }
     return started;
   }
 
@@ -129,6 +137,7 @@ export function createScheduler(deps: SchedulerDeps) {
     rebuild(companionId: string): Promise<RunOutcome> {
       const companion = companionById(companionId);
       if (!companion) return Promise.resolve({ kind: "nothing", reason: "No such companion" });
+      if (!companion.memory) return Promise.resolve(NO_MEMORY);
       return once(`rebuild:${companionId}`, () => rebuild({ ...deps, partTokens: deps.partTokens }, companion));
     },
 

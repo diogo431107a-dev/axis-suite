@@ -8,6 +8,7 @@ import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { pinsOf } from "../pins.ts";
 import { quietOf } from "../quiet.ts";
+import { needMemory } from "../companions.ts";
 import type { Services } from "../services.ts";
 
 export function memoryRoutes(s: Services): Router {
@@ -27,7 +28,7 @@ export function memoryRoutes(s: Services): Router {
 
   /** Tidies the companion's memory now, and says how that went. */
   routes.post("/companions/:id/memory/tidy", async (req: Request, res: Response) => {
-    const companion = s.companionOf(req);
+    const companion = needMemory(s.companionOf(req));
     const outcome = await s.scheduler.tidy(companion.id);
     res.json({ outcome, page: memoryPage(companion) });
   });
@@ -37,7 +38,7 @@ export function memoryRoutes(s: Services): Router {
    * at once; the page watches the runs come in.
    */
   routes.post("/companions/:id/memory/rebuild", (req: Request, res: Response) => {
-    const companion = s.companionOf(req);
+    const companion = needMemory(s.companionOf(req));
     s.scheduler.rebuild(companion.id).then(
       (outcome) => {
         if (outcome.kind === "failed")
@@ -62,11 +63,11 @@ export function memoryRoutes(s: Services): Router {
   routes.put("/companions/:id/memory/file", async (req: Request, res: Response) => {
     const body = object(req.body);
     if (typeof body.content !== "string") invalid("The file's text isn't valid");
-    res.json(await s.memoryService.save(s.companionOf(req), body.path, body.content));
+    res.json(await s.memoryService.save(needMemory(s.companionOf(req)), body.path, body.content));
   });
 
   routes.delete("/companions/:id/memory/file", async (req: Request, res: Response) => {
-    await s.memoryService.remove(s.companionOf(req), req.query.path);
+    await s.memoryService.remove(needMemory(s.companionOf(req)), req.query.path);
     res.status(204).end();
   });
 
@@ -79,7 +80,7 @@ export function memoryRoutes(s: Services): Router {
   });
 
   routes.post("/companions/:id/memory/versions/:versionId/revert", async (req: Request, res: Response) => {
-    await s.memoryService.revert(s.companionOf(req), rowId(req.params.versionId, "That version id"));
+    await s.memoryService.revert(needMemory(s.companionOf(req)), rowId(req.params.versionId, "That version id"));
     res.status(204).end();
   });
 
@@ -94,7 +95,7 @@ export function memoryRoutes(s: Services): Router {
   /** Asks the companion to leave a topic alone, `{ text }`. Every chat with it sees that on its next turn. */
   routes.post("/companions/:id/quiet", (req: Request, res: Response) => {
     const my = s.ownedBy(req);
-    const companion = my.companions.get(checkId(req.params.id));
+    const companion = needMemory(my.companions.get(checkId(req.params.id)));
     my.quiet.add(companion.id, req.body);
     res.status(201).json(memoryPage(companion));
   });

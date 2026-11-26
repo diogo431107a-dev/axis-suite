@@ -13,6 +13,7 @@ export function PinDialog({
   onClose,
   onPinned,
   onMemory,
+  memory,
 }: {
   start: { messageId: number; speaker: string; text: string };
   companionName: string;
@@ -20,6 +21,8 @@ export function PinDialog({
   onClose: () => void;
   onPinned: (page: ChatPage) => void;
   onMemory: () => void;
+  /** Whether the companion has memory: without, pins go out right after the profile. */
+  memory: boolean;
 }) {
   const { error, saving, run } = useSave();
   const [speaker, setSpeaker] = useState(start.speaker);
@@ -40,8 +43,10 @@ export function PinDialog({
     <Dialog open onClose={onClose} title="Pin a moment">
       <div className="space-y-4">
         <p className="text-sm text-faint">
-          A pinned moment is sent, word for word, in every chat with {companionName}, after the memory. The memory model
-          never rewrites it. Keep only the line that matters: every pin is sent every turn.
+          {memory
+            ? `A pinned moment is sent, word for word, in every chat with ${companionName}, after the memory. The memory model never rewrites it.`
+            : `A pinned moment is sent, word for word, in every chat with ${companionName}, after the profile.`}{" "}
+          Keep only the line that matters: every pin is sent every turn.
         </p>
         <Field label="Who said it" hint="As the model should read it: your name in the story, or the companion's.">
           <input
@@ -76,7 +81,7 @@ export function PinDialog({
             Cancel
           </Button>
           <button type="button" className="ml-auto text-sm text-accent hover:underline" onClick={onMemory}>
-            See and remove pins on the Memory page
+            See and remove pins on the {memory ? "Memory" : "Pins"} page
           </button>
         </div>
       </div>

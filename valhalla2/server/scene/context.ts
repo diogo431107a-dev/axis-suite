@@ -77,6 +77,28 @@ export function renderSheet(sheet: SceneSheet): string {
 }
 
 /**
+ * The request for a picture's prompt for a companion without memory: its profile, and for a chat
+ * picture the one message it is drawn from. No memory, no scene, no other messages.
+ */
+export function plainPictureRequest(companion: Companion, scene: Scene, hint: string): SceneRequest {
+  const parts = [`<profile name="${quote(companion.name)}">\n${companion.profile.trim()}\n</profile>`];
+  if (scene.kind === "profile") {
+    parts.push(
+      `Write the prompt for a profile picture of ${companion.name}: a portrait of them alone, showing their ` +
+        "appearance clearly, in a setting and mood that fit who they are.",
+    );
+  } else {
+    parts.push(chatUpTo(companion, scene.path, 0));
+    parts.push(
+      `Write the prompt for a picture of the moment marked <moment>, a message from a chat between the user and ${companion.name}. ` +
+        "Draw what it says; where it says nothing, choose what fits the profile.",
+    );
+  }
+  if (hint.trim()) parts.push(`The user's note for this picture: ${hint.trim()}`);
+  return { system: promptOf(companion, "picture"), prompt: parts.join("\n\n") };
+}
+
+/**
  * The request for one picture's prompt. `background` is backgroundOf(); `budget` how many tokens
  * of the chat go with a chat picture. With the moment worked out (`sheet`), that stands in for the
  * chat, and only the moment itself goes with it.

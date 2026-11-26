@@ -59,7 +59,9 @@ export function speechRoutes(s: Services): Router {
     const tree = my.chats.tree(id);
     const message = tree.get(messageId(req.params.messageId));
     const companion = my.companions.get(chat.companionId);
-    const lines = companion.voiceFeeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
+    // Without memory there is no scene: the reply is read as it is written.
+    const feeling = companion.memory && companion.voiceFeeling;
+    const lines = feeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
     const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines));
     res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(s.db) } satisfies SpeechReply);
   });

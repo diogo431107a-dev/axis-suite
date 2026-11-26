@@ -44,6 +44,11 @@ const now = () => new Date().toISOString();
 /** Runs the memory model once. A failed run is recorded as failed here; a good one is left open. */
 export async function runStep(deps: RunDeps, spec: RunSpec): Promise<StepResult> {
   const { db, memory, limits } = deps;
+  // The one place the memory model runs. Only a Claude companion with memory ever gets here; this
+  // holds that even if a caller forgot, so nothing of a Grok companion's can reach Claude.
+  if (!spec.companion.memory || spec.companion.provider !== "anthropic") {
+    throw new Error(`${spec.companion.name} has no memory, so the memory model was not run`);
+  }
   const { lastInsertRowid } = db
     .prepare("INSERT INTO memory_runs (space, chat_id, kind, model, started_at) VALUES (?, ?, ?, ?, ?)")
     .run(spec.companion.id, spec.chatId, spec.kind, spec.companion.settings.memoryModel, now());

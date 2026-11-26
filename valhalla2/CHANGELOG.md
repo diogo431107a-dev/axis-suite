@@ -4,6 +4,17 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Grok companions, and companions without memory.** A new companion is now either Claude or Grok
+  (Grok 4.7, from xAI, when the server has an xAI key), and that can't change later; nothing a Grok
+  companion says ever goes to Claude, or the other way round. A Grok companion has no memory: every
+  chat is sent whole, with your pins, pictures are drawn from the message you choose, and replies are
+  read aloud as written. A new Claude companion can be made the same way, **without memory**, or with
+  memory as before. Grok companions get a **Temperature** setting (starting on Grok's own default),
+  and a few settings work differently on Grok, as their hints say. Every companion you already have
+  is Claude, with memory, as before. **By hand:** before installing, create
+  `/etc/axis-suite/valhalla2-xai.key` (see the README), even as an empty file if you don't want Grok,
+  or Valhalla 2 won't start.
+
 ## 0.0.27 — 2026-11-25
 
 - **Memory stays in the background.** A companion was bringing the same old details up in reply

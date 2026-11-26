@@ -2,9 +2,9 @@
 import type { Response } from "express";
 import type { StreamEvent } from "../../shared/protocol.ts";
 import { frame } from "../../shared/sse.ts";
-import { asStoreError } from "../claude/client.ts";
+import { apiError } from "../chat/write.ts";
 
-// While Claude thinks, nothing is written for a while. A comment line now and then keeps every
+// While the model thinks, nothing is written for a while. A comment line now and then keeps every
 // proxy in between from deciding the stream has gone quiet for good.
 const HEARTBEAT_MS = 20_000;
 
@@ -37,7 +37,7 @@ export async function stream(
   try {
     await work(tell);
   } catch (err) {
-    const failure = asStoreError(err);
+    const failure = apiError(err);
     tell({ type: "error", error: failure.message, code: failure.code });
   } finally {
     clearInterval(heartbeat);

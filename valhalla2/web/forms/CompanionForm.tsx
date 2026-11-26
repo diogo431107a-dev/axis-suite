@@ -3,6 +3,7 @@ import { Brain, Images } from "lucide-react";
 import {
   LIMITS,
   PROMPT_KEYS,
+  providerOf,
   type Companion,
   type PromptKey,
   type Prompts,
@@ -44,6 +45,9 @@ const promptTexts = (own: Prompts): Record<PromptKey, string> =>
 
 const isDefault = (key: PromptKey, text: string): boolean => text.trim() === DEFAULT_PROMPTS[key].trim();
 
+/** The texts only a companion with memory uses: the others go out without memory too. */
+const MEMORY_ONLY: readonly PromptKey[] = ["memoryPolicy", "quiet", "consolidation", "cleanup", "scene"];
+
 /**
  * What is saved: only the texts you changed. One left as the default (or emptied) isn't stored, so
  * the companion keeps following the default, including when a later version improves it.
@@ -66,6 +70,10 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const [voice, setVoice] = useState<string | null>(companion?.voice ?? null);
   const [voiceFeeling, setVoiceFeeling] = useState(companion?.voiceFeeling ?? true);
   const [confirming, setConfirming] = useState(false);
+  // Chosen once, when the companion is created. A Grok companion never has memory.
+  const [withMemory, setWithMemory] = useState(companion?.memory ?? true);
+  const provider = companion?.provider ?? providerOf(settings.model);
+  const memory = provider === "xai" ? false : withMemory;
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
 
@@ -74,7 +82,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       const id = companion?.id ?? crypto.randomUUID();
       await api(`/api/companions/${id}`, {
         method: "PUT",
-        body: { name, profile, settings, prompts: ownPrompts(prompts), voice, voiceFeeling },
+        body: { name, profile, settings, prompts: ownPrompts(prompts), voice, voiceFeeling, memory },
       });
       await reload();
       open({ kind: "companion", id });
@@ -98,11 +106,57 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
               <Images size={15} /> Pictures
             </Button>
             <Button kind="plain" onClick={() => open({ kind: "memory", companionId: companion.id })}>
-              <Brain size={15} /> Memory
+              <Brain size={15} /> {companion.memory ? "Memory" : "Pins"}
             </Button>
           </span>
         ) : null}
       </div>
+
+      {companion ? (
+        <p className="-mt-3 text-sm text-faint">
+          {companion.provider === "xai" ? "Grok" : "Claude"} · {companion.memory ? "with memory" : "without memory"}.
+          Both were chosen when it was created.
+        </p>
+      ) : (
+        <section className="space-y-3 rounded border border-rule bg-sheet/50 p-4">
+          <div>
+            <h2 className="font-display text-lg">Memory</h2>
+            <p className="mt-1 text-xs text-faint">
+              Chosen now, with the model below: a companion can't change it, or move between Claude and Grok, later.
+            </p>
+          </div>
+          {provider === "xai" ? (
+            <p className="text-sm">
+              A Grok companion has no memory. Every chat is sent whole each turn, with your pins, and Grok caches it.
+              Pictures are drawn from the message you choose, and replies are read aloud as written. Nothing it says
+              goes to Claude.
+            </p>
+          ) : (
+            <div className="space-y-2 text-sm">
+              <label className="flex items-start gap-2">
+                <input type="radio" className="mt-1" checked={withMemory} onChange={() => setWithMemory(true)} />
+                <span>
+                  With memory
+                  <span className="mt-0.5 block text-xs text-faint">
+                    The memory model keeps what happens across chats; the oldest turns of a long chat slide out into it.
+                    Topics to leave alone, the scene, pictures that keep track of the story, and reading with feeling.
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-2">
+                <input type="radio" className="mt-1" checked={!withMemory} onChange={() => setWithMemory(false)} />
+                <span>
+                  Without memory
+                  <span className="mt-0.5 block text-xs text-faint">
+                    Every chat is sent whole each turn, with your pins. Pictures are drawn from the message you choose,
+                    and replies are read aloud as written.
+                  </span>
+                </span>
+              </label>
+            </div>
+          )}
+        </section>
+      )}
 
       <Field label="Name" hint="For the list. The model reads the profile, not this.">
         <input
@@ -126,10 +180,22 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
         />
       </Field>
 
-      <SettingsForm settings={settings} onChange={setSettings} note="Every chat with this companion uses these." />
+      <SettingsForm
+        settings={settings}
+        onChange={setSettings}
+        provider={companion?.provider ?? null}
+        memory={memory}
+        note="Every chat with this companion uses these."
+      />
 
       {health.speech ? (
-        <VoicePicker value={voice} onChange={setVoice} feeling={voiceFeeling} onFeeling={setVoiceFeeling} />
+        <VoicePicker
+          value={voice}
+          onChange={setVoice}
+          feeling={voiceFeeling}
+          onFeeling={setVoiceFeeling}
+          withFeeling={memory}
+        />
       ) : null}
 
       <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
@@ -141,7 +207,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
             Inspect, in a chat, shows each one where it goes out.
           </p>
         </div>
-        {PROMPT_KEYS.map((key) => (
+        {PROMPT_KEYS.filter((key) => memory || !MEMORY_ONLY.includes(key)).map((key) => (
           <Field key={key} label={PROMPT_LABELS[key].label} hint={PROMPT_LABELS[key].hint}>
             <textarea
               className={`${area} min-h-24`}
