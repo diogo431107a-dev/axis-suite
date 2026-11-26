@@ -3,7 +3,7 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { Response, ResponseStreamEvent } from "openai/resources/responses/responses";
 import { dollarsOf } from "../../shared/price.ts";
 import { DEFAULT_SETTINGS, hasFallback, providerOf } from "../../shared/protocol.ts";
-import { memoryModel, settings as checkSettings } from "../check.ts";
+import { settings as checkSettings } from "../check.ts";
 import { StoreError } from "../errors.ts";
 import type { SystemBlock } from "../prompt.ts";
 import { cutReply, eventOf, replyOf, requestFor, stopWatch } from "./reply.ts";
@@ -70,11 +70,21 @@ describe("which API a model is on", () => {
     expect(hasFallback("claude-opus-5-5")).toBe(true);
   });
 
-  it("keeps the memory model on Claude", () => {
-    expect(memoryModel("claude-sonnet-5-5")).toBe("claude-sonnet-5-5");
-    expect(() => memoryModel("grok-4.7")).toThrow(StoreError);
+  it("keeps both models on the same API", () => {
     expect(() => checkSettings({ memoryModel: "grok-4.7" })).toThrow(StoreError);
-    expect(checkSettings({ model: "grok-4.7" }).model).toBe("grok-4.7");
+    expect(checkSettings({ model: "grok-4.7", memoryModel: "claude-sonnet-5-5" }).memoryModel).toBe("grok-4.7");
+    // A Grok companion's memory model, which nothing uses, is its chat model.
+    expect(checkSettings({ model: "grok-4.7" })).toMatchObject({ model: "grok-4.7", memoryModel: "grok-4.7" });
+  });
+
+  it("takes a temperature for Grok only, from 0 to 1 in steps of 0.05", () => {
+    expect(checkSettings({ model: "grok-4.7" }).temperature).toBeNull();
+    expect(checkSettings({ model: "grok-4.7", temperature: 0.72 }).temperature).toBe(0.7);
+    expect(checkSettings({ model: "grok-4.7", temperature: 0 }).temperature).toBe(0);
+    expect(() => checkSettings({ model: "grok-4.7", temperature: 1.5 })).toThrow(StoreError);
+    expect(() => checkSettings({ model: "grok-4.7", temperature: "hot" })).toThrow(StoreError);
+    expect(() => checkSettings({ model: "claude-opus-5-5", temperature: 0.5 })).toThrow(StoreError);
+    expect(checkSettings({ model: "claude-opus-5-5" }).temperature).toBeNull();
   });
 });
 
@@ -112,6 +122,12 @@ describe("the request that goes to Grok", () => {
     expect(request.cache_control).toBeUndefined();
     expect(request.temperature).toBeUndefined();
     expect(request.prompt_cache_key).toBeUndefined();
+  });
+
+  it("sends a temperature only when the companion has one", () => {
+    expect(requestFor(system, messages, { ...grokSettings, temperature: null }).temperature).toBeUndefined();
+    expect(requestFor(system, messages, { ...grokSettings, temperature: 0 }).temperature).toBe(0);
+    expect(requestFor(system, messages, { ...grokSettings, temperature: 0.65 }).temperature).toBe(0.65);
   });
 });
 

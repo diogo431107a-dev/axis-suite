@@ -44,6 +44,7 @@ export function MessageActions({
   onEdit,
   onPicture,
   onScene,
+  memory,
   onDeleting,
 }: {
   chatId: string;
@@ -70,6 +71,8 @@ export function MessageActions({
   onEdit: () => void;
   onPicture: () => void;
   onScene: () => void;
+  /** Whether the companion has memory: without, there is no scene, and a like carries no comment. */
+  memory: boolean;
   onDeleting: (asking: boolean) => void;
 }) {
   const { health } = usePage();
@@ -122,9 +125,13 @@ export function MessageActions({
       ) : null}
       {!mine && text.trim() && !refused ? (
         <IconButton
-          label={liked ? "Liked. Change the comment or unlike" : "Like"}
+          label={liked ? (memory ? "Liked. Change the comment or unlike" : "Liked. Click to unlike") : "Like"}
           disabled={busy}
           onClick={() => {
+            if (!memory) {
+              void change(likePath, liked ? "DELETE" : "PUT", liked ? undefined : {});
+              return;
+            }
             if (noting) {
               onNoting(false);
               return;
@@ -177,7 +184,7 @@ export function MessageActions({
           <ImagePlus size={14} />
         </IconButton>
       ) : null}
-      {text && !refused ? (
+      {memory && text && !refused ? (
         <IconButton label="The scene: where, who, and how it is said" disabled={busy} onClick={onScene}>
           <Clapperboard size={14} />
         </IconButton>

@@ -11,6 +11,8 @@ const companion: Companion = {
   prompts: {},
   voice: null,
   voiceFeeling: true,
+  provider: "anthropic",
+  memory: true,
   createdAt: "2026-01-01T00:00:00.000Z",
   updatedAt: "2026-01-01T00:00:00.000Z",
 };

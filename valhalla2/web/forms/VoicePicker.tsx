@@ -33,12 +33,15 @@ export function VoicePicker({
   onChange,
   feeling,
   onFeeling,
+  withFeeling = true,
 }: {
   value: string | null;
   onChange: (voice: string | null) => void;
   /** Whether replies are read with the feeling of each line. */
   feeling: boolean;
   onFeeling: (feeling: boolean) => void;
+  /** Whether feeling is offered at all: a companion without memory has no scene, so reads plainly. */
+  withFeeling?: boolean;
 }) {
   const [list, setList] = useState<VoiceList | null>(null);
   const [error, setError] = useState("");
@@ -131,7 +134,12 @@ export function VoicePicker({
               ))}
             </select>
           </Field>
-          <label className="flex items-start gap-2 text-sm">
+          {withFeeling ? null : (
+            <p className="text-xs text-faint">
+              Without memory there is no scene to read a reply's feeling from, so replies are read plainly, as written.
+            </p>
+          )}
+          <label className={withFeeling ? "flex items-start gap-2 text-sm" : "hidden"}>
             <input type="checkbox" className="mt-1" checked={feeling} onChange={(e) => onFeeling(e.target.checked)} />
             <span>
               Read with feeling
@@ -157,6 +165,7 @@ export function VoicePicker({
               />
               <select
                 aria-label="Read it"
+                hidden={!withFeeling}
                 className={`${inputStyle} w-auto`}
                 value={sampleFeeling ?? ""}
                 onChange={(e) => setSampleFeeling(e.target.value === "" ? null : (e.target.value as Feeling))}

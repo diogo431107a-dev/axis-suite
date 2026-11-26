@@ -1,6 +1,14 @@
 // A chat reply: the request, streamed back as it is written, and what is stored of it.
 import type Anthropic from "@anthropic-ai/sdk";
-import type { Attempt, ContentBlock, ReplyDetails, Settings, StreamEvent, TurnUsage } from "../../shared/protocol.ts";
+import type {
+  Attempt,
+  ContentBlock,
+  Provider,
+  ReplyDetails,
+  Settings,
+  StreamEvent,
+  TurnUsage,
+} from "../../shared/protocol.ts";
 import type { SystemBlock } from "../prompt.ts";
 import { client, FALLBACK_BETA, thinking, THINKING_BINDING_BETA } from "./client.ts";
 
@@ -120,6 +128,8 @@ export async function streamReply(
 export interface WriteOptions {
   /** Keeps one chat's turns on the same cache, for an API that wants a key. Claude's needs none. */
   cacheKey?: string;
+  /** The API the companion talks to. A model from the other one is refused, never sent. */
+  provider?: Provider;
 }
 
 /**

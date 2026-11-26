@@ -3,6 +3,7 @@
 import { Router, type Request, type Response } from "express";
 import { LIMITS } from "../../shared/protocol.ts";
 import { id as checkId, messageId, object, required, text } from "../check.ts";
+import { invalid } from "../errors.ts";
 import type { Services } from "../services.ts";
 import { forgetDeletedSpeech } from "../speech/store.ts";
 
@@ -61,7 +62,16 @@ export function messageRoutes(s: Services): Router {
   routes.put("/chats/:id/messages/:messageId/like", (req: Request, res: Response) => {
     const my = s.ownedBy(req);
     const id = checkId(req.params.id);
-    my.likes.like(id, messageId(req.params.messageId), req.body === undefined ? undefined : object(req.body).comment);
+    const comment = req.body === undefined ? undefined : object(req.body).comment;
+    // A comment is praise for the memory model to read: a companion without memory has none to tell.
+    if (
+      typeof comment === "string" &&
+      comment.trim() !== "" &&
+      !my.companions.get(my.chats.get(id).companionId).memory
+    ) {
+      invalid("This companion has no memory, so a like can't carry a comment");
+    }
+    my.likes.like(id, messageId(req.params.messageId), comment);
     res.json(my.chats.page(id));
   });
 

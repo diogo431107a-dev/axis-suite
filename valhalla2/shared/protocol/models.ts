@@ -92,13 +92,14 @@ export const DEFAULT_SETTINGS: Settings = {
   stopSequences: [],
   cacheTtl: "1h",
   fallbacks: true,
+  temperature: null,
 };
 
 /** What Valhalla 2 sends with a request, besides the profile. One set per companion. */
 export interface Settings {
   /** The model that answers in character. */
   model: string;
-  /** The model that keeps the companion's memory up to date after a chat. Always a Claude model. */
+  /** The model that keeps the companion's memory up to date after a chat. Used only with memory. */
   memoryModel: string;
   maxTokens: number;
   effort: Effort;
@@ -111,4 +112,9 @@ export interface Settings {
    * gets a second chance inside the same call.
    */
   fallbacks: boolean;
+  /**
+   * Grok only: how freely it picks its words, from 0 to 1. Null sends none, and Grok uses its own
+   * default. Claude's models reject a temperature, so a Claude companion's is always null.
+   */
+  temperature: number | null;
 }

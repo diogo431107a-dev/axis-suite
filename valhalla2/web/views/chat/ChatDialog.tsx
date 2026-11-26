@@ -10,12 +10,15 @@ export function ChatDialog({
   open,
   onClose,
   chat,
+  memory,
   onSaved,
   onCompanion,
 }: {
   open: boolean;
   onClose: () => void;
   chat: ChatRow;
+  /** Whether the companion has memory: canon or one-shot only matters to memory. */
+  memory: boolean;
   onSaved: (chat: ChatRow) => void;
   onCompanion: () => void;
 }) {
@@ -53,7 +56,7 @@ export function ChatDialog({
           />
         </label>
 
-        <fieldset className="space-y-2">
+        <fieldset className={memory ? "space-y-2" : "hidden"}>
           <legend className="mb-1 text-sm font-medium">This chat is</legend>
           {CHAT_MODES.map((option) => (
             <label key={option} className="flex items-start gap-2 text-sm">

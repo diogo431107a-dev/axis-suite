@@ -3,9 +3,10 @@
 // It goes out through xAI's Responses API, built from the same system prompt and messages a
 // Claude reply is (../prompt.ts), with these differences, each forced by the API:
 //
-// - Only text goes out. Claude's thinking blocks are bound to Claude and mean nothing to Grok, so
-//   a chat that changed model sends what was said, not how it was thought. Grok's own reasoning
-//   comes back encrypted and is not kept: it would never be sent again.
+// - Only text goes out. Grok's reasoning comes back encrypted and is not kept: it would never be
+//   sent again. (A Grok companion is Grok from the day it is created, so there is no Claude
+//   thinking in its chats; a block of any other kind would be dropped all the same.)
+// - A temperature goes out only when the companion has one; otherwise Grok uses its own.
 // - Effort "max" has no Grok equivalent; it goes out as "xhigh", the highest Grok has.
 // - Grok's reasoning models refuse `stop`, so stop sequences are applied here: the moment the
 //   streamed text reaches one, the reply is cut there and the request is ended.
@@ -60,6 +61,8 @@ export function requestFor(
     stream: true,
     store: false,
     ...(cacheKey ? { prompt_cache_key: cacheKey } : {}),
+    // Only when one is chosen; otherwise Grok uses its own default.
+    ...(typeof settings.temperature === "number" ? { temperature: settings.temperature } : {}),
   };
 }
 

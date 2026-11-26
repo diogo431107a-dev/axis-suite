@@ -1,5 +1,5 @@
 // A companion, and the prompt texts it can rewrite.
-import type { Settings } from "./models.ts";
+import type { Provider, Settings } from "./models.ts";
 
 /**
  * The texts Valhalla 2 itself adds to what the model reads. Each companion can rewrite any of them;
@@ -29,6 +29,18 @@ export interface Companion {
   name: string;
   profile: string;
   settings: Settings;
+  /**
+   * The API every request about this companion goes to, chosen once when it is created: a Claude
+   * companion can move between Claude models, a Grok one between Grok models, never across.
+   */
+  provider: Provider;
+  /**
+   * Whether it has memory, chosen once when it is created; a Grok companion never has. With memory:
+   * the memory model, the sliding window, topics to leave alone, the scene, reading with feeling.
+   * Without: the whole chat is sent, and pictures and reading aloud work from the message itself.
+   * Pins work either way.
+   */
+  memory: boolean;
   prompts: Prompts;
   /** The Azure voice its replies are read aloud in; null for the server's own. */
   voice: string | null;

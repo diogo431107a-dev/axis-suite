@@ -1,10 +1,19 @@
 // What Valhalla 2 sends besides the profile.
 //
-// There is no temperature here, and that is not an omission: the current Claude models reject
-// `temperature`, `top_p` and `top_k` outright. Effort is the dial they left. A companion can
-// answer on Grok instead; some settings then work differently, and the hints say how.
+// A Claude companion has no temperature here, and that is not an omission: the current Claude
+// models reject `temperature`, `top_p` and `top_k` outright. Effort is the dial they left. A Grok
+// companion has a temperature, and some settings work differently for it; the hints say how.
 import { useState } from "react";
-import { CACHE_TTLS, EFFORTS, hasFallback, LIMITS, MODELS, providerOf, type Settings } from "../../shared/protocol.ts";
+import {
+  CACHE_TTLS,
+  EFFORTS,
+  hasFallback,
+  LIMITS,
+  MODELS,
+  providerOf,
+  type Provider,
+  type Settings,
+} from "../../shared/protocol.ts";
 import { usePage } from "../page.ts";
 import { Field, inputStyle } from "../ui/bits.tsx";
 
@@ -33,6 +42,7 @@ function ModelField({
 }) {
   const chosen = models.find((entry) => entry.id === value);
   const offersGrok = models.some((entry) => entry.provider === "xai");
+  const offersClaude = models.some((entry) => entry.provider === "anthropic");
   return (
     <Field label={label} hint={hint}>
       <select
@@ -53,7 +63,7 @@ function ModelField({
           className={`${inputStyle} mt-2 font-mono`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={offersGrok ? "claude-… or grok-…" : "claude-…"}
+          placeholder={offersGrok && offersClaude ? "claude-… or grok-…" : offersGrok ? "grok-…" : "claude-…"}
           aria-label={`${label} id`}
         />
       )}
@@ -64,7 +74,7 @@ function ModelField({
       ) : (
         <span className="mt-1 block text-xs text-faint">
           Any model id the API accepts. Valhalla 2 sends it as you typed it
-          {offersGrok ? ": an id starting grok- goes to xAI, any other to Claude." : "."}
+          {offersGrok && offersClaude ? ": an id starting grok- goes to xAI, any other to Claude." : "."}
         </span>
       )}
     </Field>
@@ -74,16 +84,36 @@ function ModelField({
 export function SettingsForm({
   settings,
   onChange,
+  provider,
+  memory,
   note,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
+  /** The companion's API, once it is saved; null for a new one, which may pick either. */
+  provider: Provider | null;
+  /** Whether the companion has memory, so whether a memory model is asked for. */
+  memory: boolean;
   note?: string;
 }) {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   const [stops, setStops] = useState(settings.stopSequences.join("\n"));
   const { health } = usePage();
   const onGrok = providerOf(settings.model) === "xai";
+
+  /**
+   * A new chat model. A Grok companion's memory model, which nothing uses, follows it; moving a new
+   * companion back to Claude gives it the server's memory model again. A temperature is Grok's only.
+   */
+  const chooseModel = (model: string) => {
+    const grok = providerOf(model) === "xai";
+    onChange({
+      ...settings,
+      model,
+      memoryModel: grok ? model : onGrok ? health.defaults.memoryModel : settings.memoryModel,
+      temperature: grok ? settings.temperature : null,
+    });
+  };
 
   return (
     <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
@@ -95,21 +125,27 @@ export function SettingsForm({
       <div className="grid gap-4 sm:grid-cols-2">
         <ModelField
           label="Model"
-          hint="Answers in character."
+          hint={
+            provider === null
+              ? "Answers in character. Claude or Grok is chosen now: a companion can't move between them later."
+              : "Answers in character."
+          }
           value={settings.model}
-          onChange={(model) => set("model", model)}
-          models={MODELS}
+          onChange={chooseModel}
+          models={provider === null ? MODELS : MODELS.filter((entry) => entry.provider === provider)}
           grok={health.grok}
           note={(cacheRead) => `Cache reads $${cacheRead} per Mtok — what the chat so far costs to re-send.`}
         />
-        <ModelField
-          label="Memory model"
-          hint="Keeps the companion's memory up to date after a chat. Always Claude."
-          value={settings.memoryModel}
-          onChange={(model) => set("memoryModel", model)}
-          models={MODELS.filter((entry) => entry.provider === "anthropic")}
-          grok={false}
-        />
+        {memory && !onGrok ? (
+          <ModelField
+            label="Memory model"
+            hint="Keeps the companion's memory up to date after a chat."
+            value={settings.memoryModel}
+            onChange={(model) => set("memoryModel", model)}
+            models={MODELS.filter((entry) => entry.provider === "anthropic")}
+            grok={false}
+          />
+        ) : null}
 
         <Field
           label="Effort"
@@ -144,28 +180,57 @@ export function SettingsForm({
           />
         </Field>
 
-        <Field
-          label="Keep the cache for"
-          hint={
-            onGrok
-              ? "Grok caches by itself, for as long as it decides. There is nothing to set."
-              : "How long the profile and the chat so far stay cheap to re-send."
-          }
-        >
-          <select
-            className={inputStyle}
-            disabled={onGrok}
-            value={settings.cacheTtl}
-            onChange={(e) => set("cacheTtl", e.target.value as Settings["cacheTtl"])}
+        {onGrok ? (
+          <Field
+            label="Temperature"
+            hint="How freely Grok picks its words: lower is steadier, higher more varied. Grok never goes above 1."
           >
-            {CACHE_TTLS.map((ttl) => (
-              <option key={ttl} value={ttl}>
-                {ttl === "5m" ? "5 minutes — cheapest if you reply quickly" : "1 hour — for longer pauses"}
-              </option>
-            ))}
-          </select>
-        </Field>
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={settings.temperature === null}
+                onChange={(e) => set("temperature", e.target.checked ? null : 0.7)}
+              />
+              Grok's default
+            </label>
+            {settings.temperature === null ? null : (
+              <span className="mt-2 flex items-center gap-3">
+                <input
+                  type="range"
+                  className="flex-1"
+                  min={0}
+                  max={1}
+                  step={0.05}
+                  value={settings.temperature}
+                  onChange={(e) => set("temperature", Number(e.target.value))}
+                  aria-label="Temperature"
+                />
+                <span className="w-10 text-right font-mono text-sm">{settings.temperature.toFixed(2)}</span>
+              </span>
+            )}
+          </Field>
+        ) : (
+          <Field label="Keep the cache for" hint="How long the profile and the chat so far stay cheap to re-send.">
+            <select
+              className={inputStyle}
+              value={settings.cacheTtl}
+              onChange={(e) => set("cacheTtl", e.target.value as Settings["cacheTtl"])}
+            >
+              {CACHE_TTLS.map((ttl) => (
+                <option key={ttl} value={ttl}>
+                  {ttl === "5m" ? "5 minutes — cheapest if you reply quickly" : "1 hour — for longer pauses"}
+                </option>
+              ))}
+            </select>
+          </Field>
+        )}
       </div>
+
+      {onGrok ? (
+        <p className="text-xs text-faint">
+          Grok caches the chat by itself, for as long as it decides: there is no cache lifetime to choose.
+        </p>
+      ) : null}
 
       <Field
         label="Stop at"
@@ -188,25 +253,25 @@ export function SettingsForm({
         />
       </Field>
 
-      <label className={`flex items-start gap-2 text-sm ${hasFallback(settings.model) ? "" : "opacity-60"}`}>
-        <input
-          type="checkbox"
-          className="mt-1"
-          checked={settings.fallbacks}
-          disabled={!hasFallback(settings.model)}
-          onChange={(e) => set("fallbacks", e.target.checked)}
-        />
-        <span>
-          Let another model answer if this one declines
-          <span className="mt-0.5 block text-xs text-faint">
-            {hasFallback(settings.model)
-              ? "Valhalla 2 adds no filter of its own either way. This only decides whether a turn the API declines gets a second chance on another model before it comes back to you."
-              : onGrok
-                ? "xAI's API has no fallback model, so this does nothing for Grok."
+      {onGrok ? null : (
+        <label className={`flex items-start gap-2 text-sm ${hasFallback(settings.model) ? "" : "opacity-60"}`}>
+          <input
+            type="checkbox"
+            className="mt-1"
+            checked={settings.fallbacks}
+            disabled={!hasFallback(settings.model)}
+            onChange={(e) => set("fallbacks", e.target.checked)}
+          />
+          <span>
+            Let another model answer if this one declines
+            <span className="mt-0.5 block text-xs text-faint">
+              {hasFallback(settings.model)
+                ? "Valhalla 2 adds no filter of its own either way. This only decides whether a turn the API declines gets a second chance on another model before it comes back to you."
                 : "The API has no other model to hand a declined Haiku turn to, so this does nothing here."}
+            </span>
           </span>
-        </span>
-      </label>
+        </label>
+      )}
     </section>
   );
 }

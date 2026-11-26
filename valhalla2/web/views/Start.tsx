@@ -50,7 +50,9 @@ export function Start() {
               ))}
             </select>
           </Field>
-          <fieldset className="space-y-2">
+          <fieldset
+            className={companions.find((one) => one.id === companionId)?.memory === false ? "hidden" : "space-y-2"}
+          >
             <legend className="mb-1 text-sm font-medium">This chat is</legend>
             {CHAT_MODES.map((option) => (
               <label key={option} className="flex items-start gap-2 text-sm">

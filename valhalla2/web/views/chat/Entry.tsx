@@ -34,6 +34,7 @@ export function Entry({
   onPin,
   onPicture,
   onScene,
+  memory,
   onView,
 }: {
   chatId: string;
@@ -58,6 +59,8 @@ export function Entry({
   onPin: (start: { messageId: number; speaker: string; text: string }) => void;
   onPicture: (messageId: number) => void;
   onScene: (messageId: number) => void;
+  /** Whether the companion has memory. */
+  memory: boolean;
   onView: (pictureId: string) => void;
 }) {
   const { message, siblings } = entry;
@@ -131,6 +134,7 @@ export function Entry({
         onEdit={() => setEditing({ id: message.id, text })}
         onPicture={() => onPicture(message.id)}
         onScene={() => onScene(message.id)}
+        memory={memory}
         onDeleting={(asking) => setDeleting(asking ? message.id : null)}
       />
 

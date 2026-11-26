@@ -72,7 +72,7 @@ export function chatRoutes(s: Services): Router {
     const { companion, tree, base } = chatParts(req);
     const { system, messages } = prepare(base, tree.activePath(), undefined, false);
     try {
-      res.json(await tokensFor(system, asParams(messages), companion.settings));
+      res.json(await tokensFor(system, asParams(messages), companion.settings, companion.provider));
     } catch (err) {
       throw apiError(err);
     }
@@ -116,7 +116,7 @@ export function chatRoutes(s: Services): Router {
       throw err;
     }
     await stream(res, release, async (tell) => {
-      if (parentId === null && memoryBusy(companion.id)) {
+      if (parentId === null && companion.memory && memoryBusy(companion.id)) {
         // A greeting is written knowing everything: it waits for memory to catch up first.
         tell({ type: "remembering" });
         await withMemoryLock(companion.id, () => undefined);

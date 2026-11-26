@@ -135,14 +135,15 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
       const chat = get(id);
       const path = createTree(db, id).entries(swipeAsk);
       const onPath = path.map((entry) => entry.message.id);
+      const companion = companions.get(chat.companionId);
       return {
         chat,
-        companion: companions.get(chat.companionId),
+        companion,
         path,
         windowStart: (
           db.prepare("SELECT window_start FROM chats WHERE id = ?").get(id) as { window_start: number | null }
         ).window_start,
-        memoryPending: hasPending(db, id),
+        memoryPending: companion.memory && hasPending(db, id),
         pictures: picturesOn(db, id, onPath),
         pinned: pinnedAmong(db, id, onPath),
         liked: likedAmong(db, id, onPath),

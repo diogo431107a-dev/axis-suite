@@ -1,6 +1,7 @@
-// Asking for a picture: Claude writes the prompt, you look it over and change what you like, and
-// only then does CivitAI make it. A chat picture is drawn from the moment as Claude worked it out
-// (the scene), which you can correct before writing the prompt again.
+// Asking for a picture: the companion's own API (Claude or Grok) writes the prompt, you look it over
+// and change what you like, and only then does CivitAI make it. With memory, a chat picture is drawn
+// from the moment as Claude worked it out (the scene), which you can correct before writing the
+// prompt again; without, from the message itself.
 import { useCallback, useEffect, useState } from "react";
 import { ImagePlus, RefreshCw } from "lucide-react";
 import {
@@ -103,13 +104,17 @@ export function PictureDialog({
 
   const change = (fields: Partial<PictureDraft>) => setDraft((at) => (at ? { ...at, ...fields } : at));
   const title = target.kind === "profile" ? `A profile picture of ${companion.name}` : "Picture this moment";
+  /** Who writes the prompt: the companion's own API. */
+  const writer = companion.provider === "xai" ? "Grok" : "Claude";
 
   return (
     <Dialog open onClose={onClose} title={title}>
       <div className="space-y-4">
         {writing ? (
           <p role="status" className="animate-pulse text-sm text-faint">
-            Claude is picturing the scene and writing the prompt…
+            {companion.memory
+              ? `${writer} is picturing the scene and writing the prompt…`
+              : `${writer} is writing the prompt…`}
           </p>
         ) : null}
 
@@ -203,7 +208,7 @@ export function PictureDialog({
 
         <div className="space-y-2 rounded border border-dashed border-rule p-3">
           <label className="block">
-            <span className="mb-1 block text-sm font-medium">A note for Claude</span>
+            <span className="mb-1 block text-sm font-medium">A note for {writer}</span>
             <input
               className={inputStyle}
               value={hint}

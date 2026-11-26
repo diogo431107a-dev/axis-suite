@@ -13,13 +13,13 @@ import {
   type PictureDraftReply,
   type PictureKind,
 } from "../../shared/protocol.ts";
-import { writePicturePrompt } from "../claude/pictures.ts";
+import { writePictureFor } from "../chat/write.ts";
 import { id as checkId, messageId, object, oneOf, required, text } from "../check.ts";
 import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import { PICTURE_DEFAULTS, randomSeed } from "../pictures/civitai.ts";
-import { backgroundOf, sceneRequest, type Scene } from "../scene/context.ts";
+import { backgroundOf, plainPictureRequest, sceneRequest, type Scene } from "../scene/context.ts";
 import type { Services } from "../services.ts";
 
 export function pictureRoutes(s: Services): Router {
@@ -49,19 +49,20 @@ export function pictureRoutes(s: Services): Router {
     const hint = body.hint === undefined ? "" : text(body.hint, LIMITS.pictureHint, "The note");
     const from = kind === "chat" ? sceneOf(req, companion, body) : null;
     const scene: Scene = from ? { kind: "chat", path: from.path } : { kind: "profile" };
-    // A chat picture is drawn from the moment worked out: read once, kept, and yours to correct.
-    const read = from ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
-    const draft = await writePicturePrompt(
-      sceneRequest(
-        companion,
-        scene,
-        hint,
-        backgroundOf(companion, s.remembered(companion.id)),
-        config.scene.tokens,
-        read?.sheet,
-      ),
-      config.pictures.promptModel,
-    );
+    // With memory, a chat picture is drawn from the moment worked out: read once, kept, and yours to
+    // correct. Without, from the message itself and the profile.
+    const read = from && companion.memory ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
+    const request = companion.memory
+      ? sceneRequest(
+          companion,
+          scene,
+          hint,
+          backgroundOf(companion, s.remembered(companion.id)),
+          config.scene.tokens,
+          read?.sheet,
+        )
+      : plainPictureRequest(companion, scene, hint);
+    const draft = await writePictureFor(companion, request);
     res.json({ ...draft, scene: read } satisfies PictureDraftReply);
   });
 

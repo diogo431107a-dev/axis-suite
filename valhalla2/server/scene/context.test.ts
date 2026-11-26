@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type Companion, type Message } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS } from "../../shared/prompts.ts";
-import { draftOf } from "../claude/pictures.ts";
+import { draftOf } from "../pictures/draft.ts";
 import { backgroundOf, sceneRequest } from "./context.ts";
 
 const companion: Companion = {
@@ -12,6 +12,8 @@ const companion: Companion = {
   prompts: {},
   voice: null,
   voiceFeeling: true,
+  provider: "anthropic",
+  memory: true,
   createdAt: "",
   updatedAt: "",
 };

@@ -41,12 +41,19 @@ export function Pins({
           {page.pins.length} of {LIMITS.pins}
         </span>
       </h2>
-      <p className="text-sm text-faint">
-        Words you pinned from a chat, with the pin under a message. Every chat with {companion.name} gets them word for
-        word, after the files above. The memory model never changes them, and a tidy-up or a rebuild leaves them as they
-        are. Removing one reaches the chat it came from on its next turn, and the other chats when they next look at
-        memory.
-      </p>
+      {companion.memory ? (
+        <p className="text-sm text-faint">
+          Words you pinned from a chat, with the pin under a message. Every chat with {companion.name} gets them word
+          for word, after the files above. The memory model never changes them, and a tidy-up or a rebuild leaves them
+          as they are. Removing one reaches the chat it came from on its next turn, and the other chats when they next
+          look at memory.
+        </p>
+      ) : (
+        <p className="text-sm text-faint">
+          Words you pinned from a chat, with the pin under a message. Every chat with {companion.name} gets them word
+          for word, after the profile, from its next turn; removing one takes it out the same way.
+        </p>
+      )}
       {page.pins.length === 0 ? (
         <p className="text-sm text-faint">Nothing is pinned yet.</p>
       ) : (
