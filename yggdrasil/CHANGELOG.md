@@ -7,6 +7,7 @@ What changed in Yggdrasil, newest first. Each version is tagged in git as `yggdr
 - **Minor:** The sidebar shows your whole outline, not only the top level: click the arrow beside a bullet to unfold or fold it there. This doesn't collapse or expand anything in the outline itself. The sidebar remembers what you unfolded in this browser, and opens the way to the bullet you are zoomed into.
 - **Minor:** Drag a bullet by its dot onto any bullet in the sidebar, or onto Home, to move it there, with everything under it. It goes first inside that bullet. Hold it over a folded bullet for a moment to unfold it and go deeper.
 - **Minor:** Alt+Shift+M, or **Move to…** in the bullet's ⋯ menu, asks where to move the bullet: type part of a bullet's name, choose with ↑ ↓ and press Enter. The bullet goes first inside the one you chose, with everything under it. It also works on bullets selected with Esc, and Ctrl+Z puts them back.
+- **Minor:** Ctrl+/, or the small ? at the top right, shows the keyboard shortcuts and what the mouse does on a bullet's dot. Esc or a click outside closes it, and you are back where you were typing.
 
 ## 1.1.0 — 2026-11-10
 
