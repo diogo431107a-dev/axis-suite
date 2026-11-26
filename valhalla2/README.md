@@ -349,18 +349,22 @@ Two things are chosen when a companion is created, and never change:
   model of the other API is refused, not sent.
 - **With or without memory**, for a Claude companion. A Grok companion is always without.
 
-|                       | With memory (Claude)                                       | Without memory (Grok, or Claude)             |
-| --------------------- | ---------------------------------------------------------- | -------------------------------------------- |
-| What a chat sends     | profile, memory, pins, topics to leave alone; the window   | profile and pins; the whole chat, every turn |
-| Memory model          | after a chat goes quiet, or "Remember now"                 | none                                         |
-| A picture of a moment | drawn from the scene, worked out from memory and the chat  | drawn from that one message and the profile  |
-| Reading aloud         | with the feeling of each line, from the scene (or plainly) | plainly, as written                          |
-| Scene, leave-alone    | yes                                                        | no                                           |
-| A like's comment      | read by the memory model                                   | no comment: a like is only a mark for you    |
+|                       | With memory (Claude)                                       | Without memory (Grok, or Claude)              |
+| --------------------- | ---------------------------------------------------------- | --------------------------------------------- |
+| What a chat sends     | profile, memory, pins, topics to leave alone; the window   | profile and pins; the chat, up to 160K tokens |
+| Memory model          | after a chat goes quiet, or "Remember now"                 | none                                          |
+| A picture of a moment | drawn from the scene, worked out from memory and the chat  | drawn from that one message and the profile   |
+| Reading aloud         | with the feeling of each line, from the scene (or plainly) | plainly, as written                           |
+| Scene, leave-alone    | yes                                                        | no                                            |
+| A like's comment      | read by the memory model                                   | no comment: a like is only a mark for you     |
 
-Without memory, nothing slides out of a long chat: it is sent whole until it outgrows the model's
-context window, and then the API's refusal is shown as it is. The prompt cache is what keeps that
-affordable. A Grok companion's picture prompt is written by its own model; a Claude companion's by
+Without memory, a chat is sent whole until it reaches about 160K tokens. Then its oldest turns slide
+out, down to about 120K, and a line in the chat shows where. What slides out is forgotten: there is
+no memory to keep it. The limit keeps every request under 200K tokens, past which xAI bills the whole
+prompt at twice the rate; a model with a smaller window slides before that window instead (less
+room for the reply). The count is only an estimate, about four characters a token, hence the margin.
+A slide goes well below the limit so that the next one is many turns away: each slide costs the
+prompt cache once, and the cache is what keeps a long chat affordable. A Grok companion's picture prompt is written by its own model; a Claude companion's by
 `PICTURE_PROMPT_MODEL`, with or without memory.
 
 ### What differs on Grok

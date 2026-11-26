@@ -17,7 +17,7 @@ import { DEFAULT_SETTINGS, blockText, providerOf, type Message } from "../shared
 import { createChats } from "../server/chat/chats.ts";
 import { generate, send, type TurnContext } from "../server/chat/turn.ts";
 import { runMemoryModel } from "../server/claude/memory.ts";
-import { writeReply } from "../server/chat/write.ts";
+import { chatWindow, writeReply } from "../server/chat/write.ts";
 import { config } from "../server/config.ts";
 import { consolidate } from "../server/memory/consolidate.ts";
 import { createMemory } from "../server/memory/store.ts";
@@ -71,7 +71,7 @@ const context: TurnContext = {
   chatId: "smoke-chat-0001",
   companion,
   memory,
-  window: { tokens: config.windowTokens, chunk: config.windowChunk },
+  window: await chatWindow(companion),
   write: writeReply,
   onEvent: (event) => {
     if (event.type === "delta") process.stdout.write(event.text);

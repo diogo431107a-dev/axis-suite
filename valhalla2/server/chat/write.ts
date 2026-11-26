@@ -16,11 +16,13 @@ import { streamReply, type Writer } from "../claude/reply.ts";
 import { contextWindow, countTokens } from "../claude/tokens.ts";
 import { config } from "../config.ts";
 import { invalid, type StoreError } from "../errors.ts";
+import { windowWithout } from "../memory/history.ts";
 import { grokError } from "../grok/client.ts";
 import { writeGrokPicturePrompt } from "../grok/pictures.ts";
 import { streamGrokReply } from "../grok/reply.ts";
 import { grokContextWindow } from "../grok/tokens.ts";
 import type { SystemBlock } from "../prompt.ts";
+import type { WindowSize } from "./turn.ts";
 
 /** The companion's API, checked against the model about to be asked. */
 export function providerFor(model: string, provider: Provider = providerOf(model)): Provider {
@@ -50,6 +52,18 @@ export function writePictureFor(
     return writeGrokPicturePrompt(request, model);
   }
   return writePicturePrompt(request, config.pictures.promptModel);
+}
+
+/**
+ * How much of a chat goes out each turn. With memory, the configured window: what slides out is
+ * folded into memory. Without, a window sized from the model's own (windowWithout in history.ts).
+ */
+export async function chatWindow(companion: Companion): Promise<WindowSize> {
+  if (companion.memory) return { tokens: config.windowTokens, chunk: config.windowChunk };
+  const { model, maxTokens } = companion.settings;
+  const window =
+    providerFor(model, companion.provider) === "xai" ? await grokContextWindow(model) : await contextWindow(model);
+  return { ...windowWithout(window, maxTokens), chunk: config.windowChunk };
 }
 
 /** A failure from either API as something the page can show. */

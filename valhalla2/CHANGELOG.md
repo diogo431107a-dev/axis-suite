@@ -4,6 +4,12 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Long chats without memory no longer get stuck.** A Grok companion, or a Claude one without
+  memory, used to send the whole chat every turn, until the chat grew too big for the model and
+  every new message was refused. Now, at about 160K tokens, its oldest turns stop being sent, and a
+  line in the chat shows where. The companion no longer sees what is above that line. This also
+  keeps every Grok request under 200K tokens, where xAI would charge twice the rate.
+
 ## 0.0.35 — 2026-11-26
 
 - **Cheaper by default.** A new companion now starts on Haiku 5.5 at high effort: about forty

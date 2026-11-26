@@ -183,8 +183,9 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
             <Fragment key={entry.message.id}>
               {entry.message.id === page.windowStart ? (
                 <p className="border-t border-dashed border-rule pt-2 text-center text-xs text-faint">
-                  Everything above has slid out of what is sent each turn. What mattered in it is in {companion.name}'s
-                  memory.
+                  {companion.memory
+                    ? `Everything above has slid out of what is sent each turn. What mattered in it is in ${companion.name}'s memory.`
+                    : `Everything above has slid out of what is sent each turn. ${companion.name} has no memory, so no longer sees it.`}
                 </p>
               ) : null}
               <Entry

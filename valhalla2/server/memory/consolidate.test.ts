@@ -297,6 +297,16 @@ describe("the window", () => {
     const at = windowFor(messages(10), 999, 10_000, 2);
     expect(at).toEqual({ from: 0, startId: null, slid: true });
   });
+
+  it("with slideTo, slides further down once it has to slide, and not before", () => {
+    const path = messages(41); // about 4,400 tokens
+    expect(windowFor(path, null, 5_000, 5, 1_000)).toEqual({ from: 0, startId: null, slid: false });
+    const plain = windowFor(path, null, 2_000, 5);
+    const further = windowFor(path, null, 2_000, 5, 1_000);
+    expect(path[further.from]!.role).toBe("user");
+    expect(further.from).toBeGreaterThan(plain.from);
+    expect(path.slice(further.from).length * 108).toBeLessThanOrEqual(1_000);
+  });
 });
 
 describe("the memory a chat sees", () => {

@@ -22,6 +22,8 @@ export interface WindowSize {
   tokens: number;
   /** How many exchanges slide out at once. */
   chunk: number;
+  /** How far down a slide goes, when that is lower than `tokens` (see windowFor). */
+  slideTo?: number;
 }
 
 export interface TurnContext {
@@ -59,8 +61,9 @@ export interface Prepared {
  * window holds. With `keep`, a slide of the window is kept, memory is looked at afresh with it,
  * and `onSlide` is told; without, nothing is changed (for Inspect and the token count).
  *
- * A companion without memory sends the whole path, after its profile and its pins: there is no
- * memory to slide turns out into, and the prompt cache is what keeps that affordable.
+ * A companion without memory sends its profile and its pins, and as much of the path as its far
+ * larger window holds (chatWindow in write.ts). There is no memory to slide turns out into, so what
+ * slides out is simply no longer sent, and `onSlide` is never told.
  */
 export function prepare(
   context: Pick<TurnContext, "db" | "chatId" | "companion" | "memory" | "window" | "onSlide">,
@@ -69,16 +72,19 @@ export function prepare(
   keep: boolean,
 ): Prepared {
   const { db, chatId, companion, memory, window } = context;
-  if (!companion.memory) {
-    const pins = pinsOf(db, companion.id);
-    return {
-      system: buildSystem(companion, pins.length > 0 ? renderPins(companion, pins) : null),
-      messages: outgoing(path, next),
-    };
-  }
   const { window_start: stored } = db.prepare("SELECT window_start FROM chats WHERE id = ?").get(chatId) as {
     window_start: number | null;
   };
+  if (!companion.memory) {
+    const pins = pinsOf(db, companion.id);
+    const system = buildSystem(companion, pins.length > 0 ? renderPins(companion, pins) : null);
+    // The profile and the pins always go whole; the chat has what is left of the window.
+    const fixed = system.reduce((sum, block) => sum + Math.ceil(block.text.length / 4), 0);
+    const room = (tokens: number) => Math.max(0, tokens - fixed);
+    const at = windowFor(path, stored, room(window.tokens), window.chunk, room(window.slideTo ?? window.tokens));
+    if (keep && at.slid) db.prepare("UPDATE chats SET window_start = ? WHERE id = ?").run(at.startId, chatId);
+    return { system, messages: outgoing(path.slice(at.from), next) };
+  }
   const at = windowFor(path, stored, window.tokens, window.chunk);
   let snapshot: string;
   if (!keep) {
