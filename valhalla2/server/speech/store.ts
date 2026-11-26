@@ -3,11 +3,21 @@
 // is instant and costs nothing. An edited reply, or another voice, is read again, and the old
 // audio is deleted. Each companion may have its own voice; one that names none is read in the
 // server's. A reply is read with the feeling of each line when the scene has worked it out
-// (direct.ts), and is read again when that changes.
+// (direct.ts), and is read again when that changes, or when its companion's speed, pitch or
+// speaking style does.
 import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
-import { blockText, type Feeling, type Message, type SceneLine, type Voice } from "../../shared/protocol.ts";
+import {
+  blockText,
+  DEFAULT_TUNING,
+  isDefaultTuning,
+  type Feeling,
+  type Message,
+  type SceneLine,
+  type Voice,
+  type VoiceTuning,
+} from "../../shared/protocol.ts";
 import { STATE_DIR, transaction } from "../db.ts";
 import { invalid, notFound } from "../errors.ts";
 import type { FileStore } from "../files.ts";
@@ -80,10 +90,24 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
     return voiceList.voices;
   }
 
-  /** The SSML for `lines` in `voice`: each said its way, or the words plainly when no line has a way. */
-  async function ssmlFor(voice: string, lines: readonly SceneLine[] | null, text: string): Promise<string> {
-    return lines ? directedSsml(lines, voice, await stylesOf(voice)) : ssmlOf(text, voice);
+  /**
+   * The SSML for `lines` in `voice`: each said its way, or the words plainly when no line has a way;
+   * at the tuning's speed and pitch, and in its style if the voice has that style.
+   */
+  async function ssmlFor(
+    voice: string,
+    lines: readonly SceneLine[] | null,
+    text: string,
+    tuning: VoiceTuning,
+  ): Promise<string> {
+    const styles = lines || tuning.style ? await stylesOf(voice) : [];
+    const fit = tuning.style && !styles.includes(tuning.style) ? { ...tuning, style: null } : tuning;
+    return lines ? directedSsml(lines, voice, styles, fit) : ssmlOf(text, voice, fit);
   }
+
+  /** What the hash adds for a tuning; nothing for the voice as it comes, so audio kept before stays. */
+  const tuned = (tuning: VoiceTuning): string =>
+    isDefaultTuning(tuning) ? "" : `\n${JSON.stringify([tuning.rate, tuning.pitch, tuning.style])}`;
 
   async function read(message: Message, voice: string, ssml: string, chars: number, hash: string): Promise<Spoken> {
     const audio = await azure.synthesize(ssml);
@@ -116,19 +140,23 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
 
     /**
      * The kept audio of a reply, read now in `voice` if it isn't kept yet: with `lines`, each said
-     * the way the scene says (direct.ts), otherwise plainly. Another way of saying it is another
-     * reading. Whose message it is, and that it is still there, is the caller's to check.
+     * the way the scene says (direct.ts), otherwise plainly, at the tuning's speed, pitch and style.
+     * Another way of saying it is another reading. Whose message it is, and that it is still there,
+     * is the caller's to check.
      */
     async of(
       message: Message,
       voice: string = serverVoice,
       lines: readonly SceneLine[] | null = null,
+      tuning: VoiceTuning = DEFAULT_TUNING,
     ): Promise<Spoken> {
       if (message.role !== "assistant") invalid("Only a companion's replies are read aloud");
       const text = spokenText(message.content.map(blockText).join(""));
       if (!text) invalid("This reply has nothing to read aloud");
       const how = lines ? `\n${JSON.stringify(lines.map((line) => [line.text, line.feeling, line.strength]))}` : "";
-      const hash = createHash("sha256").update(`${voice}\n${text}${how}`).digest("hex");
+      const hash = createHash("sha256")
+        .update(`${voice}\n${text}${how}${tuned(tuning)}`)
+        .digest("hex");
 
       const kept = db
         .prepare("SELECT file FROM speech WHERE message_id = ? AND voice = ? AND text_hash = ?")
@@ -139,7 +167,7 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       let reading = underway.get(key);
       if (!reading) {
         const chars = lines ? lines.reduce((sum, line) => sum + [...line.text].length, 0) : [...text].length;
-        reading = ssmlFor(voice, lines, text)
+        reading = ssmlFor(voice, lines, text, tuning)
           .then((ssml) => read(message, voice, ssml, chars, hash))
           .finally(() => underway.delete(key));
         underway.set(key, reading);
@@ -150,20 +178,26 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
     voices,
 
     /**
-     * `text` read in `voice`, to hear it before choosing it: plainly, or every line with `feeling`.
+     * `text` read in `voice` with `tuning`, to hear it before choosing it: plainly, or every line
+     * with `feeling`.
      * Not kept as a file: the last few are kept in memory, and the characters count like any other
      * reading.
      */
-    sample(voice: string, text: string, feeling: Feeling | null = null): Promise<Uint8Array> {
+    sample(
+      voice: string,
+      text: string,
+      feeling: Feeling | null = null,
+      tuning: VoiceTuning = DEFAULT_TUNING,
+    ): Promise<Uint8Array> {
       const spoken = spokenText(text);
       if (!spoken) invalid("Write something for the voice to read");
       const key = createHash("sha256")
-        .update(`${voice}\n${feeling ?? ""}\n${spoken}`)
+        .update(`${voice}\n${feeling ?? ""}\n${spoken}${tuned(tuning)}`)
         .digest("hex");
       let audio = samples.get(key);
       if (!audio) {
         const lines = feeling ? linesOf(text).map((line) => ({ ...line, feeling, strength: 2 as const })) : null;
-        audio = ssmlFor(voice, lines, spoken)
+        audio = ssmlFor(voice, lines, spoken, tuning)
           .then((ssml) => azure.synthesize(ssml))
           .then((bytes) => {
             count([...spoken].length);

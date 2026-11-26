@@ -14,6 +14,7 @@ import {
   settings as checkSettings,
   text,
   voice as checkVoice,
+  voiceTuning as checkTuning,
 } from "./check.ts";
 import { config } from "./config.ts";
 import { invalid, notFound, tooMany } from "./errors.ts";
@@ -27,6 +28,9 @@ interface Row {
   prompts: string;
   voice: string | null;
   voice_feeling: number;
+  voice_rate: number;
+  voice_pitch: number;
+  voice_style: string | null;
   provider: string;
   memory: number;
   created_at: string;
@@ -44,6 +48,7 @@ export const companionOf = (row: Row): Companion => ({
   prompts: JSON.parse(row.prompts) as Companion["prompts"],
   voice: row.voice,
   voiceFeeling: row.voice_feeling === 1,
+  voiceTuning: { rate: row.voice_rate, pitch: row.voice_pitch, style: row.voice_style },
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
@@ -56,6 +61,9 @@ const NAMES = [
   "prompts",
   "voice",
   "voice_feeling",
+  "voice_rate",
+  "voice_pitch",
+  "voice_style",
   "provider",
   "memory",
   "created_at",
@@ -116,6 +124,7 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       const voice = checkVoice(fields.voice);
       // On unless said otherwise.
       const voiceFeeling = fields.voiceFeeling === false ? 0 : 1;
+      const tuning = checkTuning(fields.voiceTuning);
       const now = new Date().toISOString();
       const asked = fields.memory === undefined ? undefined : fields.memory === true;
       if (provider === "xai" && asked === true) invalid("A Grok companion has no memory");
@@ -125,14 +134,27 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       }
       if (existing) {
         db.prepare(
-          "UPDATE companions SET name = ?, profile = ?, settings = ?, prompts = ?, voice = ?, voice_feeling = ?, updated_at = ? WHERE id = ?",
-        ).run(name, profile, JSON.stringify(settings), JSON.stringify(prompts), voice, voiceFeeling, now, id);
+          `UPDATE companions SET name = ?, profile = ?, settings = ?, prompts = ?, voice = ?, voice_feeling = ?,
+           voice_rate = ?, voice_pitch = ?, voice_style = ?, updated_at = ? WHERE id = ?`,
+        ).run(
+          name,
+          profile,
+          JSON.stringify(settings),
+          JSON.stringify(prompts),
+          voice,
+          voiceFeeling,
+          tuning.rate,
+          tuning.pitch,
+          tuning.style,
+          now,
+          id,
+        );
       } else {
         const { count } = db.prepare("SELECT count(*) AS count FROM companions WHERE owner = ?").get(owner) as {
           count: number;
         };
         if (count >= LIMITS.companions) tooMany(`Valhalla 2 keeps ${LIMITS.companions} companions at most`);
-        db.prepare(`INSERT INTO companions (${COLUMNS}, owner) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+        db.prepare(`INSERT INTO companions (${COLUMNS}, owner) VALUES (${NAMES.map(() => "?").join(", ")}, ?)`).run(
           id,
           name,
           profile,
@@ -140,6 +162,9 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
           JSON.stringify(prompts),
           voice,
           voiceFeeling,
+          tuning.rate,
+          tuning.pitch,
+          tuning.style,
           provider,
           memory ? 1 : 0,
           now,

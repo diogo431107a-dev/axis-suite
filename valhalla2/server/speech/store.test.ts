@@ -220,3 +220,41 @@ describe("reading aloud", () => {
     expect(knownSpeechFiles(db).size).toBe(0);
   });
 });
+
+describe("reading aloud at a companion's speed, pitch and style", () => {
+  it("keeps the audio read before when nothing is changed", async () => {
+    const { tree, hello, speech } = setup();
+    const before = await speech.of(tree.get(hello.id));
+    const same = await speech.of(tree.get(hello.id), undefined, null, { rate: 0, pitch: 0, style: null });
+    expect(same).toEqual({ file: before.file, read: 0 });
+  });
+
+  it("reads again at another speed, pitch or style", async () => {
+    const { tree, hello, read, speech } = setup();
+    const before = await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural");
+    const faster = await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural", null, {
+      rate: 10,
+      pitch: 0,
+      style: null,
+    });
+    expect(faster.file).not.toBe(before.file);
+    expect(read.at(-1)).toContain('<prosody rate="+10%">Waves. Hello.</prosody>');
+    await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural", null, { rate: 10, pitch: 0, style: "calm" });
+    expect(read.at(-1)).toContain('<mstts:express-as style="calm"><prosody rate="+10%">');
+  });
+
+  it("leaves out a style the voice hasn't", async () => {
+    const { tree, hello, read, speech } = setup();
+    await speech.of(tree.get(hello.id), "pt-BR-FranciscaNeural", null, { rate: 0, pitch: 0, style: "cheerful" });
+    expect(read.at(-1)).toContain('<voice name="pt-BR-FranciscaNeural">Waves. Hello.</voice>');
+  });
+
+  it("reads a sample at the speed asked for, as another sample", async () => {
+    const { read, speech } = setup();
+    await speech.sample("pt-BR-FranciscaNeural", "Olá!");
+    await speech.sample("pt-BR-FranciscaNeural", "Olá!", null, { rate: -20, pitch: 5, style: null });
+    const ssml = read.filter((what) => what.startsWith("<speak"));
+    expect(ssml).toHaveLength(2);
+    expect(ssml[1]).toContain('<prosody rate="-20%" pitch="+5%">Olá!</prosody>');
+  });
+});

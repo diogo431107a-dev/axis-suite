@@ -253,6 +253,13 @@ A companion's replies can be read aloud, by Azure AI Speech's neural voices.
   multilingual also reads other languages, telling them from the text; any other voice reads in
   its own language. Changing the voice reads a reply again, in the new voice, the next time you
   play it.
+- **Speed, pitch and style.** Under the voice, **Speed** (from half to twice the voice's usual)
+  and **Pitch** (up to half lower or higher) are kept with the companion, and **Hear it** reads at
+  them before you save. A voice with styles of its own also offers a **Speaking style** (chat,
+  friendly, calm…): every line is read in it, unless the line's feeling has a style of its own that
+  fits better. Feelings are read on top of all three: a whisper is still slower than the
+  companion's own speed. Changing any of them reads a reply again the next time you play it; audio
+  read before they existed is kept as long as they stay at the voice's usual.
 - **As replies arrive.** The speaker switch in a chat's header (**Aloud** / **Silent**) says whether
   each new reply, version or greeting is read as soon as it is written. It is remembered by the
   browser, not the companion — on at home, off on the phone in public — and starts on.

@@ -289,6 +289,15 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE companions ADD COLUMN memory INTEGER NOT NULL DEFAULT 1;
     `);
   },
+  // v11: how a companion's voice is set: its speed and pitch in percent (0: the voice's usual), and
+  // a speaking style of its own (NULL: none).
+  (db) => {
+    db.exec(`
+      ALTER TABLE companions ADD COLUMN voice_rate INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE companions ADD COLUMN voice_pitch INTEGER NOT NULL DEFAULT 0;
+      ALTER TABLE companions ADD COLUMN voice_style TEXT;
+    `);
+  },
 ];
 
 /**

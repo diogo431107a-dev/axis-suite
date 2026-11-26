@@ -4,6 +4,13 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **A voice's speed, pitch and speaking style.** On a companion's page, under **Voice**, two new
+  sliders set how fast (half to twice the usual) and how high (up to half lower or higher) its
+  replies are read, and a voice with styles of its own (chat, friendly, calm…) can be given one to
+  speak in. They are kept with the companion, **Hear it** tries them before you save, and feelings
+  are read on top of them. Every companion starts at the voice's usual, so nothing sounds different
+  until you change it, and audio already read is kept.
+
 ## 0.0.30 — 2026-11-25
 
 - **Grok companions, and companions without memory.** A new companion is now either Claude or Grok

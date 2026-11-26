@@ -121,6 +121,7 @@ describe("companions from before the choice existed", () => {
       provider: "anthropic",
       memory: true,
       settings: { temperature: null },
+      voiceTuning: { rate: 0, pitch: 0, style: null },
     });
     db.close();
   });
@@ -310,5 +311,28 @@ describe("a picture without memory", () => {
       ),
     ).toThrow(/Grok declined/);
     void blockText;
+  });
+});
+
+describe("a companion's voice speed, pitch and style", () => {
+  it("is the voice's usual unless set, and kept as set", () => {
+    const { companions } = setup();
+    expect(companions.save("comp-0001", { name: "Freya" }).voiceTuning).toEqual({ rate: 0, pitch: 0, style: null });
+    const tuning = { rate: 15, pitch: -6, style: "chat" };
+    expect(companions.save("comp-0001", { name: "Freya", voiceTuning: tuning }).voiceTuning).toEqual(tuning);
+    expect(companions.get("comp-0001").voiceTuning).toEqual(tuning);
+    expect(companions.save("comp-0001", { name: "Freya", voiceTuning: { style: "" } }).voiceTuning).toEqual({
+      rate: 0,
+      pitch: 0,
+      style: null,
+    });
+  });
+
+  it("refuses what Azure doesn't take", () => {
+    const { companions } = setup();
+    expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { rate: 101 } })).toThrow(/speed/);
+    expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { pitch: -51 } })).toThrow(/pitch/);
+    expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { rate: 2.5 } })).toThrow(/whole/);
+    expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { style: '"><x' } })).toThrow(/style/);
   });
 });

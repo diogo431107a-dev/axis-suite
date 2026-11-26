@@ -48,4 +48,10 @@ export const LIMITS = {
   voice: 100,
   /** What a voice reads when you try it. */
   voiceSample: 300,
+  /** How much faster or slower a companion's voice reads, in percent: Azure takes half to double speed. */
+  voiceRateMin: -50,
+  voiceRateMax: 100,
+  /** How much higher or lower it reads, in percent: Azure takes half to one and a half times the pitch. */
+  voicePitchMin: -50,
+  voicePitchMax: 50,
 } as const;

@@ -3,9 +3,16 @@
 // Azure has two ways to direct a voice. A few voices have speaking styles of their own (cheerful,
 // whispering, sad…), which sound the most natural; a line whose feeling matches one of the voice's
 // styles is read in it. Every voice follows speed, pitch and volume, so every other line is read
-// with those, set for its feeling. The words are always the reply's own.
-import type { Feeling, SceneLine, Strength } from "../../shared/protocol.ts";
-import { escapeXml, langOf } from "./text.ts";
+// with those, set for its feeling, in the companion's own speaking style if it has one. The
+// companion's speed and pitch are under all of it. The words are always the reply's own.
+import {
+  DEFAULT_TUNING,
+  type Feeling,
+  type SceneLine,
+  type Strength,
+  type VoiceTuning,
+} from "../../shared/protocol.ts";
+import { combinePitch, combineRate, deliver, escapeXml, speak } from "./text.ts";
 
 /** The voice's own styles that fit a feeling, the closest first. */
 const STYLES: Readonly<Record<Feeling, readonly string[]>> = {
@@ -64,34 +71,42 @@ export function styleFor(feeling: Feeling, styles: readonly string[]): string | 
   return STYLES[feeling].find((style) => styles.includes(style)) ?? null;
 }
 
-const percent = (value: number): string => `${value >= 0 ? "+" : ""}${Math.round(value)}%`;
-
-/** One line, in the voice's style for its feeling or with speed, pitch and volume. */
-function lineOf(line: SceneLine, styles: readonly string[]): string {
+/**
+ * One line: in the voice's style for its feeling, or else in the companion's own style, with speed,
+ * pitch and volume. The companion's speed and pitch are under everything; a feeling read with
+ * speed and pitch is read on top of them.
+ */
+function lineOf(line: SceneLine, styles: readonly string[], tuning: VoiceTuning): string {
   const said = escapeXml(line.text);
   const style = styleFor(line.feeling, styles);
-  if (style)
-    return `<mstts:express-as style="${style}" styledegree="${DEGREE[line.strength]}">${said}</mstts:express-as>`;
+  if (style) {
+    return deliver(said, { style, degree: DEGREE[line.strength], rate: tuning.rate, pitch: tuning.pitch });
+  }
   const [rate, pitch, volume] = PROSODY[line.feeling].map((value) => value * SCALE[line.strength]) as [
     number,
     number,
     number,
   ];
-  const attributes = [
-    rate ? `rate="${percent(rate)}"` : "",
-    pitch ? `pitch="${percent(pitch)}"` : "",
-    volume ? `volume="${percent(volume)}"` : "",
-  ].filter(Boolean);
-  return attributes.length > 0 ? `<prosody ${attributes.join(" ")}>${said}</prosody>` : said;
+  return deliver(said, {
+    style: tuning.style,
+    rate: combineRate(tuning.rate, rate),
+    pitch: combinePitch(tuning.pitch, pitch),
+    volume,
+  });
 }
 
-/** The SSML Azure reads: the lines in one voice, each said its way, a pause between paragraphs. */
-export function directedSsml(lines: readonly SceneLine[], voice: string, styles: readonly string[]): string {
+/**
+ * The SSML Azure reads: the lines in one voice, each said its way, a pause between paragraphs.
+ * The companion's style is used only if the voice has it, which is the caller's to check.
+ */
+export function directedSsml(
+  lines: readonly SceneLine[],
+  voice: string,
+  styles: readonly string[],
+  tuning: VoiceTuning = DEFAULT_TUNING,
+): string {
   const said = lines.map(
-    (line, at) => `${line.paragraph && at > 0 ? '<break time="400ms"/>' : ""}${lineOf(line, styles)}`,
+    (line, at) => `${line.paragraph && at > 0 ? '<break time="400ms"/>' : ""}${lineOf(line, styles, tuning)}`,
   );
-  return (
-    `<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xmlns:mstts="https://www.w3.org/2001/mstts" ` +
-    `xml:lang="${escapeXml(langOf(voice))}"><voice name="${escapeXml(voice)}">${said.join(" ")}</voice></speak>`
-  );
+  return speak(voice, said.join(" "), true);
 }
