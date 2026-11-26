@@ -1,12 +1,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { CircleCheck, PanelLeft, UserRound } from "lucide-react";
+import { CircleCheck, CircleHelp, PanelLeft, UserRound } from "lucide-react";
 import { SignedOutError, fetchMe, goToSignIn, watchForSignIn, type Me } from "@axis-suite/heimdall-client/browser";
 import { AboutButton } from "./About.tsx";
 import { attachFiles, isOutlineFile } from "./files/upload.ts";
 import { importFile } from "./io/importer.ts";
 import { insertDrafts } from "./model/commands.ts";
 import { Outliner } from "./model/outliner.ts";
+import type { Focus } from "./model/undo.ts";
 import { ExportDialog } from "./outline/ExportDialog.tsx";
+import { HelpDialog } from "./outline/HelpDialog.tsx";
 import { OutlinerContext, useNode, useOutliner, useSyncState, useView } from "./outline/hooks.ts";
 import { focusSearch, zoomFromLocation } from "./outline/nav.ts";
 import { MoveDialog } from "./outline/MoveDialog.tsx";
@@ -99,18 +101,25 @@ function Page({ me, notice }: { me: Me; notice: string }) {
     () => o.ui.dialog,
   );
   const closeDialog = useCallback(() => o.ui.setDialog(null), [o]);
+  // The keyboard shortcuts (Ctrl+/ or the ?), with the caret or selection to give back on closing.
+  const [help, setHelp] = useState<{ before: Focus } | null>(null);
+  const openHelp = useCallback(() => setHelp((h) => h ?? { before: o.focus() }), [o]);
 
-  // Ctrl+F searches the outline rather than the page.
+  // Ctrl+F searches the outline rather than the page; Ctrl+/ shows the keyboard shortcuts.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && !e.altKey && e.key.toLowerCase() === "f") {
+      if (!(e.ctrlKey || e.metaKey) || e.shiftKey || e.altKey) return;
+      if (e.key.toLowerCase() === "f") {
         e.preventDefault();
         focusSearch();
+      } else if (e.key === "/") {
+        e.preventDefault();
+        openHelp();
       }
     };
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
-  }, []);
+  }, [openHelp]);
 
   // Each time the user comes back to this tab, check who is signed in: after signing in again
   // from the banner's link, the waiting changes go out; if someone else signed in, the page
@@ -156,6 +165,15 @@ function Page({ me, notice }: { me: Me; notice: string }) {
         <div className="flex min-w-0 flex-1 justify-center">
           <SearchBox />
         </div>
+        <button
+          type="button"
+          title="Keyboard shortcuts (Ctrl+/)"
+          aria-label="Keyboard shortcuts"
+          onClick={openHelp}
+          className="hidden rounded p-1 text-gray-400 hover:bg-gray-100 hover:text-gray-700 sm:flex"
+        >
+          <CircleHelp className="h-4 w-4" />
+        </button>
         <button
           type="button"
           aria-pressed={showCompleted}
@@ -221,6 +239,14 @@ function Page({ me, notice }: { me: Me; notice: string }) {
       <UploadProgress />
       {dialog?.kind === "export" && <ExportDialog root={dialog.root} onClose={closeDialog} />}
       {dialog?.kind === "share" && <ShareDialog id={dialog.id} onClose={closeDialog} />}
+      {help && (
+        <HelpDialog
+          onClose={() => {
+            setHelp(null);
+            o.restore(help.before);
+          }}
+        />
+      )}
       {dialog?.kind === "move" && <MoveDialog ids={dialog.ids} before={dialog.before} onClose={closeDialog} />}
     </div>
   );

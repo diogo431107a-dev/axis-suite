@@ -68,6 +68,7 @@ Click any text to edit it; the caret lands on the character you clicked. A bulle
 | Alt+S                               | Star / unstar (also on bullets selected with Esc)                                   |
 | Alt+M                               | Duplicate, with everything under it (also on bullets selected with Esc)             |
 | Alt+Shift+M                         | Move to…, with everything under it (also on bullets selected with Esc)              |
+| Ctrl+/                              | Show these keys (also the ? at the top right)                                       |
 
 **Text.** The syntax is Dynalist's: `**bold**`, `__italic__`, `~~strike~~`, `` `code` ``, `[text](url)` and bare URLs, `#tags`, `@mentions`, and dates as `!(2026-10-11)` or `!(2026-10-11 14:30)`. Dates show as chips (Today, Tomorrow, a weekday; red when overdue) and open a date picker when clicked. Links only ever point to `http(s):` or `mailto:` addresses, or to a file uploaded to Yggdrasil.
 
