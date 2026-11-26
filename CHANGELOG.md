@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.220 — 2026-11-26
+
+Heimdall 0.0.31 adds Bifrost: an **Open Bifrost** button on Heimdall's page leads to a list of every installed module, with its address and what it is for, each user's most-opened modules first, and links to Habits Saga and Roundcube below them. Nothing to do by hand.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.31  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.39  |
+
 ## 0.0.217 — 2026-11-26
 
 Every module now runs on Node.js 24 instead of 22; Node.js 24 is supported until April 2028. The installer upgrades Node.js on a server by itself the first time it runs, so there is nothing to do by hand. Heimdall 0.0.28 also lets the development server send you back to Star's after signing in. Nothing else changes for whoever uses the modules.

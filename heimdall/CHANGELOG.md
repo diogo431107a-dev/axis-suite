@@ -4,6 +4,8 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+## 0.0.31 — 2026-11-26
+
 - Heimdall's page has an **Open Bifrost** button. Bifrost lists every installed module with its address and what it is for (hover over a module, or tap its **?**, to read more), and puts the ones you open most often from there first. Each user has their own order. Below them, links to Habits Saga and to Roundcube, the webmail, which have sign-ins of their own.
 - Development only: Valhalla 2's development server, at 127.0.0.1:5188, is listed in Bifrost and can receive you after sign-in.
 
