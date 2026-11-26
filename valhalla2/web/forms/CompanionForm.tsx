@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { Brain, Images } from "lucide-react";
 import {
+  DEFAULT_TUNING,
   LIMITS,
   PROMPT_KEYS,
   providerOf,
@@ -8,6 +9,7 @@ import {
   type PromptKey,
   type Prompts,
   type Settings,
+  type VoiceTuning,
 } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
@@ -69,6 +71,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const [prompts, setPrompts] = useState(() => promptTexts(companion?.prompts ?? {}));
   const [voice, setVoice] = useState<string | null>(companion?.voice ?? null);
   const [voiceFeeling, setVoiceFeeling] = useState(companion?.voiceFeeling ?? true);
+  const [voiceTuning, setVoiceTuning] = useState<VoiceTuning>(companion?.voiceTuning ?? DEFAULT_TUNING);
   const [confirming, setConfirming] = useState(false);
   // Chosen once, when the companion is created. A Grok companion never has memory.
   const [withMemory, setWithMemory] = useState(companion?.memory ?? true);
@@ -82,7 +85,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       const id = companion?.id ?? crypto.randomUUID();
       await api(`/api/companions/${id}`, {
         method: "PUT",
-        body: { name, profile, settings, prompts: ownPrompts(prompts), voice, voiceFeeling, memory },
+        body: { name, profile, settings, prompts: ownPrompts(prompts), voice, voiceFeeling, voiceTuning, memory },
       });
       await reload();
       open({ kind: "companion", id });
@@ -192,6 +195,8 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
         <VoicePicker
           value={voice}
           onChange={setVoice}
+          tuning={voiceTuning}
+          onTuning={setVoiceTuning}
           feeling={voiceFeeling}
           onFeeling={setVoiceFeeling}
           withFeeling={memory}

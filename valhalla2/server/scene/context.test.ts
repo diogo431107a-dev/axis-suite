@@ -12,6 +12,7 @@ const companion: Companion = {
   prompts: {},
   voice: null,
   voiceFeeling: true,
+  voiceTuning: { rate: 0, pitch: 0, style: null },
   provider: "anthropic",
   memory: true,
   createdAt: "",

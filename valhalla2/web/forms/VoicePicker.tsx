@@ -1,9 +1,9 @@
 // The voice a companion's replies are read aloud in: any of the voices Azure offers, found by
-// name or language, and heard before it is chosen; and whether replies are read with the feeling
-// of each line, as the scene works it out.
+// name or language, and heard before it is chosen; its speed, pitch and speaking style; and
+// whether replies are read with the feeling of each line, as the scene works it out.
 import { useEffect, useMemo, useRef, useState } from "react";
-import { LoaderCircle, Volume2 } from "lucide-react";
-import { FEELINGS, LIMITS, type Feeling, type Voice, type VoiceList } from "../../shared/protocol.ts";
+import { LoaderCircle, RotateCcw, Volume2 } from "lucide-react";
+import { FEELINGS, LIMITS, type Feeling, type Voice, type VoiceList, type VoiceTuning } from "../../shared/protocol.ts";
 import { api, apiBlob, describeError } from "../api.ts";
 import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 
@@ -28,15 +28,68 @@ const matches = (voice: Voice, words: string[]): boolean => {
   return words.every((word) => about.includes(word));
 };
 
+/** A change in percent as the page shows it: "usual", "+15%", "−10%". */
+const change = (value: number): string => (value === 0 ? "usual" : `${value > 0 ? "+" : "−"}${Math.abs(value)}%`);
+
+/** Faster or slower, higher or lower: a slider from Azure's least to its most, and back to usual. */
+function Tuner({
+  label,
+  hint,
+  value,
+  min,
+  max,
+  step,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: number;
+  min: number;
+  max: number;
+  step: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <span className="flex items-center gap-3">
+        <input
+          type="range"
+          className="flex-1"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(e) => onChange(Number(e.target.value))}
+          aria-label={label}
+        />
+        <span className="w-12 text-right font-mono text-sm">{change(value)}</span>
+        <Button
+          kind="quiet"
+          onClick={() => onChange(0)}
+          disabled={value === 0}
+          title={`Back to the voice's usual ${label.toLowerCase()}`}
+        >
+          <RotateCcw size={14} />
+        </Button>
+      </span>
+    </Field>
+  );
+}
+
 export function VoicePicker({
   value,
   onChange,
+  tuning,
+  onTuning,
   feeling,
   onFeeling,
   withFeeling = true,
 }: {
   value: string | null;
   onChange: (voice: string | null) => void;
+  /** The voice's speed, pitch and speaking style. */
+  tuning: VoiceTuning;
+  onTuning: (tuning: VoiceTuning) => void;
   /** Whether replies are read with the feeling of each line. */
   feeling: boolean;
   onFeeling: (feeling: boolean) => void;
@@ -63,6 +116,14 @@ export function VoicePicker({
   const byId = (id: string) => voices.find((voice) => voice.id === id);
   const serverVoice = list ? byId(list.default) : undefined;
   const chosen = value ? byId(value) : serverVoice;
+  const styles = chosen?.styles ?? [];
+
+  /** Another voice; a speaking style it hasn't is let go. */
+  const choose = (next: string | null) => {
+    onChange(next);
+    const nextStyles = (next ? byId(next) : serverVoice)?.styles ?? [];
+    if (tuning.style && !nextStyles.includes(tuning.style)) onTuning({ ...tuning, style: null });
+  };
 
   // The voices that match what you typed, by language; the chosen one is always there.
   const groups = useMemo(() => {
@@ -78,7 +139,12 @@ export function VoicePicker({
     setHearing(true);
     setError("");
     try {
-      const audio = await apiBlob("/api/voices/sample", { voice: value, text: sample, feeling: sampleFeeling });
+      const audio = await apiBlob("/api/voices/sample", {
+        voice: value,
+        text: sample,
+        feeling: sampleFeeling,
+        tuning,
+      });
       const url = URL.createObjectURL(audio);
       player.current?.pause();
       const playing = new Audio(url);
@@ -97,8 +163,8 @@ export function VoicePicker({
       <div>
         <h2 className="font-display text-lg">Voice</h2>
         <p className="mt-1 text-xs text-faint">
-          The voice its replies are read aloud in, from every voice Azure offers. A reply already read is read again in
-          the new voice the next time you play it.
+          The voice its replies are read aloud in, from every voice Azure offers, and how it speaks. A reply already
+          read is read again in the new voice, speed, pitch or style the next time you play it.
         </p>
       </div>
 
@@ -116,7 +182,7 @@ export function VoicePicker({
             <select
               className={inputStyle}
               value={value ?? ""}
-              onChange={(e) => onChange(e.target.value === "" ? null : e.target.value)}
+              onChange={(e) => choose(e.target.value === "" ? null : e.target.value)}
             >
               <option value="">
                 The server's voice
@@ -134,6 +200,48 @@ export function VoicePicker({
               ))}
             </select>
           </Field>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Tuner
+              label="Speed"
+              hint="From half to twice the voice's usual speed."
+              value={tuning.rate}
+              min={LIMITS.voiceRateMin}
+              max={LIMITS.voiceRateMax}
+              step={5}
+              onChange={(rate) => onTuning({ ...tuning, rate })}
+            />
+            <Tuner
+              label="Pitch"
+              hint="Lower or higher than the voice's usual, by up to half."
+              value={tuning.pitch}
+              min={LIMITS.voicePitchMin}
+              max={LIMITS.voicePitchMax}
+              step={1}
+              onChange={(pitch) => onTuning({ ...tuning, pitch })}
+            />
+          </div>
+          {styles.length > 0 ? (
+            <Field
+              label="Speaking style"
+              hint={`${chosen?.name ?? "This voice"} has styles of its own. Lines are read in this one unless their feeling has a style that fits better.`}
+            >
+              <select
+                className={inputStyle}
+                value={tuning.style ?? ""}
+                onChange={(e) => onTuning({ ...tuning, style: e.target.value === "" ? null : e.target.value })}
+              >
+                <option value="">None — the voice's usual way</option>
+                {tuning.style && !styles.includes(tuning.style) ? (
+                  <option value={tuning.style}>{tuning.style} (this voice hasn't it)</option>
+                ) : null}
+                {styles.map((style) => (
+                  <option key={style} value={style}>
+                    {style}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          ) : null}
           {withFeeling ? null : (
             <p className="text-xs text-faint">
               Without memory there is no scene to read a reply's feeling from, so replies are read plainly, as written.
@@ -147,8 +255,8 @@ export function VoicePicker({
                 Before a reply is read, Claude works out the scene (the clapperboard under it) and how each line is
                 said: teasing, whispered, angry. A fraction of a cent a reply, and a moment's wait the first time.{" "}
                 {chosen && chosen.styles.length > 0
-                  ? `${chosen.name} has styles of its own (${chosen.styles.join(", ")}), which sound the most natural; other feelings are read with speed, pitch and volume.`
-                  : "This voice has no styles of its own, so feelings are read with speed, pitch and volume. Type “styles” above to find voices that have them."}
+                  ? `${chosen.name} has styles of its own (${chosen.styles.join(", ")}), which sound the most natural; other feelings are read with speed, pitch and volume, on top of the speed and pitch above.`
+                  : "This voice has no styles of its own, so feelings are read with speed, pitch and volume, on top of the speed and pitch above. Type “styles” above to find voices that have them."}
               </span>
             </span>
           </label>

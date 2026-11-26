@@ -1,8 +1,9 @@
 // Replies read aloud. Asking (POST) reads the reply if it isn't kept yet and says where the audio
 // is; the page then plays that file (GET), which an <audio> element can fetch by itself. A reply is
 // read in its companion's voice, or the server's when it names none, and with the feeling of each
-// line as the scene worked it out, unless the companion reads plainly. The voices to choose from,
-// and a short sample of one, are here too.
+// line as the scene worked it out, unless the companion reads plainly; at the companion's speed,
+// pitch and speaking style either way. The voices to choose from, and a short sample of one, are
+// here too.
 import { Router, type Request, type Response } from "express";
 import {
   FEELINGS,
@@ -14,7 +15,15 @@ import {
   type SpeechReply,
   type VoiceList,
 } from "../../shared/protocol.ts";
-import { id as checkId, messageId, object, oneOf, required, voice as checkVoice } from "../check.ts";
+import {
+  id as checkId,
+  messageId,
+  object,
+  oneOf,
+  required,
+  voice as checkVoice,
+  voiceTuning as checkTuning,
+} from "../check.ts";
 import { invalid, StoreError } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import type { Services } from "../services.ts";
@@ -62,7 +71,7 @@ export function speechRoutes(s: Services): Router {
     // Without memory there is no scene: the reply is read as it is written.
     const feeling = companion.memory && companion.voiceFeeling;
     const lines = feeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
-    const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines));
+    const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines, companion.voiceTuning));
     res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(s.db) } satisfies SpeechReply);
   });
 
@@ -81,7 +90,10 @@ export function speechRoutes(s: Services): Router {
     res.json({ voices: await asked(() => read.voices()), default: read.voice } satisfies VoiceList);
   });
 
-  /** `{ voice, text, feeling? }` read aloud, to hear a voice before choosing it. Answers with the MP3. */
+  /**
+   * `{ voice, text, feeling?, tuning? }` read aloud, to hear a voice (at a speed, pitch and style)
+   * before choosing it. Answers with the MP3.
+   */
   routes.post("/voices/sample", async (req: Request, res: Response) => {
     const read = needSpeech();
     const body = object(req.body);
@@ -91,7 +103,8 @@ export function speechRoutes(s: Services): Router {
       body.feeling === undefined || body.feeling === null
         ? null
         : oneOf<Feeling>(body.feeling, FEELINGS, "The feeling");
-    const audio = await asked(() => read.sample(voice, text, feeling));
+    const tuning = checkTuning(body.tuning);
+    const audio = await asked(() => read.sample(voice, text, feeling, tuning));
     res.type("audio/mpeg").send(Buffer.from(audio));
   });
 

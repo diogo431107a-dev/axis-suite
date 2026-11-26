@@ -1,5 +1,6 @@
 // A companion, and the prompt texts it can rewrite.
 import type { Provider, Settings } from "./models.ts";
+import type { VoiceTuning } from "./speech.ts";
 
 /**
  * The texts Valhalla 2 itself adds to what the model reads. Each companion can rewrite any of them;
@@ -46,6 +47,8 @@ export interface Companion {
   voice: string | null;
   /** Whether its replies are read with the feeling of each line (the scene), or plainly. */
   voiceFeeling: boolean;
+  /** Its voice's speed, pitch and speaking style. */
+  voiceTuning: VoiceTuning;
   createdAt: string;
   updatedAt: string;
 }

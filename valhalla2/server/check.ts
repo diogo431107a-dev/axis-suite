@@ -2,6 +2,7 @@
 import {
   CACHE_TTLS,
   DEFAULT_SETTINGS,
+  DEFAULT_TUNING,
   EFFORTS,
   LIMITS,
   PROMPT_KEYS,
@@ -11,6 +12,7 @@ import {
   type Effort,
   type Prompts,
   type Settings,
+  type VoiceTuning,
 } from "../shared/protocol.ts";
 import { invalid } from "./errors.ts";
 
@@ -94,6 +96,27 @@ export function voice(value: unknown): string | null {
   const name = required(value, LIMITS.voice, "The voice");
   if (!/^[A-Za-z0-9:_-]+$/.test(name)) invalid("That voice name isn't valid");
   return name;
+}
+
+/**
+ * A voice's speed, pitch and speaking style, each left out meaning the voice's usual. Whether the
+ * voice has the style is found out when it reads: one it hasn't is left out then.
+ */
+export function voiceTuning(value: unknown): VoiceTuning {
+  if (value === undefined || value === null) return DEFAULT_TUNING;
+  const fields = object(value);
+  const rate =
+    fields.rate === undefined ? 0 : whole(fields.rate, LIMITS.voiceRateMin, LIMITS.voiceRateMax, "The speed");
+  const pitch =
+    fields.pitch === undefined ? 0 : whole(fields.pitch, LIMITS.voicePitchMin, LIMITS.voicePitchMax, "The pitch");
+  let style: string | null = null;
+  if (fields.style !== undefined && fields.style !== null && fields.style !== "") {
+    if (typeof fields.style !== "string" || !/^[A-Za-z0-9_-]{1,40}$/.test(fields.style)) {
+      invalid("That speaking style isn't valid");
+    }
+    style = fields.style;
+  }
+  return { rate, pitch, style };
 }
 
 /** A row id from a URL (a memory version, a pin): a positive whole number. */

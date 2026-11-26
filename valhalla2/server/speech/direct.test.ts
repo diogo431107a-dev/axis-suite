@@ -38,3 +38,35 @@ describe("a reply read with feeling", () => {
     expect(ssml).toContain('<voice name="pt-BR-FranciscaNeural">A &amp; B. <break time="400ms"/>&lt;C&gt;</voice>');
   });
 });
+
+describe("a reply read with feeling, in a voice set faster, higher, or in a style", () => {
+  const tuning = { rate: 20, pitch: 10, style: "chat" };
+
+  it("reads a line with no feeling in the companion's style, speed and pitch", () => {
+    const ssml = directedSsml([line("Yes.", "neutral")], "en-US-JennyNeural", ["chat", "sad"], tuning);
+    expect(ssml).toContain(
+      '<mstts:express-as style="chat"><prosody rate="+20%" pitch="+10%">Yes.</prosody></mstts:express-as>',
+    );
+  });
+
+  it("puts a feeling's speed and pitch on top of the companion's", () => {
+    // Angry is 8% faster and 3% higher: 1.2 × 1.08 and 1.1 × 1.03.
+    const ssml = directedSsml([line("Get out.", "angry")], "en-US-JennyNeural", ["chat"], tuning);
+    expect(ssml).toContain(
+      '<mstts:express-as style="chat"><prosody rate="+30%" pitch="+13%" volume="+20%">Get out.</prosody></mstts:express-as>',
+    );
+  });
+
+  it("lets a feeling's own style win, keeping the companion's speed and pitch", () => {
+    const ssml = directedSsml([line("Oh.", "sad")], "en-US-JennyNeural", ["chat", "sad"], tuning);
+    expect(ssml).toContain(
+      '<mstts:express-as style="sad" styledegree="1.2"><prosody rate="+20%" pitch="+10%">Oh.</prosody></mstts:express-as>',
+    );
+  });
+
+  it("never goes past what Azure takes", () => {
+    const fast = { rate: 100, pitch: 50, style: null };
+    const ssml = directedSsml([line("Now!", "excited", 3)], "pt-BR-FranciscaNeural", [], fast);
+    expect(ssml).toContain('<prosody rate="+100%" pitch="+50%" volume="+15%">Now!</prosody>');
+  });
+});
