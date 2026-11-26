@@ -16,7 +16,6 @@ packages:
   - star
   - fafnir
   - tyr
-  - valhalla
   - valhalla2
   - packages/*
 

@@ -3,9 +3,8 @@
 Companions you define, through the Claude API, who remember — or, created that way, through the
 xAI API on Grok, without memory.
 
-A fork of [Valhalla](../valhalla/README.md), kept apart from it while the two are compared: its own
-folder, service, database, address and API key file. Nothing is shared between them, and nothing
-moves from one to the other.
+It began as a fork of Valhalla, an earlier companions module that was compared with it and then
+retired from the suite (2026-11-25). Nothing of Valhalla's was carried over.
 
 You write a companion in one text box: who they are, what they look like, how they behave, and who
 _you_ are when you talk to them — before a queen you might be a cup-bearer; in a wolf pack, a wolf.
@@ -23,7 +22,7 @@ signed in there sees their own companions and chats and nobody else's.
 | Sign-in  | Heimdall, through `@axis-suite/heimdall-client`                                       |
 | Address  | `https://valhalla2.<domain>`; https://localhost:8458 in WSL; port 5188 in `pnpm dev`  |
 
-Like Valhalla and Fafnir, Valhalla 2 calls outside the suite: every message goes to
+Like Fafnir, Valhalla 2 calls outside the suite: every message goes to
 `api.anthropic.com`, on the server's API key, which whoever runs the suite pays for; everything a
 Grok companion asks goes to `api.x.ai` instead, on the server's xAI key, and never to Anthropic. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
