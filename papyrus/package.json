@@ -5,7 +5,7 @@
   "description": "Papyrus — a journal, one page per day, for every signed-in user",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

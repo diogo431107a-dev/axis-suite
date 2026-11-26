@@ -4,6 +4,8 @@ What changed in Saga, newest first. Each version is tagged in git as `saga-v<ver
 
 ## Unreleased
 
+- Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 1.1.0 — 2026-11-14
 
 - **Minor:** Dates. Each companion's card says when you last did its habit ("Last done yesterday · 13 Nov"), and each vice's card says when you last paid it. A new **History** button on both shows the last 7 days, the last 30 days and all time, then every day it happened. Dates are kept from this version on, so older check-ins and tithes have none.

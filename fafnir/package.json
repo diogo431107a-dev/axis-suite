@@ -5,7 +5,7 @@
   "description": "Fafnir Personal Finances — what you have, what you owe and where your money goes, in US dollars",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

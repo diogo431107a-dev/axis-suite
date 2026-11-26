@@ -5,7 +5,7 @@
   "description": "Urd — a time tracker that stays open all day, for every signed-in user",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

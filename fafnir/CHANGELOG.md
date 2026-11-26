@@ -4,6 +4,8 @@ What changed in Fafnir, newest first. Each version is tagged in git as `fafnir-v
 
 ## Unreleased
 
+- Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 2.0.0 — 2026-11-02
 
 What you're worth over time, where it is now, and budgets.

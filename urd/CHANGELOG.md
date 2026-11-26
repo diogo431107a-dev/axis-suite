@@ -4,6 +4,8 @@ What changed in Urd, newest first. Each version is tagged in git as `urd-v<versi
 
 ## Unreleased
 
+- Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 2.1.0 — 2026-10-25
 
 - **Minor:** Dark mode. Urd follows the computer's or phone's light or dark setting, and a switch in the header (System, Light, Dark) overrides it, remembered on each computer. Urd is the first app in the suite to have one.

@@ -5,7 +5,7 @@
   "description": "Valkyrie — kanban boards for every signed-in user",
   "type": "module",
   "engines": {
-    "node": ">=22.18"
+    "node": ">=24.11"
   },
   "files": [
     "dist"

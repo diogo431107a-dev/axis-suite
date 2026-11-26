@@ -4,6 +4,8 @@ What changed in Loggbok, newest first. Each version is tagged in git as `loggbok
 
 ## Unreleased
 
+- Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.
+
 ## 0.0.16 — 2026-10-25
 
 - Clicking 📒 Loggbok at the top left opens an About box with Loggbok's version and the Axis Suite version it was built with. Every module of the suite opens its About box the same way.
