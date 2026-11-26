@@ -85,9 +85,9 @@ export function prepare(
 
 /** Writes a reply to `path` and returns what to store, reporting it as it is written. */
 async function reply(context: TurnContext, path: Message[], instruction: string | null) {
-  const { companion, write, onEvent } = context;
+  const { companion, write, onEvent, chatId } = context;
   const { system, messages } = prepare(context, path, { instruction }, true);
-  return write(system, asParams(messages), companion.settings, onEvent);
+  return write(system, asParams(messages), companion.settings, onEvent, { cacheKey: chatId });
 }
 
 /** Says something at the end of the selected path, and gets the companion's answer. */

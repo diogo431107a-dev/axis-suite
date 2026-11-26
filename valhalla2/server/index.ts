@@ -2,6 +2,7 @@
 // sign-in through Heimdall.
 import express from "express";
 import { keySource } from "./claude/client.ts";
+import { grokKeySource } from "./grok/client.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { apiNotFound, onError } from "./http/errors.ts";
 import { chatRoutes } from "./routes/chats.ts";
@@ -20,6 +21,7 @@ const PORT = Number(process.env.PORT ?? 3016);
 const db = openDatabase(DB_FILE);
 console.log(`Everyone's companions, chats and memory: ${DB_FILE}`);
 console.log(`Claude API key: ${keySource()}`);
+console.log(`xAI API key: ${grokKeySource()}`);
 
 const services = createServices(db);
 

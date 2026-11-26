@@ -116,5 +116,20 @@ export async function streamReply(
   return replyOf(await stream.finalMessage(), settings.model);
 }
 
-/** The function that writes a reply. The server uses streamReply; the tests hand in their own. */
-export type Writer = typeof streamReply;
+/** What a writer is told besides the request itself. */
+export interface WriteOptions {
+  /** Keeps one chat's turns on the same cache, for an API that wants a key. Claude's needs none. */
+  cacheKey?: string;
+}
+
+/**
+ * The function that writes a reply. The server uses writeReply (../chat/write.ts), which hands the
+ * request to Claude or Grok by the model; the tests hand in their own.
+ */
+export type Writer = (
+  system: SystemBlock[],
+  messages: Anthropic.Beta.BetaMessageParam[],
+  settings: Settings,
+  onEvent: (event: StreamEvent) => void,
+  options?: WriteOptions,
+) => Promise<Reply>;

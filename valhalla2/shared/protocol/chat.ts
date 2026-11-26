@@ -159,7 +159,8 @@ export interface PromptView {
 }
 
 export interface TokenView {
-  inputTokens: number;
+  /** What the chat would send as it stands; null when the API can't count it beforehand (Grok). */
+  inputTokens: number | null;
   /** The model's context window, as the Models API reports it, or null when it doesn't say. */
   contextWindow: number | null;
 }

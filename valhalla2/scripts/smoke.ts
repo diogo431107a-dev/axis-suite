@@ -3,6 +3,7 @@
 //   pnpm smoke
 //
 // It spends money — a fraction of a cent on Haiku — which is why it is not part of `pnpm test`.
+// CHAT_MODEL picks the model that answers; a grok- one has Grok answer, with memory still on Claude.
 // It runs on a throwaway database in memory and goes through the same code the server uses: a
 // greeting after the hidden opener, two turns, another version of the last reply, and an edit
 // of the greeting before one more turn. The edit changes what the earlier thinking was bound to,
@@ -15,7 +16,7 @@ import { DEFAULT_SETTINGS, blockText, type Message } from "../shared/protocol.ts
 import { createChats } from "../server/chat/chats.ts";
 import { generate, send, type TurnContext } from "../server/chat/turn.ts";
 import { runMemoryModel } from "../server/claude/memory.ts";
-import { streamReply } from "../server/claude/reply.ts";
+import { writeReply } from "../server/chat/write.ts";
 import { config } from "../server/config.ts";
 import { consolidate } from "../server/memory/consolidate.ts";
 import { createMemory } from "../server/memory/store.ts";
@@ -62,7 +63,7 @@ const context: TurnContext = {
   companion,
   memory,
   window: { tokens: config.windowTokens, chunk: config.windowChunk },
-  write: streamReply,
+  write: writeReply,
   onEvent: (event) => {
     if (event.type === "delta") process.stdout.write(event.text);
   },

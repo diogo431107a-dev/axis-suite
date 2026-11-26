@@ -18,11 +18,22 @@ function priceOf(turn: ReplyDetails): string | null {
 export function Usage({ last, tokens }: { last: ReplyDetails | null; tokens: TokenView | null }) {
   const usage = last?.usage ?? null;
   const price = last ? priceOf(last) : null;
+  // Without a count beforehand (Grok), the last reply's own input is the nearest there is.
+  const sentLast = usage
+    ? usage.input_tokens + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0)
+    : null;
+  const context = tokens?.inputTokens ?? sentLast;
   return (
     <div className="flex flex-wrap items-center gap-x-4 gap-y-1 font-mono text-xs text-faint">
       {tokens ? (
-        <span title="What this chat sends as it stands, against the model's context window">
-          context {count(tokens.inputTokens)}
+        <span
+          title={
+            tokens.inputTokens === null
+              ? "What the last reply sent, against the model's context window. This API can't count a chat before it is sent."
+              : "What this chat sends as it stands, against the model's context window"
+          }
+        >
+          context {context === null ? "—" : count(context)}
           {tokens.contextWindow ? ` / ${count(tokens.contextWindow)}` : ""}
         </span>
       ) : null}

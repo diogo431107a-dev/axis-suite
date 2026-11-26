@@ -2,9 +2,7 @@
 import { Router, type Request, type Response } from "express";
 import { LIMITS, type StreamEvent } from "../../shared/protocol.ts";
 import { generate, prepare, send, type TurnContext } from "../chat/turn.ts";
-import { asStoreError } from "../claude/client.ts";
-import { streamReply } from "../claude/reply.ts";
-import { contextWindow, countTokens } from "../claude/tokens.ts";
+import { apiError, tokensFor, writeReply } from "../chat/write.ts";
 import { id as checkId, messageId, object, required } from "../check.ts";
 import { config } from "../config.ts";
 import { stream } from "../http/stream.ts";
@@ -74,13 +72,9 @@ export function chatRoutes(s: Services): Router {
     const { companion, tree, base } = chatParts(req);
     const { system, messages } = prepare(base, tree.activePath(), undefined, false);
     try {
-      const [inputTokens, window] = await Promise.all([
-        countTokens(system, asParams(messages), companion.settings),
-        contextWindow(companion.settings.model),
-      ]);
-      res.json({ inputTokens, contextWindow: window });
+      res.json(await tokensFor(system, asParams(messages), companion.settings));
     } catch (err) {
-      throw asStoreError(err);
+      throw apiError(err);
     }
   });
 
@@ -91,7 +85,7 @@ export function chatRoutes(s: Services): Router {
     const context = (onEvent: (event: StreamEvent) => void): TurnContext => ({
       ...base,
       tree,
-      write: streamReply,
+      write: writeReply,
       onEvent,
     });
     return { tree, companion, release, context };

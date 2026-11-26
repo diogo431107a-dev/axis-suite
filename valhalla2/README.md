@@ -1,6 +1,7 @@
 # Valhalla 2
 
-Companions you define, through the Claude API, who remember.
+Companions you define, through the Claude API, who remember. A companion can also answer on Grok,
+through the xAI API.
 
 A fork of [Valhalla](../valhalla/README.md), kept apart from it while the two are compared: its own
 folder, service, database, address and API key file. Nothing is shared between them, and nothing
@@ -17,13 +18,14 @@ signed in there sees their own companions and chats and nobody else's.
 |          |                                                                                       |
 | -------- | ------------------------------------------------------------------------------------- |
 | Frontend | React 19, Vite 8, Tailwind 4                                                          |
-| Backend  | Express 5, the Claude API through `@anthropic-ai/sdk`                                 |
+| Backend  | Express 5, the Claude API through `@anthropic-ai/sdk`, xAI's through `openai`         |
 | Data     | SQLite (`node:sqlite`): `/var/lib/valhalla2/valhalla2.db` on a server, `data/` in dev |
 | Sign-in  | Heimdall, through `@axis-suite/heimdall-client`                                       |
 | Address  | `https://valhalla2.<domain>`; https://localhost:8458 in WSL; port 5188 in `pnpm dev`  |
 
 Like Valhalla and Fafnir, Valhalla 2 calls outside the suite: every message goes to
-`api.anthropic.com`, on the server's API key, which whoever runs the suite pays for. Pictures, when
+`api.anthropic.com`, on the server's API key, which whoever runs the suite pays for; a companion
+answering on Grok sends its replies to `api.x.ai` instead, on the server's xAI key. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
 pays in Buzz. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
 the server's Azure key.
@@ -330,6 +332,34 @@ said differently.
   companion's voice can shift a little. Nothing is lost: the thinking is kept, and is read again
   when the chat is back on your model.
 
+## Answering on Grok
+
+A companion's **Model** can be Grok 4.7, or any id starting `grok-` typed in by hand, when the server
+has an xAI key. Only the replies in its chats come from Grok. Its memory model, the scene reading and
+picture prompts are always Claude, so a Grok companion still needs the Claude key, and the memory
+model can't be set to Grok.
+
+The request is built by the same code as a Claude one, and Inspect shows it the same way. What
+differs is forced by xAI's API:
+
+- **Only what was said goes out.** Claude's thinking means nothing to Grok, so it is left out, and
+  Grok's own reasoning comes back encrypted and is not kept. A chat can change model at any point:
+  each model reads the words before it, not how they were thought.
+- **Effort** goes out as Grok's `reasoning.effort`. Grok has no `max`, so `max` is sent as `xhigh`.
+  It is always sent, because Grok's own default is `high`, slow and dear for dialogue.
+- **Stop sequences are applied by Valhalla 2**, because Grok's reasoning models refuse them. The
+  moment the reply reaches one, it is cut there and the request is ended. A reply cut that way has no
+  usage reported, so its cost is not shown.
+- **Caching is automatic.** There is no lifetime to choose and no breakpoint to set; each chat's
+  requests carry its id as `prompt_cache_key`, so they land on the same cache. Cached input is $0.50
+  per million against $2.00. A prompt of 200K tokens or more is billed at twice the rate, all of it.
+- **There is no fallback model and no classifier category.** A reply xAI filters is stored as a
+  refusal, with whatever it said.
+- **A chat can't be counted before it is sent**: xAI has no counting endpoint. The context line
+  under the composer shows what the last reply sent instead.
+- **Nothing is kept by xAI.** Requests go out with `store: false`; the whole history is sent each
+  turn anyway.
+
 ## Running it
 
 From the suite's root, with Heimdall running beside it (`pnpm dev` starts every module):
@@ -355,6 +385,12 @@ For pictures, add the CivitAI key on a line of its own in the same file:
 echo 'CIVITAI_API_KEY=<your key>' >> valhalla2/data/secret.env
 ```
 
+For Grok, add the xAI key the same way:
+
+```bash
+echo 'XAI_API_KEY=<your key>' >> valhalla2/data/secret.env
+```
+
 To read aloud, add the Azure Speech key the same way (its region is `SPEECH_REGION` in `dev.env`):
 
 ```bash
@@ -368,6 +404,9 @@ itself. The key is read by the server process and never reaches the browser.
 pnpm --filter valhalla2 test    # none of the tests calls the real API
 pnpm --filter valhalla2 smoke   # one real chat, then its memory, against the API. A few cents.
 ```
+
+`CHAT_MODEL=grok-4.7 pnpm --filter valhalla2 smoke` has the chat answered by Grok instead; the memory
+still runs on Claude.
 
 ## Settings
 
@@ -470,13 +509,14 @@ One module holding both halves, like the rest of the suite.
 | `server/http/`         | a reply as it streams (`stream.ts`), a kept file sent to its owner (`sendStored.ts`), errors as JSON (`errors.ts`)                                                                                                                                                       |
 | `server/db.ts`         | the database, its migrations, transactions, removed users                                                                                                                                                                                                                |
 | `server/companions.ts` | companions                                                                                                                                                                                                                                                               |
-| `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`)                                                                                                                                                                                         |
+| `server/chat/`         | chats (`chats.ts`), the message tree (`tree.ts`), asking for replies (`turn.ts`), and whether Claude or Grok writes them (`write.ts`)                                                                                                                                    |
 | `server/memory/`       | memory: paths, files and versions (`store.ts`), the memory tool (`tool.ts`), what a chat sees (`inject.ts`), the window (`history.ts`), consolidation, tidy-ups and rebuilds (`consolidate.ts`, `cleanup.ts`, `rebuild.ts`, `run.ts`) and when they run (`scheduler.ts`) |
 | `server/prompt.ts`     | the system prompt and the messages. Deterministic, or the cache never hits                                                                                                                                                                                               |
 | `server/pins.ts`       | pinned moments: kept word for word, sent after memory, and the chats that must look again                                                                                                                                                                                |
 | `server/quiet.ts`      | topics to leave alone: sent after memory and pins, shown to the memory model, and every chat looks again                                                                                                                                                                 |
 | `server/likes.ts`      | liked replies: the words as they were liked, and the praise memory hasn't heard of yet, or must take back                                                                                                                                                                |
 | `server/backup.ts`     | the daily backups                                                                                                                                                                                                                                                        |
+| `server/grok/`         | the only folder that talks to the xAI API: the client and its errors (`client.ts`), its key (`key.ts`), chat replies (`reply.ts`), context windows (`tokens.ts`)                                                                                                         |
 | `server/key.ts`        | where the API key comes from: the systemd credential, or the env                                                                                                                                                                                                         |
 | `server/files.ts`      | the folders of kept files, pictures and audio, written whole and swept of strays                                                                                                                                                                                         |
 | `server/scene/`        | a moment worked out: what Claude reads of it (`context.ts`), a reply cut into lines (`lines.ts`), and the kept readings (`sheet.ts`)                                                                                                                                     |
@@ -518,6 +558,12 @@ if it is empty (an empty file means no pictures):
 read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-civitai.key && unset KEY
 ```
 
+**So does the xAI key**, which lets a companion answer on Grok; an empty file means no Grok:
+
+```
+read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-xai.key && unset KEY
+```
+
 **So does the Azure Speech key**, which reads replies aloud; again an empty file means none. Its
 region is `SPEECH_REGION` in `deploy/valhalla2.service` (`brazilsouth`): a key from a resource in
 another region needs that line changed too.
@@ -527,7 +573,8 @@ read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/st
 ```
 
 Everyone who can sign in to Heimdall can talk to companions on this key, so give the suite a key of
-its own and set a monthly spend limit for it in the Claude Console.
+its own and set a monthly spend limit for it in the Claude Console. The same goes for the xAI key,
+in the xAI Console.
 
 Valhalla 2 backs its database up by itself once a day, while it runs, into
 `/var/lib/private/valhalla2/backups/valhalla2-YYYY-MM-DD.db` (systemd keeps `/var/lib/valhalla2`

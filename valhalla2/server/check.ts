@@ -5,6 +5,7 @@ import {
   EFFORTS,
   LIMITS,
   PROMPT_KEYS,
+  providerOf,
   type CacheTtl,
   type Effort,
   type Prompts,
@@ -55,6 +56,13 @@ export function model(value: unknown): string {
   return name;
 }
 
+/** The memory model: always Claude, since it works through Claude's memory tool. */
+export function memoryModel(value: unknown): string {
+  const name = model(value);
+  if (providerOf(name) !== "anthropic") invalid("The memory model has to be a Claude model");
+  return name;
+}
+
 export function stopSequences(value: unknown): string[] {
   if (value === undefined || value === null) return [];
   if (!Array.isArray(value)) invalid("The stop sequences aren't valid");
@@ -93,7 +101,7 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
   const body = object(value);
   return {
     model: model(body.model ?? defaults.model),
-    memoryModel: model(body.memoryModel ?? defaults.memoryModel),
+    memoryModel: memoryModel(body.memoryModel ?? defaults.memoryModel),
     maxTokens: whole(body.maxTokens ?? defaults.maxTokens, LIMITS.minTokens, LIMITS.maxTokens, "Reply length"),
     effort: oneOf<Effort>(body.effort ?? defaults.effort, EFFORTS, "The effort"),
     stopSequences: stopSequences(body.stopSequences),
