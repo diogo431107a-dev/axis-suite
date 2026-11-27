@@ -6,7 +6,7 @@
 // change: the API it talks to (Claude or Grok), and whether it has memory. Nothing a Grok companion
 // says goes to Anthropic, and nothing a Claude one says goes to xAI.
 import type { DatabaseSync } from "node:sqlite";
-import { LIMITS, providerOf, type Companion, type Provider, type Settings } from "../shared/protocol.ts";
+import { LIMITS, hasScenes, providerOf, type Companion, type Provider, type Settings } from "../shared/protocol.ts";
 import {
   object,
   prompts as checkPrompts,
@@ -127,10 +127,11 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       const tuning = checkTuning(fields.voiceTuning);
       const now = new Date().toISOString();
       const asked = fields.memory === undefined ? undefined : fields.memory === true;
-      if (provider === "xai" && asked === true) invalid("A Grok companion has no memory");
-      const memory = existing ? existing.memory === 1 : provider === "anthropic" && asked !== false;
+      // On unless said otherwise, for Claude and Grok alike. Once made, it changes only one way:
+      // a Grok companion without memory can have it turned on (memory/rebuild.ts), never off.
+      const memory = existing ? existing.memory === 1 : asked !== false;
       if (existing && asked !== undefined && asked !== memory) {
-        invalid("Whether a companion has memory is chosen when it is created, and can't be changed");
+        invalid("Whether a companion has memory is chosen when it is created, and can't be changed here");
       }
       if (existing) {
         db.prepare(
@@ -186,6 +187,11 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
 }
 
 export type Companions = ReturnType<typeof createCompanions>;
+
+/** The companion, or a refusal when it has no scenes (hasScenes) and what was asked needs them. */
+export function needScenes(companion: Companion): Companion {
+  return hasScenes(companion) ? companion : invalid("This companion has no scenes");
+}
 
 /** The companion, or a refusal when it has no memory and what was asked needs it. */
 export function needMemory(companion: Companion): Companion {

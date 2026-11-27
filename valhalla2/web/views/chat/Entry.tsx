@@ -35,6 +35,7 @@ export function Entry({
   onPicture,
   onScene,
   memory,
+  scenes,
   onView,
 }: {
   chatId: string;
@@ -61,6 +62,8 @@ export function Entry({
   onScene: (messageId: number) => void;
   /** Whether the companion has memory. */
   memory: boolean;
+  /** Whether the companion has scenes. */
+  scenes: boolean;
   onView: (pictureId: string) => void;
 }) {
   const { message, siblings } = entry;
@@ -135,6 +138,7 @@ export function Entry({
         onPicture={() => onPicture(message.id)}
         onScene={() => onScene(message.id)}
         memory={memory}
+        scenes={scenes}
         onDeleting={(asking) => setDeleting(asking ? message.id : null)}
       />
 

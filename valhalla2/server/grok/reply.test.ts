@@ -73,8 +73,9 @@ describe("which API a model is on", () => {
   it("keeps both models on the same API", () => {
     expect(() => checkSettings({ memoryModel: "grok-4.7" })).toThrow(StoreError);
     expect(checkSettings({ model: "grok-4.7", memoryModel: "claude-sonnet-5-5" }).memoryModel).toBe("grok-4.7");
-    // A Grok companion's memory model, which nothing uses, is its chat model.
+    // A Grok companion's memory model is a Grok model: the one it names, or else its chat model.
     expect(checkSettings({ model: "grok-4.7" })).toMatchObject({ model: "grok-4.7", memoryModel: "grok-4.7" });
+    expect(checkSettings({ model: "grok-4.7", memoryModel: "grok-5" }).memoryModel).toBe("grok-5");
   });
 
   it("takes a temperature for Grok only, from 0 to 1 in steps of 0.05", () => {

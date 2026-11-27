@@ -13,6 +13,8 @@ export interface MemoryRunRequest {
   settings: Settings;
   /** The most requests the run may make. */
   maxIterations: number;
+  /** Keeps one run's requests on the same cache, for an API that caches by key (Grok's). */
+  cacheKey?: string;
 }
 
 export interface MemoryRunResult {

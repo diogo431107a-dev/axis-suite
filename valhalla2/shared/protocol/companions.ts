@@ -36,10 +36,11 @@ export interface Companion {
    */
   provider: Provider;
   /**
-   * Whether it has memory, chosen once when it is created; a Grok companion never has. With memory:
-   * the memory model, the sliding window, topics to leave alone, the scene, reading with feeling.
-   * Without: the whole chat is sent, and pictures and reading aloud work from the message itself.
-   * Pins work either way.
+   * Whether it has memory, chosen when it is created (a Grok companion without can have it turned
+   * on later, never off). With memory: the memory model, the sliding window, topics to leave alone,
+   * and for a Claude companion the scene and reading with feeling (see hasScenes). Without: the
+   * whole chat is sent, and pictures and reading aloud work from the message itself. Pins work
+   * either way.
    */
   memory: boolean;
   prompts: Prompts;
@@ -52,3 +53,11 @@ export interface Companion {
   createdAt: string;
   updatedAt: string;
 }
+
+/**
+ * Whether the companion has scenes: a moment worked out from memory and the chat, which pictures
+ * are drawn from and replies read aloud with. Claude reads them, so only a Claude companion with
+ * memory has them; a Grok one's pictures and readings work from the message itself.
+ */
+export const hasScenes = (companion: Pick<Companion, "memory" | "provider">): boolean =>
+  companion.memory && companion.provider === "anthropic";

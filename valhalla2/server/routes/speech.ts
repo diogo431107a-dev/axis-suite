@@ -7,6 +7,7 @@
 import { Router, type Request, type Response } from "express";
 import {
   FEELINGS,
+  hasScenes,
   LIMITS,
   type ApiError,
   type Companion,
@@ -68,8 +69,8 @@ export function speechRoutes(s: Services): Router {
     const tree = my.chats.tree(id);
     const message = tree.get(messageId(req.params.messageId));
     const companion = my.companions.get(chat.companionId);
-    // Without memory there is no scene: the reply is read as it is written.
-    const feeling = companion.memory && companion.voiceFeeling;
+    // Without a scene (no memory, or Grok) the reply is read as it is written.
+    const feeling = hasScenes(companion) && companion.voiceFeeling;
     const lines = feeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
     const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines, companion.voiceTuning));
     res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(s.db) } satisfies SpeechReply);

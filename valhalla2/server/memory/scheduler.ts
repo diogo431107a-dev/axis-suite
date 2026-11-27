@@ -10,7 +10,8 @@
 //     catches whatever was left when the server last stopped.
 // A companion's memory is tidied after every `cleanup.every` consolidations, or after
 // `cleanup.days` if it changed at all (checked after each consolidation and by the same timer),
-// and when you press "Tidy up now". It is rebuilt only when you ask.
+// and when you press "Tidy up now". It is rebuilt only when you ask, and a Grok companion without
+// memory gets it, by the same rebuild, only when you turn it on.
 //
 // No cron, no daemon: one timer in this process. A chat whose last run failed (declined, say) is
 // not retried by the timer until something in it changes; the buttons always try.
@@ -140,6 +141,22 @@ export function createScheduler(deps: SchedulerDeps) {
       if (!companion) return Promise.resolve({ kind: "nothing", reason: "No such companion" });
       if (!companion.memory) return Promise.resolve(NO_MEMORY);
       return once(`rebuild:${companionId}`, () => rebuild({ ...deps, partTokens: deps.partTokens }, companion));
+    },
+
+    /**
+     * Turns memory on for a Grok companion without it, by building its memory from every chat
+     * (rebuild.ts), or joins the run already doing it. Memory is never turned off again.
+     */
+    enableMemory(companionId: string): Promise<RunOutcome> {
+      const companion = companionById(companionId);
+      if (!companion) return Promise.resolve({ kind: "nothing", reason: "No such companion" });
+      if (companion.memory) return Promise.resolve({ kind: "nothing", reason: "This companion already has memory" });
+      if (companion.provider !== "xai") {
+        return Promise.resolve({ kind: "nothing", reason: "Only a Grok companion can have memory turned on later" });
+      }
+      return once(`rebuild:${companionId}`, () =>
+        rebuild({ ...deps, partTokens: deps.partTokens }, companion, { enable: true }),
+      );
     },
 
     /** Whether a chat is being folded into memory right now. */

@@ -126,16 +126,22 @@ export function rowId(value: unknown, what: string): number {
 }
 
 /**
- * Settings from the page, anything left out taken from `defaults`. Both models are on the same API:
- * a Grok companion's memory model, which nothing uses, is its chat model.
+ * Settings from the page, anything left out taken from `defaults`. Both models are on the same API.
+ * A Grok companion's memory model is a Grok model: the one it names, or else its chat model (the
+ * defaults name a Claude one, and a Grok companion may have been saved before it had memory).
  */
 export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS): Settings {
   if (value === undefined || value === null) return { ...defaults };
   const body = object(value);
   const chatModel = model(body.model ?? defaults.model);
   const provider = providerOf(chatModel);
-  // A Grok companion has no memory, so whatever memory model came with it is replaced, never sent.
-  const memory = provider === "xai" ? chatModel : model(body.memoryModel ?? defaults.memoryModel);
+  const asked = body.memoryModel === undefined ? undefined : model(body.memoryModel);
+  const memory =
+    provider === "xai"
+      ? asked !== undefined && providerOf(asked) === "xai"
+        ? asked
+        : chatModel
+      : (asked ?? model(defaults.memoryModel));
   if (providerOf(memory) !== provider) invalid("The memory model has to be a Claude model");
   return {
     model: chatModel,

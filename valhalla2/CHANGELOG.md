@@ -4,6 +4,18 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Grok companions can now have memory.** A new Grok companion can be made with memory, as a
+  Claude one can. Grok keeps it after each chat, in the same files, on the same Memory page, with
+  canon and one-shot, likes' comments and topics to leave alone, and nothing of it goes to Claude. A
+  Grok companion with memory sends about the last 60K tokens of a chat each turn (a Claude one
+  sends 20K), and what slides out is filed into memory first.
+- **An existing Grok companion can have memory turned on**, with **Turn memory on…** on its Pins
+  page. Grok reads every chat it has had and writes its memory from them, which takes a few minutes
+  and a few cents a chat. Its chats carry on as before meanwhile, and if it fails nothing changes.
+  It can't be turned off again.
+- On Grok, pictures are still drawn from the message you choose, and replies are read aloud as
+  written: the scene stays with Claude companions for now.
+
 ## 0.0.44 — 2026-11-26
 
 - **The Chats page now says what to do when a reply steps out of character** and refuses to go on:

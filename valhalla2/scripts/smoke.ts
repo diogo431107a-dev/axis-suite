@@ -3,8 +3,8 @@
 //   pnpm smoke
 //
 // It spends money — a fraction of a cent on Haiku — which is why it is not part of `pnpm test`.
-// CHAT_MODEL picks the model that answers. A grok- one makes a Grok companion, which has no memory:
-// the chat runs on Grok, and the memory step is skipped.
+// CHAT_MODEL picks the model that answers. A grok- one makes a Grok companion: the chat runs on
+// Grok, and so does its memory model, with the memory tool as a function (server/grok/memory.ts).
 // It runs on a throwaway database in memory and goes through the same code the server uses: a
 // greeting after the hidden opener, two turns, another version of the last reply, and an edit
 // of the greeting before one more turn. The edit changes what the earlier thinking was bound to,
@@ -16,8 +16,7 @@
 import { DEFAULT_SETTINGS, blockText, providerOf, type Message } from "../shared/protocol.ts";
 import { createChats } from "../server/chat/chats.ts";
 import { generate, send, type TurnContext } from "../server/chat/turn.ts";
-import { runMemoryModel } from "../server/claude/memory.ts";
-import { chatWindow, writeReply } from "../server/chat/write.ts";
+import { chatWindow, runMemoryFor, writeReply } from "../server/chat/write.ts";
 import { config } from "../server/config.ts";
 import { consolidate } from "../server/memory/consolidate.ts";
 import { createMemory } from "../server/memory/store.ts";
@@ -25,7 +24,7 @@ import { createCompanions } from "../server/companions.ts";
 import { openDatabase } from "../server/db.ts";
 
 const model = process.env.CHAT_MODEL || "claude-haiku-5-5";
-// A Grok companion has no memory: its memory model is its own chat model, and nothing uses it.
+// A Grok companion's memory model is its own chat model.
 const grok = providerOf(model) === "xai";
 const settings = {
   ...DEFAULT_SETTINGS,
@@ -109,15 +108,14 @@ console.log("If `cached` stays 0 after the first turns, the prompt cache is not 
 console.log("server/prompt.ts for anything that differs between two requests. After the edit, a");
 console.log("smaller `cached` is expected: everything after the greeting is new to the cache.\n");
 
-if (!companion.memory) {
-  console.log(`${model} is a Grok model: the companion has no memory, so there is nothing to fold in.`);
-  process.exit(0);
-}
 console.log(`Folding the chat into memory with ${settings.memoryModel}…`);
 const outcome = await consolidate(
-  { db, memory, limits: config.memory, run: runMemoryModel, maxIterations: config.memoryIterations },
+  { db, memory, limits: config.memory, run: runMemoryFor, maxIterations: config.memoryIterations },
   "smoke-chat-0001",
   companion,
 );
-console.log(outcome, "\n");
+console.log(outcome);
+const run = db.prepare("SELECT model, attempts FROM memory_runs ORDER BY id DESC LIMIT 1").get() as
+  { model: string; attempts: string | null } | undefined;
+console.log(`its requests on ${run?.model}:`, run?.attempts ? JSON.parse(run.attempts) : "none recorded", "\n");
 for (const file of memory.files(companion.id)) console.log(`── /memories/${file.path}\n${file.content}`);

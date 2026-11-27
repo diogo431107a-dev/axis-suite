@@ -29,7 +29,8 @@ one line, and save, and it stays as you left it until the message's own words ch
 again** asks afresh. What was sent and what it cost are under it. How Claude reads a scene is one of
 the companion's own texts, **Scene reading instructions**.
 
-The scene needs memory: a companion without memory has none (see [providers](providers.md)).
+The scene needs memory, and Claude: a companion without memory has none, and neither has a Grok
+companion yet, with memory or without (see [providers](providers.md)).
 
 ## Pictures
 

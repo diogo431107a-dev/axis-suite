@@ -10,6 +10,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { startDailyBackups } from "./backup.ts";
 import { createBusy } from "./busy.ts";
 import { createChats } from "./chat/chats.ts";
+import { runMemoryFor } from "./chat/write.ts";
 import { id as checkId } from "./check.ts";
 import { createCompanions } from "./companions.ts";
 import { config } from "./config.ts";
@@ -18,7 +19,6 @@ import { createLikes } from "./likes.ts";
 import { createScheduler } from "./memory/scheduler.ts";
 import { createMemoryService } from "./memory/service.ts";
 import { createMemory } from "./memory/store.ts";
-import { runMemoryModel } from "./claude/memory.ts";
 import { startPictures } from "./pictures/feature.ts";
 import { createPictures } from "./pictures/store.ts";
 import { createPins, pinsOf } from "./pins.ts";
@@ -29,7 +29,7 @@ import { createScenes, momentRequest } from "./scene/sheet.ts";
 import { startSpeech } from "./speech/feature.ts";
 import type { Companion, Message } from "../shared/protocol.ts";
 import { closeCutShortRuns, removeGoneUsers } from "./startup.ts";
-import { needMemory } from "./companions.ts";
+import { needScenes } from "./companions.ts";
 
 export function createServices(db: DatabaseSync) {
   closeCutShortRuns(db);
@@ -40,7 +40,7 @@ export function createServices(db: DatabaseSync) {
     db,
     memory,
     limits: config.memory,
-    run: runMemoryModel,
+    run: runMemoryFor,
     maxIterations: config.memoryIterations,
     idleMinutes: config.idleMinutes,
     cleanup: config.cleanup,
@@ -80,9 +80,9 @@ export function createServices(db: DatabaseSync) {
     pins: pinsOf(db, companionId),
   });
 
-  /** What is asked about the moment at the end of `path`. Only a companion with memory has a scene. */
+  /** What is asked about the moment at the end of `path`. Only a Claude companion with memory has a scene. */
   const moment = (companion: Companion, path: readonly Message[]) =>
-    momentRequest(needMemory(companion), remembered(companion.id), path, config.scene.tokens);
+    momentRequest(needScenes(companion), remembered(companion.id), path, config.scene.tokens);
 
   /** The signed-in person's companion named by `:id` in the path. */
   const companionOf = (req: Request) => ownedBy(req).companions.get(checkId(req.params.id));

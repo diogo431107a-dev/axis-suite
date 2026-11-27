@@ -3,10 +3,12 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Response } from "openai/resources/responses/responses";
-import { DEFAULT_SETTINGS, blockText, type Message } from "../shared/protocol.ts";
+import { DEFAULT_SETTINGS, blockText, hasScenes, type Message } from "../shared/protocol.ts";
 import { createChats } from "./chat/chats.ts";
+import { chatWindow } from "./chat/write.ts";
+import { config } from "./config.ts";
 import { prepare } from "./chat/turn.ts";
-import { createCompanions, needMemory } from "./companions.ts";
+import { createCompanions, needMemory, needScenes } from "./companions.ts";
 import { openDatabase } from "./db.ts";
 import { StoreError } from "./errors.ts";
 import { grokDraftOf, pictureRequestFor } from "./grok/pictures.ts";
@@ -28,7 +30,7 @@ function setup() {
 }
 
 describe("Claude or Grok, with or without memory", () => {
-  it("takes both from a new companion: Claude with memory unless told otherwise", () => {
+  it("takes both from a new companion: with memory unless told otherwise", () => {
     const { companions } = setup();
     expect(companions.save("comp-0001", { name: "Hrothgar" })).toMatchObject({ provider: "anthropic", memory: true });
     expect(companions.save("comp-0002", { name: "Wealhtheow", memory: false })).toMatchObject({
@@ -37,18 +39,41 @@ describe("Claude or Grok, with or without memory", () => {
     });
     expect(companions.save("comp-0003", { name: "Grendel", settings: grok })).toMatchObject({
       provider: "xai",
-      memory: false,
+      memory: true,
       settings: { model: "grok-4.7", memoryModel: "grok-4.7", temperature: null },
+    });
+    expect(companions.save("comp-0004", { name: "Grendel", settings: grok, memory: false })).toMatchObject({
+      provider: "xai",
+      memory: false,
     });
   });
 
-  it("gives a Grok companion no memory, and no memory files", () => {
+  it("gives a Grok companion with memory its files, and one without none", () => {
     const { db, companions } = setup();
-    expect(() => companions.save("comp-0001", { name: "Grendel", settings: grok, memory: true })).toThrow(
-      /Grok companion has no memory/,
-    );
-    companions.save("comp-0002", { name: "Grendel", settings: grok });
+    companions.save("comp-0001", { name: "Grendel", settings: grok, memory: true });
+    companions.save("comp-0002", { name: "Grendel", settings: grok, memory: false });
+    expect(createMemory(db, LIMITS).files("comp-0001").length).toBeGreaterThan(0);
     expect(createMemory(db, LIMITS).files("comp-0002")).toEqual([]);
+  });
+
+  it("sends a Grok companion with memory a larger window than a Claude one", async () => {
+    const { companions } = setup();
+    const claude = companions.save("comp-0001", { name: "Hrothgar" });
+    const grokWith = companions.save("comp-0002", { name: "Grendel", settings: grok, memory: true });
+    expect(await chatWindow(claude)).toEqual({ tokens: config.windowTokens, chunk: config.windowChunk });
+    expect(await chatWindow(grokWith)).toEqual({ tokens: config.grokWindowTokens, chunk: config.windowChunk });
+    expect(config.grokWindowTokens).toBeGreaterThan(config.windowTokens);
+  });
+
+  it("gives scenes to a Claude companion with memory only", () => {
+    const { companions } = setup();
+    const claude = companions.save("comp-0001", { name: "Hrothgar" });
+    const without = companions.save("comp-0002", { name: "Wealhtheow", memory: false });
+    const grokWith = companions.save("comp-0003", { name: "Grendel", settings: grok, memory: true });
+    expect(needScenes(claude)).toBe(claude);
+    expect(() => needScenes(without)).toThrow(/no scenes/);
+    expect(() => needScenes(grokWith)).toThrow(/no scenes/);
+    expect(hasScenes(grokWith)).toBe(false);
   });
 
   it("lets a Claude companion move between Claude models, never to Grok", () => {
@@ -292,6 +317,34 @@ describe("a chat without memory", () => {
     expect(ran).toBe(0);
   });
 
+  it("never runs a memory model of the other API", async () => {
+    const { db, companions } = setup();
+    const companion = companions.save("comp-0009", { name: "Grendel", settings: grok, memory: true });
+    let ran = 0;
+    const deps = {
+      db,
+      memory: createMemory(db, LIMITS),
+      limits: LIMITS,
+      run: () => {
+        ran++;
+        return Promise.reject(new Error("never"));
+      },
+      maxIterations: 8,
+    };
+    const spec = {
+      kind: "consolidate" as const,
+      chatId: null,
+      work: companion.id,
+      source: "test",
+      mode: "canon" as const,
+      system: "",
+      prompt: "",
+    };
+    const toClaude = { ...companion, settings: { ...companion.settings, memoryModel: "claude-sonnet-5-5" } };
+    await expect(runStep(deps, { ...spec, companion: toClaude })).rejects.toThrow(/isn't a model of/);
+    expect(ran).toBe(0);
+  });
+
   it("says memory has nothing pending", () => {
     const { chats } = chatWithout();
     expect(chats.page("chat-0001").memoryPending).toBe(false);
@@ -304,6 +357,7 @@ describe("a picture without memory", () => {
       name: "Grendel",
       profile: "<appearance>Huge.</appearance>",
       settings: grok,
+      memory: false,
     }),
   };
   const said = (id: number, role: "user" | "assistant", text: string): Message => ({

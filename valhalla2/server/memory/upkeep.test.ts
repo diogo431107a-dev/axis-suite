@@ -13,6 +13,7 @@ import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { cleanup, cleanupDue } from "./cleanup.ts";
 import { consolidate } from "./consolidate.ts";
+import { createScheduler } from "./scheduler.ts";
 import { partsOf, rebuild } from "./rebuild.ts";
 import { createMemory } from "./store.ts";
 
@@ -168,6 +169,81 @@ describe("rebuilding from every chat", () => {
     expect(memory.files(companion.id)).toEqual(before);
     const runs = db.prepare("SELECT ok FROM memory_runs ORDER BY id").all() as { ok: number }[];
     expect(runs.map((run) => run.ok)).toEqual([0, 0]);
+  });
+
+  it("turns memory on for a Grok companion without it, once every chat is read", async () => {
+    const { db, chats, memory } = setup();
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    const grok = { ...DEFAULT_SETTINGS, model: "grok-4.7" };
+    const companion = companions.save("comp-0002", { name: "Grendel", settings: grok, memory: false });
+    chats.create({ id: "chat-0001", companionId: companion.id });
+    put(chats.tree("chat-0001"), null, "assistant", "I rise from the mere.");
+    db.prepare("UPDATE chats SET window_start = 1 WHERE id = 'chat-0001'").run();
+    const model = scriptedModel(() => [note("Met Grendel at the mere.")]);
+    const scheduler = createScheduler({
+      db,
+      memory,
+      limits: LIMITS,
+      run: model.run,
+      maxIterations: 8,
+      idleMinutes: 30,
+      cleanup: { every: 10, days: 7 },
+      partTokens: 20_000,
+    });
+    expect(await scheduler.enableMemory(companion.id)).toMatchObject({
+      kind: "done",
+      summary: "Memory is on, built from 1 chat in 1 step.",
+    });
+    // The run went to the companion's own memory model, a Grok one.
+    expect(model.asked[0]!.settings.memoryModel).toBe("grok-4.7");
+    expect(companions.get(companion.id).memory).toBe(true);
+    expect(memory.read(companion.id, "user.md")!.content).toContain("Met Grendel at the mere.");
+    // Each chat measures its window again, at the size a chat with memory sends.
+    expect(db.prepare("SELECT window_start FROM chats WHERE id = 'chat-0001'").get()).toEqual({ window_start: null });
+    expect(await scheduler.enableMemory(companion.id)).toMatchObject({ kind: "nothing", reason: /already/ });
+  });
+
+  it("leaves a Grok companion without memory when turning it on fails", async () => {
+    const { db, chats, memory } = setup();
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    const companion = companions.save("comp-0002", {
+      name: "Grendel",
+      settings: { ...DEFAULT_SETTINGS, model: "grok-4.7" },
+      memory: false,
+    });
+    chats.create({ id: "chat-0001", companionId: companion.id });
+    put(chats.tree("chat-0001"), null, "assistant", "I rise from the mere.");
+    const model = scriptedModel(
+      () => [note("partial")],
+      () => ({ stopReason: "refusal" }),
+    );
+    const outcome = await rebuild(
+      { db, memory, limits: LIMITS, run: model.run, maxIterations: 8, partTokens: 20_000 },
+      companion,
+      { enable: true },
+    );
+    expect(outcome).toMatchObject({ kind: "failed" });
+    expect(companions.get(companion.id).memory).toBe(false);
+    expect(memory.files(companion.id)).toEqual([]);
+  });
+
+  it("turns memory on only for a Grok companion without it", async () => {
+    const { db, companion, memory } = setup();
+    const scheduler = createScheduler({
+      db,
+      memory,
+      limits: LIMITS,
+      run: scriptedModel(() => []).run,
+      maxIterations: 8,
+      idleMinutes: 30,
+      cleanup: { every: 10, days: 7 },
+      partTokens: 20_000,
+    });
+    expect(await scheduler.enableMemory(companion.id)).toMatchObject({ kind: "nothing" });
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    const claude = companions.save("comp-0003", { name: "Beowulf", memory: false });
+    expect(await scheduler.enableMemory(claude.id)).toMatchObject({ kind: "nothing", reason: /Only a Grok/ });
+    expect(companions.get(claude.id).memory).toBe(false);
   });
 
   it("marks every selected path as in memory, and nothing else", async () => {

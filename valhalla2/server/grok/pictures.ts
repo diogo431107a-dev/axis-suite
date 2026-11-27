@@ -1,5 +1,5 @@
 // A picture's prompt, written by Grok for a Grok companion, for CivitAI to paint. A Grok companion
-// has no memory and no scene, so what it reads is the profile and one message (../scene/context.ts).
+// has no scene, so what it reads is the profile and one message (../scene/context.ts).
 import type { Response, ResponseCreateParamsNonStreaming } from "openai/resources/responses/responses";
 import { dollarsOf } from "../../shared/price.ts";
 import { blockText, type PictureDraftReply } from "../../shared/protocol.ts";

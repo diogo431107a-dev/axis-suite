@@ -49,6 +49,25 @@ export function memoryRoutes(s: Services): Router {
     res.status(202).json(memoryPage(companion));
   });
 
+  /**
+   * Turns memory on for a Grok companion without it: its memory is built from every chat, which
+   * can take minutes, so this answers at once and the page watches the runs come in. Memory is on
+   * only once that has worked; if it fails, the companion stays as it was.
+   */
+  routes.post("/companions/:id/memory/enable", (req: Request, res: Response) => {
+    const companion = s.companionOf(req);
+    if (companion.memory) invalid("This companion already has memory");
+    if (companion.provider !== "xai") invalid("Only a Grok companion can have memory turned on later");
+    s.scheduler.enableMemory(companion.id).then(
+      (outcome) => {
+        if (outcome.kind === "failed")
+          console.error(`Turning on the memory of ${companion.id} failed: ${outcome.error}`);
+      },
+      (err: unknown) => console.error(`Turning on the memory of ${companion.id} failed:`, err),
+    );
+    res.status(202).json(memoryPage(companion));
+  });
+
   /** Backs the whole database up now, as today's backup. */
   routes.post("/companions/:id/memory/backup", (req: Request, res: Response) => {
     const companion = s.companionOf(req);
