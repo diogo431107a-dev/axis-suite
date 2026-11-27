@@ -3,6 +3,7 @@
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import {
+  hasScenes,
   LIMITS,
   ORIENTATIONS,
   PICTURE_KINDS,
@@ -49,10 +50,11 @@ export function pictureRoutes(s: Services): Router {
     const hint = body.hint === undefined ? "" : text(body.hint, LIMITS.pictureHint, "The note");
     const from = kind === "chat" ? sceneOf(req, companion, body) : null;
     const scene: Scene = from ? { kind: "chat", path: from.path } : { kind: "profile" };
-    // With memory, a chat picture is drawn from the moment worked out: read once, kept, and yours to
-    // correct. Without, from the message itself and the profile.
-    const read = from && companion.memory ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
-    const request = companion.memory
+    // With scenes, a chat picture is drawn from the moment worked out: read once, kept, and yours to
+    // correct. Without (no memory, or Grok), from the message itself and the profile.
+    const scenes = hasScenes(companion);
+    const read = from && scenes ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
+    const request = scenes
       ? sceneRequest(
           companion,
           scene,

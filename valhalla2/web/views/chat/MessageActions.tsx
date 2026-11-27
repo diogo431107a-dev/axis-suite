@@ -45,6 +45,7 @@ export function MessageActions({
   onPicture,
   onScene,
   memory,
+  scenes,
   onDeleting,
 }: {
   chatId: string;
@@ -71,8 +72,10 @@ export function MessageActions({
   onEdit: () => void;
   onPicture: () => void;
   onScene: () => void;
-  /** Whether the companion has memory: without, there is no scene, and a like carries no comment. */
+  /** Whether the companion has memory: without, a like carries no comment. */
   memory: boolean;
+  /** Whether the companion has scenes (a Claude companion with memory). */
+  scenes: boolean;
   onDeleting: (asking: boolean) => void;
 }) {
   const { health } = usePage();
@@ -184,7 +187,7 @@ export function MessageActions({
           <ImagePlus size={14} />
         </IconButton>
       ) : null}
-      {memory && text && !refused ? (
+      {scenes && text && !refused ? (
         <IconButton label="The scene: where, who, and how it is said" disabled={busy} onClick={onScene}>
           <Clapperboard size={14} />
         </IconButton>

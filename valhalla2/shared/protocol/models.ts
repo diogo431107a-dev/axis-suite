@@ -14,8 +14,9 @@ export type CacheTtl = (typeof CACHE_TTLS)[number];
 
 /**
  * Which API answers a model: Anthropic's for Claude, xAI's for Grok. Told by the id alone, so a
- * model typed in by hand needs nothing more. Only chat replies can come from Grok; the memory
- * model, scene reading and picture prompts are always Claude.
+ * model typed in by hand needs nothing more. A companion is one or the other, and everything it
+ * asks goes to its own API: chat replies, its memory model and picture prompts. Scene reading is
+ * Claude's only, so a Grok companion has none.
  */
 export type Provider = "anthropic" | "xai";
 export const providerOf = (model: string): Provider => (model.startsWith("grok-") ? "xai" : "anthropic");

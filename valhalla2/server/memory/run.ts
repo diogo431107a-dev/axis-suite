@@ -5,7 +5,7 @@
 // a space of memory files it is handed (a scratch copy, or a rebuild's fresh files); whether those
 // are kept is up to the caller, which finishes a successful run inside the transaction that keeps
 // them (`finishRun`).
-import type { ChatMode, Companion } from "../../shared/protocol.ts";
+import { providerOf, type ChatMode, type Companion } from "../../shared/protocol.ts";
 import type { MemoryRunner } from "../claude/memory.ts";
 import type { MemoryLimits } from "../config.ts";
 import type { DatabaseSync } from "node:sqlite";
@@ -46,10 +46,16 @@ const now = () => new Date().toISOString();
 /** Runs the memory model once. A failed run is recorded as failed here; a good one is left open. */
 export async function runStep(deps: RunDeps, spec: RunSpec): Promise<StepResult> {
   const { db, memory, limits } = deps;
-  // The one place the memory model runs. Only a Claude companion with memory ever gets here; this
-  // holds that even if a caller forgot, so nothing of a Grok companion's can reach Claude.
-  if (!spec.companion.memory || spec.companion.provider !== "anthropic") {
+  // The one place the memory model runs. Only a companion with memory ever gets here, and only
+  // with a memory model of its own API; this holds that even if a caller forgot, so nothing of a
+  // Grok companion's can reach Claude, or the reverse.
+  if (!spec.companion.memory) {
     throw new Error(`${spec.companion.name} has no memory, so the memory model was not run`);
+  }
+  if (providerOf(spec.companion.settings.memoryModel) !== spec.companion.provider) {
+    throw new Error(
+      `${spec.companion.settings.memoryModel} isn't a model of ${spec.companion.name}'s API, so the memory model was not run`,
+    );
   }
   const { lastInsertRowid } = db
     .prepare("INSERT INTO memory_runs (space, chat_id, kind, model, started_at) VALUES (?, ?, ?, ?, ?)")
@@ -84,6 +90,7 @@ export async function runStep(deps: RunDeps, spec: RunSpec): Promise<StepResult>
       }),
       settings: spec.companion.settings,
       maxIterations: deps.maxIterations,
+      cacheKey: `memory-run:${runId}`,
     });
   } catch (err) {
     return fail(err instanceof Error ? err.message : String(err));

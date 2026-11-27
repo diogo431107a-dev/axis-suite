@@ -181,11 +181,13 @@ differences:
 - **Temperature decides how different a swipe is.** At a low temperature a swipe writes much the
   same reply again, refusal included. For a reply that keeps refusing, raise it, or go back to
   Grok's default, then swipe.
-- **Nothing tidies up after you.** There is no memory to read the refusal, but nothing drops it
-  either: left in the chat, it is sent with every turn until the chat reaches about 160K tokens and
-  it slides out. Swipe it or edit your message rather than talking past it.
-- **The profile is the only place that lasts.** The fifth-swipe answer helps only that reply, and
-  no memory carries it into later chats.
+- **Without memory, nothing tidies up after you.** Nothing drops the refusal: left in the chat, it
+  is sent with every turn until the chat reaches about 160K tokens and it slides out. Swipe it or
+  edit your message rather than talking past it. With memory it is as on Claude: it stays until it
+  slides out of the 60K window, and the memory model reads it.
+- **Without memory, the profile is the only place that lasts.** The fifth-swipe answer helps only
+  that reply, and no memory carries it into later chats. With memory, it reaches `feedback.md` as
+  on Claude.
 - **The policy is xAI's**, not Anthropic's, so what one declines the other may not. A companion
   can't move between the two (see [Claude or Grok](providers.md)).
 

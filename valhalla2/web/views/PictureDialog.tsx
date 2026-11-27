@@ -1,10 +1,11 @@
 // Asking for a picture: the companion's own API (Claude or Grok) writes the prompt, you look it over
-// and change what you like, and only then does CivitAI make it. With memory, a chat picture is drawn
-// from the moment as Claude worked it out (the scene), which you can correct before writing the
-// prompt again; without, from the message itself.
+// and change what you like, and only then does CivitAI make it. With scenes (a Claude companion with
+// memory), a chat picture is drawn from the moment as Claude worked it out, which you can correct
+// before writing the prompt again; without, from the message itself.
 import { useCallback, useEffect, useState } from "react";
 import { ImagePlus, RefreshCw } from "lucide-react";
 import {
+  hasScenes,
   LIMITS,
   ORIENTATIONS,
   type Companion,
@@ -112,7 +113,7 @@ export function PictureDialog({
       <div className="space-y-4">
         {writing ? (
           <p role="status" className="animate-pulse text-sm text-faint">
-            {companion.memory
+            {hasScenes(companion)
               ? `${writer} is picturing the scene and writing the prompt…`
               : `${writer} is writing the prompt…`}
           </p>

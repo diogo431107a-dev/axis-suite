@@ -2,7 +2,7 @@
 // the composer.
 import { Fragment, useEffect, useRef, useState } from "react";
 import { BookmarkCheck, Brain, Eye, Settings2, Volume2, VolumeX } from "lucide-react";
-import type { Message, PathEntry, Picture, PictureDraft } from "../../../shared/protocol.ts";
+import { hasScenes, type Message, type PathEntry, type Picture, type PictureDraft } from "../../../shared/protocol.ts";
 import { api, describeError } from "../../api.ts";
 import { usePage } from "../../page.ts";
 import { Button, Notice } from "../../ui/bits.tsx";
@@ -212,6 +212,7 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
                 onPicture={(messageId) => setPicturing({ messageId })}
                 onScene={setScening}
                 memory={companion.memory}
+                scenes={hasScenes(companion)}
                 onView={setViewing}
               />
             </Fragment>

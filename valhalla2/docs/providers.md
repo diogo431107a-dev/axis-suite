@@ -1,25 +1,64 @@
 # Claude or Grok, with or without memory
 
-Two things are chosen when a companion is created, and never change:
+Two things are chosen when a companion is created:
 
 - **Claude or Grok.** The Model picker offers both (Grok when the server has an xAI key). A Claude
   companion can later move to any other Claude model, a Grok one to any other Grok model, but never
   across. Anthropic and xAI have different usage policies, so the two never mix: **everything a Grok
-  companion asks goes to xAI, everything a Claude companion asks goes to Anthropic.** A request for a
-  model of the other API is refused, not sent.
-- **With or without memory**, for a Claude companion. A Grok companion is always without.
+  companion asks goes to xAI, everything a Claude companion asks goes to Anthropic**, its memory
+  model included. A request for a model of the other API is refused, not sent.
+- **With or without memory.** A Claude companion keeps the choice for good. A Grok companion made
+  without memory can have it turned on later (see [Turning memory on](#turning-memory-on)), but
+  never off.
 
-|                       | With memory (Claude)                                       | Without memory (Grok, or Claude)              |
-| --------------------- | ---------------------------------------------------------- | --------------------------------------------- |
-| What a chat sends     | profile, memory, pins, topics to leave alone; the window   | profile and pins; the chat, up to 160K tokens |
-| Memory model          | after a chat goes quiet, or "Remember now"                 | none                                          |
-| A picture of a moment | drawn from the scene, worked out from memory and the chat  | drawn from that one message and the profile   |
-| Reading aloud         | with the feeling of each line, from the scene (or plainly) | plainly, as written                           |
-| Scene, leave-alone    | yes                                                        | no                                            |
-| A like's comment      | read by the memory model                                   | no comment: a like is only a mark for you     |
-| Canon or one-shot     | decides what memory keeps                                  | makes no difference                           |
+|                       | Claude with memory                                         | Grok with memory                            | Without memory (Claude or Grok)               |
+| --------------------- | ---------------------------------------------------------- | ------------------------------------------- | --------------------------------------------- |
+| What a chat sends     | profile, memory, pins, topics to leave alone; about 20K    | the same; about 60K                         | profile and pins; the chat, up to 160K tokens |
+| Memory model          | a Claude model (Sonnet 5.5 by default)                     | a Grok model (its chat model by default)    | none                                          |
+| A picture of a moment | drawn from the scene, worked out from memory and the chat  | drawn from that one message and the profile | drawn from that one message and the profile   |
+| Reading aloud         | with the feeling of each line, from the scene (or plainly) | plainly, as written                         | plainly, as written                           |
+| Leave alone           | yes                                                        | yes                                         | no                                            |
+| Scene                 | yes                                                        | not yet                                     | no                                            |
+| A like's comment      | read by the memory model                                   | read by the memory model                    | no comment: a like is only a mark for you     |
+| Canon or one-shot     | decides what memory keeps                                  | decides what memory keeps                   | makes no difference                           |
 
-How a companion with memory remembers is in [How memory works](memory.md).
+How a companion with memory remembers is in [How memory works](memory.md). It is the same on both
+APIs: the same files, the same runs, the same rules. Only the model that keeps it differs.
+
+## Memory on Grok
+
+A Grok companion's memory is kept by a Grok model, its **Memory model** setting, which starts as
+its chat model. Claude never sees any of it.
+
+- **The memory tool is a function.** xAI has no built-in memory tool, so Grok is given one function,
+  `memory`, with the same commands as Anthropic's (`view`, `create`, `str_replace`, `insert`,
+  `delete`, `rename`). Valhalla 2 carries them out exactly as for Claude, with the same limits, the
+  same one-shot rules and the same log, so either model's runs look alike on the Memory page.
+- **More of the chat is sent**: about 60K tokens (`VALHALLA_GROK_WINDOW_TOKENS`) rather than Claude's
+  20K, so more of a scene stays word for word. A model with a smaller window gets less, as without
+  memory. What slides out is filed into memory first, as on Claude.
+- **A filtered run fails.** There is no fallback model, so a run xAI filters changes nothing, as a
+  declined run does on Claude, and is tried again when the chat changes.
+- **Its thinking is kept within a run.** Grok's reasoning comes back encrypted; a run sends it back
+  with each step, so the model doesn't lose its train of thought, and nothing of it is stored.
+- **Cost.** A run is a few requests in a row, each re-reading the earlier ones at the cached rate
+  ($0.50 per million on Grok 4.7): a few cents a run. Each turn of a chat sends about 60K tokens,
+  most of it from the cache, about a cent.
+- **No scene yet.** The scene is worked out by Claude, so a Grok companion's pictures are drawn from
+  the message and the profile, and its replies are read aloud as written, with memory or without.
+
+### Turning memory on
+
+A Grok companion without memory has **Turn memory on…** on its Pins page. It asks first, then:
+
+1. The memory model reads every chat the companion has had, one after another, as a
+   [rebuild](memory.md#rebuilding) does, and writes the memory files from them.
+2. Meanwhile the companion's chats carry on as before, without memory.
+3. When every chat has been read, memory is on: the Pins page becomes the Memory page, and each chat
+   sends its last 60K tokens with the memory before it from its next turn on.
+
+If any step fails, nothing changes, the companion is still without memory, and the run's error is
+on the page. Memory can't be turned off again afterwards.
 
 ## Long chats without memory
 
@@ -43,15 +82,17 @@ differs is forced by xAI's API:
 
 - **Temperature.** A Grok companion has a temperature, from 0 to 1. It starts on **Grok's default**,
   which sends none; Grok never samples above 1. Claude's models reject a temperature, so a Claude
-  companion has none.
+  companion has none. The memory model never gets one.
 - **Effort** goes out as Grok's `reasoning.effort`. Grok has no `max`, so `max` is sent as `xhigh`.
-  It is always sent, because Grok's own default is `high`, slow and dear for dialogue.
+  It is always sent, because Grok's own default is `high`, slow and dear for dialogue. Memory runs
+  use `medium`, as on Claude.
 - **Stop sequences are applied by Valhalla 2**, because Grok's reasoning models refuse them. The
   moment the reply reaches one, it is cut there and the request is ended. A reply cut that way has no
   usage reported, so its cost is not shown.
 - **Caching is automatic.** There is no lifetime to choose and no breakpoint to set; each chat's
-  requests carry its id as `prompt_cache_key`, so they land on the same cache. Cached input is $0.50
-  per million against $2.00. A prompt of 200K tokens or more is billed at twice the rate, all of it.
+  requests carry its id as `prompt_cache_key`, so they land on the same cache, and each memory run
+  its own. Cached input is $0.50 per million against $2.00. A prompt of 200K tokens or more is billed
+  at twice the rate, all of it.
 - **Only text is kept.** Grok's reasoning comes back encrypted and is not stored.
 - **There is no fallback model and no classifier category.** A reply xAI filters is stored as a
   refusal, with whatever it said. What to do about one is in

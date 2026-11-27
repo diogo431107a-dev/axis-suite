@@ -102,8 +102,8 @@ export function SettingsForm({
   const onGrok = providerOf(settings.model) === "xai";
 
   /**
-   * A new chat model. A Grok companion's memory model, which nothing uses, follows it; moving a new
-   * companion back to Claude gives it the server's memory model again. A temperature is Grok's only.
+   * A new chat model. Moving a new companion to Grok makes its memory model the Grok model too;
+   * moving it back to Claude gives it the server's memory model again. A temperature is Grok's only.
    * Moving between Claude and Grok resets effort to what is economical there: Grok's high is slow
    * and dear for dialogue, so it starts low; Claude starts on the server's default (high, on Haiku).
    */
@@ -113,7 +113,7 @@ export function SettingsForm({
     onChange({
       ...settings,
       model,
-      memoryModel: grok ? model : onGrok ? health.defaults.memoryModel : settings.memoryModel,
+      memoryModel: moved ? (grok ? model : health.defaults.memoryModel) : settings.memoryModel,
       effort: moved ? (grok ? "low" : health.defaults.effort) : settings.effort,
       temperature: grok ? settings.temperature : null,
     });
@@ -140,14 +140,14 @@ export function SettingsForm({
           grok={health.grok}
           note={(cacheRead) => `Cache reads $${cacheRead} per Mtok — what the chat so far costs to re-send.`}
         />
-        {memory && !onGrok ? (
+        {memory ? (
           <ModelField
             label="Memory model"
             hint="Keeps the companion's memory up to date after a chat."
             value={settings.memoryModel}
             onChange={(model) => set("memoryModel", model)}
-            models={MODELS.filter((entry) => entry.provider === "anthropic")}
-            grok={false}
+            models={MODELS.filter((entry) => entry.provider === (onGrok ? "xai" : "anthropic"))}
+            grok={onGrok && health.grok}
           />
         ) : null}
 

@@ -37,8 +37,21 @@ export function partsOf(path: Message[], budget: number): Message[][] {
   return parts;
 }
 
-/** Rebuilds one companion's memory from all its chats. Never throws for a failed run. */
-export function rebuild(deps: RunDeps & { partTokens: number }, companion: Companion): Promise<RunOutcome> {
+/**
+ * Rebuilds one companion's memory from all its chats. Never throws for a failed run.
+ *
+ * With `enable`, this is how a companion without memory gets it ("Turn memory on"): the rebuild
+ * runs as if it had memory, while the companion as stored still has none, so its chats carry on as
+ * before. Only when every step has worked is memory turned on, in the transaction that keeps the
+ * files; each chat then measures its window again, at the size a chat with memory sends. If any
+ * step fails, nothing changes, and the companion still has no memory.
+ */
+export function rebuild(
+  deps: RunDeps & { partTokens: number },
+  stored: Companion,
+  { enable = false }: { enable?: boolean } = {},
+): Promise<RunOutcome> {
+  const companion: Companion = enable ? { ...stored, memory: true } : stored;
   return withMemoryLock(companion.id, async (): Promise<RunOutcome> => {
     const { db, memory } = deps;
     const space = `rebuild:${companion.id}:${Date.now()}`;
@@ -121,11 +134,19 @@ export function rebuild(deps: RunDeps & { partTokens: number }, companion: Compa
         for (const id of chat.feedback) markFeedback.run(at, id);
         markFiled(db, chat.praise, at);
       }
+      if (enable) {
+        db.prepare("UPDATE companions SET memory = 1, updated_at = ? WHERE id = ?").run(at, companion.id);
+        db.prepare("UPDATE chats SET window_start = NULL WHERE companion_id = ?").run(companion.id);
+      }
     });
-    const summary =
-      filed.length === 0
+    const read = `${filed.length} ${filed.length === 1 ? "chat" : "chats"} in ${steps.length} ${steps.length === 1 ? "step" : "steps"}`;
+    const summary = enable
+      ? filed.length === 0
+        ? "Memory is on. There were no chats to read yet, so it starts from its empty files."
+        : `Memory is on, built from ${read}.`
+      : filed.length === 0
         ? "There were no chats to rebuild from: memory is back to its empty files."
-        : `Rebuilt from ${filed.length} ${filed.length === 1 ? "chat" : "chats"} in ${steps.length} ${steps.length === 1 ? "step" : "steps"}.`;
+        : `Rebuilt from ${read}.`;
     return { kind: "done", runId: steps.at(-1)?.runId ?? 0, summary };
   });
 }

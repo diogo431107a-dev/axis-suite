@@ -73,10 +73,10 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const [voiceFeeling, setVoiceFeeling] = useState(companion?.voiceFeeling ?? true);
   const [voiceTuning, setVoiceTuning] = useState<VoiceTuning>(companion?.voiceTuning ?? DEFAULT_TUNING);
   const [confirming, setConfirming] = useState(false);
-  // Chosen once, when the companion is created. A Grok companion never has memory.
+  // Chosen when the companion is created. A Grok companion without memory can have it turned on later.
   const [withMemory, setWithMemory] = useState(companion?.memory ?? true);
   const provider = companion?.provider ?? providerOf(settings.model);
-  const memory = provider === "xai" ? false : withMemory;
+  const memory = companion?.memory ?? withMemory;
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
 
@@ -118,7 +118,8 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       {companion ? (
         <p className="-mt-3 text-sm text-faint">
           {companion.provider === "xai" ? "Grok" : "Claude"} · {companion.memory ? "with memory" : "without memory"}.
-          Both were chosen when it was created.
+          Both were chosen when it was created
+          {companion.provider === "xai" && !companion.memory ? "; memory can be turned on from its Pins page." : "."}
         </p>
       ) : (
         <section className="space-y-3 rounded border border-rule bg-sheet/50 p-4">
@@ -128,36 +129,31 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
               Chosen now, with the model below: a companion can't change it, or move between Claude and Grok, later.
             </p>
           </div>
-          {provider === "xai" ? (
-            <p className="text-sm">
-              A Grok companion has no memory. Every chat is sent whole each turn, with your pins, and Grok caches it.
-              Pictures are drawn from the message you choose, and replies are read aloud as written. Nothing it says
-              goes to Claude.
-            </p>
-          ) : (
-            <div className="space-y-2 text-sm">
-              <label className="flex items-start gap-2">
-                <input type="radio" className="mt-1" checked={withMemory} onChange={() => setWithMemory(true)} />
-                <span>
-                  With memory
-                  <span className="mt-0.5 block text-xs text-faint">
-                    The memory model keeps what happens across chats; the oldest turns of a long chat slide out into it.
-                    Topics to leave alone, the scene, pictures that keep track of the story, and reading with feeling.
-                  </span>
+          <div className="space-y-2 text-sm">
+            <label className="flex items-start gap-2">
+              <input type="radio" className="mt-1" checked={withMemory} onChange={() => setWithMemory(true)} />
+              <span>
+                With memory
+                <span className="mt-0.5 block text-xs text-faint">
+                  The memory model keeps what happens across chats; the oldest turns of a long chat slide out into it.
+                  {provider === "xai"
+                    ? " Topics to leave alone. On Grok, pictures are still drawn from the message you choose, and replies are read aloud as written. Nothing it says goes to Claude."
+                    : " Topics to leave alone, the scene, pictures that keep track of the story, and reading with feeling."}
                 </span>
-              </label>
-              <label className="flex items-start gap-2">
-                <input type="radio" className="mt-1" checked={!withMemory} onChange={() => setWithMemory(false)} />
-                <span>
-                  Without memory
-                  <span className="mt-0.5 block text-xs text-faint">
-                    Every chat is sent whole each turn, with your pins. Pictures are drawn from the message you choose,
-                    and replies are read aloud as written.
-                  </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input type="radio" className="mt-1" checked={!withMemory} onChange={() => setWithMemory(false)} />
+              <span>
+                Without memory
+                <span className="mt-0.5 block text-xs text-faint">
+                  Every chat is sent whole each turn, with your pins. Pictures are drawn from the message you choose,
+                  and replies are read aloud as written.
+                  {provider === "xai" ? " Memory can be turned on later." : ""}
                 </span>
-              </label>
-            </div>
-          )}
+              </span>
+            </label>
+          </div>
         </section>
       )}
 
@@ -199,7 +195,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
           onTuning={setVoiceTuning}
           feeling={voiceFeeling}
           onFeeling={setVoiceFeeling}
-          withFeeling={memory}
+          withFeeling={memory && provider === "anthropic"}
         />
       ) : null}
 

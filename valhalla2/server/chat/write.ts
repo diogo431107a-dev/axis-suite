@@ -11,6 +11,7 @@ import {
   type TokenView,
 } from "../../shared/protocol.ts";
 import { asStoreError } from "../claude/client.ts";
+import { runMemoryModel, type MemoryRunner } from "../claude/memory.ts";
 import { writePicturePrompt } from "../claude/pictures.ts";
 import { streamReply, type Writer } from "../claude/reply.ts";
 import { contextWindow, countTokens } from "../claude/tokens.ts";
@@ -18,6 +19,7 @@ import { config } from "../config.ts";
 import { invalid, type StoreError } from "../errors.ts";
 import { windowWithout } from "../memory/history.ts";
 import { grokError } from "../grok/client.ts";
+import { runGrokMemoryModel } from "../grok/memory.ts";
 import { writeGrokPicturePrompt } from "../grok/pictures.ts";
 import { streamGrokReply } from "../grok/reply.ts";
 import { grokContextWindow } from "../grok/tokens.ts";
@@ -38,6 +40,10 @@ export const writeReply: Writer = (system, messages, settings, onEvent, options)
     ? streamGrokReply(system, messages, settings, onEvent, options)
     : streamReply(system, messages, settings, onEvent);
 
+/** Runs the memory model on its own API: Claude's for a Claude companion, Grok's for a Grok one. */
+export const runMemoryFor: MemoryRunner = (request) =>
+  providerFor(request.settings.memoryModel) === "xai" ? runGrokMemoryModel(request) : runMemoryModel(request);
+
 /**
  * Writes a picture's prompt on the companion's API: Claude's picture-prompt model for a Claude
  * companion, a Grok companion's own model for a Grok one.
@@ -55,15 +61,20 @@ export function writePictureFor(
 }
 
 /**
- * How much of a chat goes out each turn. With memory, the configured window: what slides out is
- * folded into memory. Without, a window sized from the model's own (windowWithout in history.ts).
+ * How much of a chat goes out each turn. With memory, the configured window (a larger one on Grok):
+ * what slides out is folded into memory. Without, a window sized from the model's own
+ * (windowWithout in history.ts), which also caps Grok's window with memory on a smaller model.
  */
 export async function chatWindow(companion: Companion): Promise<WindowSize> {
-  if (companion.memory) return { tokens: config.windowTokens, chunk: config.windowChunk };
+  if (companion.memory && companion.provider === "anthropic") {
+    return { tokens: config.windowTokens, chunk: config.windowChunk };
+  }
   const { model, maxTokens } = companion.settings;
   const window =
     providerFor(model, companion.provider) === "xai" ? await grokContextWindow(model) : await contextWindow(model);
-  return { ...windowWithout(window, maxTokens), chunk: config.windowChunk };
+  const largest = windowWithout(window, maxTokens);
+  if (companion.memory) return { tokens: Math.min(config.grokWindowTokens, largest.tokens), chunk: config.windowChunk };
+  return { ...largest, chunk: config.windowChunk };
 }
 
 /** A failure from either API as something the page can show. */

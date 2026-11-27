@@ -1,7 +1,7 @@
 // A companion's memory: the files the memory model keeps, what changed in them and when, and
 // every run of the memory model with what it cost. Anything can be edited by hand, or put back
 // the way it was; both are kept in the history like any other change.
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { ArrowLeft, RefreshCw } from "lucide-react";
 import type { Companion, MemoryPage } from "../../../shared/protocol.ts";
 import { api, describeError } from "../../api.ts";
@@ -13,10 +13,11 @@ import { NewFile } from "./NewFile.tsx";
 import { Pins } from "./Pins.tsx";
 import { Quiet } from "./Quiet.tsx";
 import { Runs } from "./Runs.tsx";
+import { TurnOn } from "./TurnOn.tsx";
 import { Upkeep } from "./Upkeep.tsx";
 
 export function Memory({ companion }: { companion: Companion }) {
-  const { open } = usePage();
+  const { open, reload } = usePage();
   const [page, setPage] = useState<MemoryPage | null>(null);
   const [error, setError] = useState("");
   const [chosen, setChosen] = useState<string | null>(null);
@@ -42,6 +43,13 @@ export function Memory({ companion }: { companion: Companion }) {
     return () => clearInterval(timer);
   }, [page?.busy, load]);
 
+  // Once memory has been turned on, the companion itself has changed: read it again.
+  const wasBusy = useRef(false);
+  useEffect(() => {
+    if (wasBusy.current && page && !page.busy && !companion.memory) void reload();
+    wasBusy.current = page?.busy ?? false;
+  }, [page, companion.memory, reload]);
+
   return (
     <div className="mx-auto max-w-5xl space-y-5 p-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -63,6 +71,9 @@ export function Memory({ companion }: { companion: Companion }) {
           every chat, after the profile.
         </p>
       )}
+      {page && !companion.memory && companion.provider === "xai" ? (
+        <TurnOn base={base} page={page} companion={companion} onPage={setPage} onError={setError} />
+      ) : null}
       <p className={companion.memory ? "text-sm text-faint" : "hidden"}>
         What {companion.name} remembers across chats. After a chat goes quiet (or when you press "Remember now" in it),
         the memory model updates these files from what was said on the path you selected. Each chat reads them as they
@@ -70,9 +81,11 @@ export function Memory({ companion }: { companion: Companion }) {
       </p>
       {page?.busy ? (
         <Notice kind="quiet">
-          {page.rebuilding
-            ? "Rebuilding from every chat. The files below stay as they are until it finishes; its steps appear at the bottom as they run."
-            : "The memory model is updating these files right now."}
+          {page.rebuilding && !companion.memory
+            ? "Building memory from every chat. Memory is on once it finishes; its steps appear at the bottom as they run."
+            : page.rebuilding
+              ? "Rebuilding from every chat. The files below stay as they are until it finishes; its steps appear at the bottom as they run."
+              : "The memory model is updating these files right now."}
         </Notice>
       ) : null}
       <Notice>{error}</Notice>
@@ -121,7 +134,7 @@ export function Memory({ companion }: { companion: Companion }) {
         <Quiet companion={companion} page={page} onPage={setPage} onError={setError} />
       ) : null}
 
-      {page && companion.memory ? <Runs page={page} /> : null}
+      {page && (companion.memory || page.runs.length > 0) ? <Runs page={page} /> : null}
     </div>
   );
 }
