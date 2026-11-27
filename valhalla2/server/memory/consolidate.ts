@@ -8,7 +8,8 @@
 //     what took their place, so whatever came only from them can be taken back;
 //   - the reasons you gave for rejecting replies;
 //   - the praise you gave liked replies, and any you took back (see likes.ts);
-//   - the chat's mode, and a note when it changed since the chat was last filed.
+//   - the chat's mode, and a note when it changed since the chat was last filed. A chat switched
+//     from canon to one-shot is re-filed with world.md and story/ open, to take its events out.
 //
 // The model works with the memory tool on a scratch copy of the companion's files. Only when it
 // finishes is the copy swapped in, in one transaction with the marks that say what was processed;
@@ -23,7 +24,7 @@ import {
   type QuietTopic,
   type RunOutcome,
 } from "../../shared/protocol.ts";
-import { CONSOLIDATION_MODES, promptOf } from "../../shared/prompts.ts";
+import { CANON_TO_ONE_SHOT, CONSOLIDATION_MODES, promptOf } from "../../shared/prompts.ts";
 import { transaction } from "../db.ts";
 import { createTree } from "../chat/tree.ts";
 import { markFiled, praiseFor, type Praise } from "../likes.ts";
@@ -235,6 +236,9 @@ export function consolidate(deps: ConsolidateDeps, chatId: string, companion: Co
       return { kind: "nothing", reason: "Memory already has everything in this chat" };
     }
 
+    // A canon chat switched to one-shot left its events in world.md and story/: this run may take
+    // them out, though a one-shot otherwise can't touch those files.
+    const takeBack = pending.modeChanged && pending.chat.consolidated_mode === "canon";
     const scratch = `scratch:${companion.id}:${Date.now()}`;
     memory.copy(companion.id, scratch);
     const step = await runStep(deps, {
@@ -244,9 +248,10 @@ export function consolidate(deps: ConsolidateDeps, chatId: string, companion: Co
       work: scratch,
       source: `consolidate:${chatId}`,
       mode: pending.chat.mode,
+      takeBack,
       system: `${promptOf(companion, "consolidation")}
 
-${CONSOLIDATION_MODES[pending.chat.mode]}`,
+${takeBack ? CANON_TO_ONE_SHOT : CONSOLIDATION_MODES[pending.chat.mode]}`,
       prompt: promptFor(companion, memory.files(companion.id), pending, quietOf(deps.db, companion.id)),
     });
     if (!step.ok) {

@@ -37,6 +37,14 @@ export interface ToolOptions {
    * reach the story: world.md and story/ can be read but not written.
    */
   mode: ChatMode;
+  /**
+   * Set only for the run that re-files a chat switched from canon to one-shot: its events went into
+   * world.md and story/ while it was canon, and must come back out, so those files are writable
+   * for that one run. Taking out rather than adding is asked of the model, not checked here: a
+   * removal and a rewrite look the same to the tool, and the run's changes are in each file's
+   * history, where they can be put back.
+   */
+  takeBack?: boolean;
 }
 
 /** Whether a one-shot chat may not write here. */
@@ -47,7 +55,8 @@ const numbered = (lines: string[], first: number): string =>
 
 /** The commands, carried out. Each returns what the model is told, or throws a ToolError. */
 export function memoryCommands(options: ToolOptions) {
-  const { db, memory, limits, space, source, runId, mode } = options;
+  const { db, memory, limits, space, source, runId, mode, takeBack = false } = options;
+  const storyLocked = mode === "one-shot" && !takeBack;
   const change = (op: string): Change => ({ op, source, runId });
 
   const path = (raw: unknown): string => {
@@ -61,7 +70,7 @@ export function memoryCommands(options: ToolOptions) {
 
   const writable = (relative: string): void => {
     if (relative === "") throw new ToolError(`Error: ${absolute("")} itself can't be changed`);
-    if (mode === "one-shot" && storyOnly(relative)) {
+    if (storyLocked && storyOnly(relative)) {
       throw new ToolError(
         `Error: ${absolute(relative)} is read-only for this chat. It is a standalone one-shot scenario, so its events ` +
           "stay out of world.md and story/. Record only what it shows about the character, the relationship, the user " +
@@ -214,7 +223,7 @@ export function memoryCommands(options: ToolOptions) {
       if (!memory.read(space, relative) && !memory.isDirectory(space, relative)) {
         throw new ToolError(`Error: The path ${absolute(relative)} does not exist`);
       }
-      if (mode === "one-shot" && memory.under(space, relative).some((file) => storyOnly(file.path))) {
+      if (storyLocked && memory.under(space, relative).some((file) => storyOnly(file.path))) {
         writable("story");
       }
       changing(() => memory.remove(space, relative, change("delete")));
@@ -234,7 +243,7 @@ export function memoryCommands(options: ToolOptions) {
         throw new ToolError(`Error: The destination ${absolute(to)} already exists`);
       }
       if (within(to, from)) throw new ToolError(`Error: ${absolute(from)} can't be moved inside itself`);
-      if (mode === "one-shot" && memory.under(space, from).some((file) => storyOnly(file.path))) writable("story");
+      if (storyLocked && memory.under(space, from).some((file) => storyOnly(file.path))) writable("story");
       changing(() => memory.rename(space, from, to, change("rename")));
       return `Successfully renamed ${absolute(from)} to ${absolute(to)}`;
     },

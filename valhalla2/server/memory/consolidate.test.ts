@@ -257,6 +257,71 @@ describe("consolidation", () => {
     await consolidate(deps, "chat-0001", companion);
     expect(model.asked[1]!.prompt).toContain("was filed into memory as canon and is now one-shot");
   });
+
+  it("takes a canon chat switched to one-shot back out of world.md and story/, once", async () => {
+    const { db, companion, chats, memory, tree } = setup();
+    const greeting = put(tree, null, "assistant", "We sail at dawn, captain.");
+    const summary = "- The two of them sank the Grey Gull.";
+    const ship = "- The Grey Gull, a sunken ship.";
+    const model = scriptedModel((request) => {
+      const run = model.asked.length;
+      if (run === 1) {
+        return [
+          {
+            command: "str_replace",
+            path: "/memories/story/recent.md",
+            old_str: "newest last.\n",
+            new_str: `newest last.\n${summary}\n`,
+          },
+          { command: "insert", path: "/memories/world.md", insert_line: 3, insert_text: ship },
+        ];
+      }
+      if (run === 2) {
+        expect(request.system).toContain("take them back out");
+        return [
+          { command: "str_replace", path: "/memories/story/recent.md", old_str: `${summary}\n`, new_str: "" },
+          { command: "str_replace", path: "/memories/world.md", old_str: `${ship}\n`, new_str: "" },
+        ];
+      }
+      // An ordinary one-shot run afterwards is locked out of the story again.
+      return [{ command: "insert", path: "/memories/world.md", insert_line: 3, insert_text: "- A pirate island." }];
+    });
+    const deps = { db, memory, limits: LIMITS, run: model.run, maxIterations: 8 };
+
+    await consolidate(deps, "chat-0001", companion);
+    expect(memory.read(companion.id, "story/recent.md")?.content).toContain(summary);
+    expect(memory.read(companion.id, "world.md")?.content).toContain(ship);
+
+    chats.change("chat-0001", { mode: "one-shot" });
+    await consolidate(deps, "chat-0001", companion);
+    expect(memory.read(companion.id, "story/recent.md")?.content).not.toContain(summary);
+    expect(memory.read(companion.id, "world.md")?.content).not.toContain(ship);
+    expect(model.asked[1]!.system).not.toContain("Do not touch world.md or story/");
+    expect(hasPending(db, "chat-0001")).toBe(false);
+
+    put(tree, greeting, "user", "Hoist the sails!");
+    await consolidate(deps, "chat-0001", companion);
+    expect(model.asked[2]!.system).toContain("Do not touch world.md or story/");
+    expect(memory.read(companion.id, "world.md")?.content).not.toContain("pirate island");
+  });
+
+  it("re-files a one-shot switched to canon with the story open, as any canon chat", async () => {
+    const { db, companion, chats, memory, tree } = setup();
+    chats.change("chat-0001", { mode: "one-shot" });
+    put(tree, null, "assistant", "In this dream, we are pirates.");
+    const model = scriptedModel(() =>
+      model.asked.length === 2
+        ? [{ command: "insert", path: "/memories/world.md", insert_line: 3, insert_text: "- The pirate ship." }]
+        : [],
+    );
+    const deps = { db, memory, limits: LIMITS, run: model.run, maxIterations: 8 };
+    await consolidate(deps, "chat-0001", companion);
+    chats.change("chat-0001", { mode: "canon" });
+    await consolidate(deps, "chat-0001", companion);
+    expect(model.asked[1]!.system).toContain("This chat is canon");
+    expect(model.asked[1]!.system).not.toContain("take them back out");
+    expect(memory.read(companion.id, "world.md")?.content).toContain("The pirate ship.");
+  });
 });
 
 describe("the window", () => {

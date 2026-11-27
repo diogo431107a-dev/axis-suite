@@ -4,6 +4,14 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Switching a chat from canon to one-shot now takes its events back out of the story.** Before,
+  the chat's summary and what it added to the world stayed in memory after the switch. Now the
+  memory model removes them the next time it reads the chat, and keeps what other chats also show.
+  What it removed is in each file's history on the Memory page, where it can be put back.
+- **The README is shorter**: it keeps what Valhalla 2 does and how to run, set up and install it.
+  How everything works is in the new `docs/` folder, with a full explanation of memory in
+  `docs/memory.md`.
+
 ## 0.0.39 — 2026-11-26
 
 - Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.

@@ -32,6 +32,8 @@ export interface RunSpec {
   source: string;
   /** The rules the tool applies: a one-shot may not write world.md or story/. */
   mode: ChatMode;
+  /** Whether a canon chat switched to one-shot is being taken back out of world.md and story/. */
+  takeBack?: boolean;
   system: string;
   prompt: string;
 }
@@ -78,6 +80,7 @@ export async function runStep(deps: RunDeps, spec: RunSpec): Promise<StepResult>
         runId,
         chatId: spec.chatId,
         mode: spec.mode,
+        takeBack: spec.takeBack ?? false,
       }),
       settings: spec.companion.settings,
       maxIterations: deps.maxIterations,
