@@ -35,7 +35,7 @@ Open http://127.0.0.1:3000. The demo accounts are `odin` / `allfather-demo`, `fr
 
 ## Bifrost
 
-Bifrost (`/bifrost`, the **Open Bifrost** button) lists every installed module with its address, a few words on what it is, and a longer explanation on hover or behind its **?** button. Clicking one goes through `/bifrost/go/<module>`, which counts the visit and sends the browser on, so each user's most-opened modules come first; ties are in alphabetical order.
+Bifrost (`/bifrost`, the **Open Bifrost** button) lists every installed module with its address, a few words on what it is, and a longer explanation on hover or behind its **?** button. Its look is its own, snowy plains under the rainbow bridge, while the rest of Heimdall stays dark. Every link opens in a new tab. Clicking a module goes through `/bifrost/go/<module>`, which counts the visit and sends the browser on, so each user's most-opened modules come first; ties are in alphabetical order. Signed out, `/bifrost` sends the browser to sign in with `?next=/bifrost`, the one address inside Heimdall that `next` may name, so signing in comes back to Bifrost.
 
 - **Which modules, at what address:** the `RETURN_ORIGIN_<MODULE>` variables the installer gives Heimdall, so only installed modules appear. A module not described in `server/modules.ts` is listed under its plain name.
 - **The counts:** `bifrost.json` next to the sessions (`/var/lib/heimdall/` on a server), per user. A removed user's counts are dropped when Heimdall starts. Deleting the file only resets everyone's order.

@@ -16,6 +16,11 @@ const LOGO_SVG = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" cl
 
 const FAVICON = `data:image/svg+xml,${encodeURIComponent(LOGO_SVG)}`;
 
+// Bifrost's snowy plains: far mountains, three rolling fields of snow and a few pines.
+const HILLS = `data:image/svg+xml,${encodeURIComponent(
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1440 400" preserveAspectRatio="none"><path d="M0 170 120 110 210 150 330 70 450 140 560 95 690 160 820 80 940 135 1070 60 1190 130 1310 90 1440 140V400H0Z" fill="#c4d4e6"/><path d="M330 70 365 92 350 100 385 112 330 70ZM820 80 858 104 842 110 880 122ZM1070 60 1110 86 1094 92 1134 106Z" fill="#f4f8fc"/><path d="M0 230C240 180 420 205 640 190S1080 160 1440 205V400H0Z" fill="#dfe9f4"/><path d="M190 205 202 180 214 205ZM205 207 219 176 233 207ZM1180 192 1192 168 1204 192ZM1196 194 1209 164 1222 194Z" fill="#8ea6bd"/><path d="M0 290C300 245 560 270 820 255S1240 235 1440 265V400H0Z" fill="#edf3f9"/><path d="M0 345C380 315 760 340 1100 325 1260 318 1360 322 1440 330V400H0Z" fill="#ffffff"/></svg>`,
+)}`;
+
 const CSS = `
 :root{color-scheme:dark;--bg:#0b0f17;--card:#121826;--field:#0d1320;--line:#232c3d;--text:#e6e9f0;--muted:#8b95a7;--accent:#4dabf7;
 --bifrost:linear-gradient(90deg,#ff6b6b,#ffb84d,#7ee081,#4dabf7,#b197fc)}
@@ -93,9 +98,29 @@ box-shadow:0 10px 30px rgba(0,0,0,.45);font-size:13px;pointer-events:none;opacit
 .back:hover{color:var(--text)}
 @media (max-width:480px){.card{padding:28px 20px 24px}.row .go{grid-template-columns:1fr}.row .what{order:1}.row .host{order:2;grid-column:1;grid-row:auto;max-width:none}}
 @media (hover:none){.row .hint{display:none}}
+/* Bifrost: the rainbow bridge over snowy plains. */
+body.bifrost{color-scheme:light;--bg:#eef3f8;--card:rgba(255,255,255,.8);--field:rgba(255,255,255,.85);--line:#d2dde9;--text:#1d2b3a;--muted:#5a6b7d;--accent:#2b7bbf;--hover:#e8f0f8;
+background:url("${HILLS}") bottom/100% 42vh no-repeat fixed,linear-gradient(#bfd3e8 0%,#dce8f3 45%,#f3f7fb 100%) fixed,var(--bg)}
+body.bifrost::before{content:"";position:fixed;inset:0;pointer-events:none;
+background-image:radial-gradient(4px 4px at 30px 40px,#fff 60%,transparent 70%),radial-gradient(3px 3px at 140px 120px,#fff 60%,transparent 70%),
+radial-gradient(5px 5px at 90px 200px,#fff 60%,transparent 70%),radial-gradient(3px 3px at 210px 60px,#fff 60%,transparent 70%),
+radial-gradient(4px 4px at 260px 230px,#fff 60%,transparent 70%);background-size:240px 240px,300px 300px,280px 280px,200px 200px,320px 320px;
+filter:drop-shadow(0 0 1.5px rgba(70,100,135,.45));animation:snowfall 24s linear infinite}
+@keyframes snowfall{to{background-position:0 240px,0 300px,0 280px,0 200px,0 320px}}
+@media (prefers-reduced-motion:reduce){body.bifrost::before{animation:none}}
+.bifrost .card{z-index:1;backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-color:rgba(255,255,255,.9);box-shadow:0 24px 60px rgba(40,70,100,.18)}
+.bifrost .logo path:nth-of-type(2){stroke:#1d2b3a}
+.bifrost .row{box-shadow:0 1px 2px rgba(40,70,100,.06)}
+.bifrost .row:hover,.bifrost .row:focus-within{border-color:#a8c1da}
+.bifrost .row .info:hover,.bifrost .about .close:hover{background:var(--hover)}
+.bifrost .row .hint{background:#fff;color:var(--text);box-shadow:0 10px 30px rgba(40,70,100,.18)}
+.bifrost .about{background:#fff;box-shadow:0 20px 60px rgba(40,70,100,.25)}
+.bifrost .about::backdrop{background:rgba(40,60,80,.25)}
+.bifrost .button{background:var(--text);color:#fff}
+.bifrost .button:hover{background:#2e4258}
 `;
 
-function page(nonce: string, title: string, body: string, script = "", wide = false): string {
+function page(nonce: string, title: string, body: string, script = "", bifrost = false): string {
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -105,8 +130,8 @@ function page(nonce: string, title: string, body: string, script = "", wide = fa
 <link rel="icon" href="${FAVICON}">
 <style nonce="${nonce}">${CSS}</style>
 </head>
-<body>
-<main class="card${wide ? " wide" : ""}">
+<body${bifrost ? ' class="bifrost"' : ""}>
+<main class="card${bifrost ? " wide" : ""}">
 ${body}
 </main>
 ${ABOUT}
@@ -235,7 +260,7 @@ document.querySelectorAll(".ts").forEach(function (el) {
 function bifrostRow(id: string, href: string, info: ModuleInfo, host: string): { row: string; popover: string } {
   const hint = info.about ? `<span class="hint" aria-hidden="true">${esc(info.about)}</span>` : "";
   const row = `<li class="row">
-<a class="go" href="${esc(href)}"${info.about ? ` aria-describedby="about-${id}"` : ""}><span class="name">${esc(info.name)}</span><span class="host">${esc(host)}</span>${info.what ? `<span class="what">${esc(info.what)}</span>` : ""}</a>
+<a class="go" href="${esc(href)}" target="_blank" rel="noopener"${info.about ? ` aria-describedby="about-${id}"` : ""}><span class="name">${esc(info.name)}</span><span class="host">${esc(host)}</span>${info.what ? `<span class="what">${esc(info.what)}</span>` : ""}</a>
 ${info.about ? `<button type="button" class="info" popovertarget="about-${id}" aria-label="About ${esc(info.name)}">?</button>` : ""}
 ${hint}
 </li>`;
@@ -244,7 +269,7 @@ ${hint}
 <div class="about-head"><h2>${esc(info.name)}</h2><button type="button" class="close" popovertarget="about-${id}" popovertargetaction="hide" aria-label="Close">×</button></div>
 ${info.what ? `<p class="muted">${esc(info.what)}</p>` : ""}
 <p class="explain">${esc(info.about)}</p>
-<a class="button open" href="${esc(href)}">Open ${esc(info.name)}</a>
+<a class="button open" href="${esc(href)}" target="_blank" rel="noopener">Open ${esc(info.name)}</a>
 </div>`
     : "";
   return { row, popover };
