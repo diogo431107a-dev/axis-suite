@@ -4,6 +4,8 @@ What changed in Heimdall, newest first. Each version is tagged in git as `heimda
 
 ## Unreleased
 
+## 0.0.33 — 2026-11-26
+
 - Bifrost has a look of its own: the rainbow bridge over snowy plains, with snow falling (it stays still if your device is set to reduce motion).
 - Every link in Bifrost opens in a new tab, so Bifrost stays open in its own.
 - Opening Bifrost while signed out shows the sign-in page, and signing in brings you back to Bifrost instead of Heimdall's page. Useful for a bookmark, or an address that sends people straight to Bifrost.
