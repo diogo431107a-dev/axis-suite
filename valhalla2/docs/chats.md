@@ -1,7 +1,8 @@
 # Chats
 
 How a chat works: what is sent, how replies can be written again and branched, how likes and modes
-work, what happens when the API declines a turn, and what each turn costs. How the companion
+work, what happens when the API declines a turn or a reply steps out of character, and what each
+turn costs. How the companion
 remembers across chats is in [How memory works](memory.md).
 
 ## What Valhalla 2 adds to a request
@@ -131,6 +132,62 @@ said differently.
 - The fallback model cannot read the earlier replies' thinking, only what was said, so the
   companion's voice can shift a little. Nothing is lost: the thinking is kept, and is read again
   when the chat is back on your model.
+
+## When a reply steps out of character
+
+Sometimes a reply isn't the companion at all but the model speaking for itself: "I won't continue
+with this." It comes in two kinds, and they need different handling.
+
+- **Shown as a refusal**, a declined turn ([above](#when-the-api-declines-a-turn)). It is already
+  left out of what later turns send. A swipe sends the same request again and usually gets the
+  same answer, so say it another way instead, or tick the fallback.
+- **An ordinary reply that refuses.** The model wrote it as its answer, so Valhalla 2 treats it as
+  one: while it is on the selected path, it goes out with every later turn, and the memory model
+  reads it. A model tends to stay consistent with what it has already said, so a refusal left in
+  place makes the next one likelier.
+
+**What works, in order:**
+
+1. **Swipe.** A refusal like this is often just bad luck in how the reply was drawn. The version
+   you swipe away leaves the selected path, so neither later turns nor memory see it.
+2. **If it refuses again at the same point, edit your own message**, not the reply. What set it off
+   is in what you sent. Add what the model was missing (that this is a story, where the scene is
+   going, that the characters are adults) and let it write again.
+3. **At the fifth swipe, answer the question.** Your answer goes, hidden, with every later version
+   of that reply ([above](#a-chat-is-a-tree)), so it works as an instruction. Say what you want
+   rather than what went wrong: "Stay in character; this is a story we are writing together."
+4. **If it happens in chat after chat, put that context in the profile.** The profile goes with
+   every turn, so it deals with the cause rather than one reply.
+
+**What doesn't help:**
+
+- **Arguing, correcting or apologizing in the chat.** The refusal stays in, and your next message
+  reads as pushing back on it, so the model tends to hold its ground or hedge. An apology also tells
+  it the request was out of line. A short out-of-character note works better inside your edited
+  message than as an answer to the refusal.
+- **Deleting it.** A swipe already takes it off the path. Delete only to have it gone from the
+  chat altogether.
+- **Branching.** A branch is for keeping one line of the story while trying another, not for
+  getting past a refusal.
+
+If the same scene is declined however you put it, and by the fallback model too, it is probably
+something the usage policy rules out, and no wording will change that.
+
+**On Grok** ([what differs](providers.md#what-differs-on-grok)), the same order works, with these
+differences:
+
+- **No fallback.** A reply xAI filters is shown as a refusal, with no category, and can only be
+  written again or said differently.
+- **Temperature decides how different a swipe is.** At a low temperature a swipe writes much the
+  same reply again, refusal included. For a reply that keeps refusing, raise it, or go back to
+  Grok's default, then swipe.
+- **Nothing tidies up after you.** There is no memory to read the refusal, but nothing drops it
+  either: left in the chat, it is sent with every turn until the chat reaches about 160K tokens and
+  it slides out. Swipe it or edit your message rather than talking past it.
+- **The profile is the only place that lasts.** The fifth-swipe answer helps only that reply, and
+  no memory carries it into later chats.
+- **The policy is xAI's**, not Anthropic's, so what one declines the other may not. A companion
+  can't move between the two (see [Claude or Grok](providers.md)).
 
 ## Things the current API decides, not Valhalla 2
 

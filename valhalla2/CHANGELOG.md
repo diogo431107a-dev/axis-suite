@@ -4,6 +4,10 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **The Chats page now says what to do when a reply steps out of character** and refuses to go on:
+  swipe first, then edit your own message, use the fifth-swipe question, and put lasting context in
+  the profile, with what to do differently on Grok.
+
 ## 0.0.42 — 2026-11-26
 
 - **A long chat no longer forgets the turns that slide out of it for a while.** When a chat with
