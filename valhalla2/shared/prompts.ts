@@ -126,6 +126,19 @@ export const CONSOLIDATION_MODES: Readonly<Record<ChatMode, string>> = {
     "items in open_threads.md.",
 };
 
+/**
+ * What the memory model is told, in place of the one-shot line, when it re-files a chat that was
+ * filed as canon and is now a one-shot: the one run that may write world.md and story/ for a
+ * one-shot, and only to take out what the chat put there.
+ */
+export const CANON_TO_ONE_SHOT =
+  "This chat was filed as canon and is now a standalone one-shot scenario: its events are no longer part of the " +
+  "shared story, so take them back out. Remove this chat's summary from story/recent.md; if it was already " +
+  "condensed into story/arcs.md, remove only this chat's part of that arc. Remove from world.md and from the plot " +
+  "hooks in open_threads.md what came only from this chat, and keep what other chats also show. Only remove: add " +
+  "nothing to world.md or story/. Then update character_canon.md, relationship.md, user.md, feedback.md and the " +
+  "real-life items in open_threads.md as for any one-shot.";
+
 /** What the companion is told about the chat's mode, after its memory. */
 export const CHAT_MODE_LINES: Readonly<Record<ChatMode, string>> = {
   canon: "This chat is canon: what happens in it is part of your story together.",

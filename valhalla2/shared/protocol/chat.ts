@@ -168,8 +168,11 @@ export interface TokenView {
 /** The events the server sends while a reply is being written. */
 export type StreamEvent =
   | { type: "start" }
-  /** The companion's memory is being updated first; the reply waits for it. */
-  | { type: "remembering" }
+  /**
+   * The companion's memory is being updated first; the reply waits for it. From its other chats
+   * (before a greeting), or from this one's oldest turns, which are sliding out of the window.
+   */
+  | { type: "remembering"; about: "others" | "this" }
   | { type: "thinking" }
   | { type: "delta"; text: string }
   | { type: "done"; message: Message }

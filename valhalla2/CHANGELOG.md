@@ -4,6 +4,21 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **A long chat no longer forgets the turns that slide out of it for a while.** When a chat with
+  memory grew past what is sent, its oldest turns stopped being sent before the memory model had
+  filed them, so for a while the companion saw them neither in the chat nor in its memory. Now the
+  reply waits until they are in memory (the chat says the companion is putting the oldest part of
+  this chat into memory first), which makes that one reply slower. If filing them fails, the reply
+  goes ahead without them, as before; if it takes over three minutes, the oldest turns are sent once
+  more and the next reply tries again.
+- **Switching a chat from canon to one-shot now takes its events back out of the story.** Before,
+  the chat's summary and what it added to the world stayed in memory after the switch. Now the
+  memory model removes them the next time it reads the chat, and keeps what other chats also show.
+  What it removed is in each file's history on the Memory page, where it can be put back.
+- **The README is shorter**: it keeps what Valhalla 2 does and how to run, set up and install it.
+  How everything works is in the new `docs/` folder, with a full explanation of memory in
+  `docs/memory.md`.
+
 ## 0.0.39 — 2026-11-26
 
 - Runs on Node.js 24 instead of 22. The installer upgrades Node.js on the server by itself the first time it runs.

@@ -35,8 +35,37 @@ export interface TurnContext {
   window: WindowSize;
   write: Writer;
   onEvent: (event: StreamEvent) => void;
-  /** Told when the oldest turns slide out of the window, so they can be folded into memory. */
-  onSlide?: () => void;
+  /**
+   * Told when the oldest turns slide out of the window, to fold them into memory; settles once
+   * that run has finished, however it went.
+   */
+  onSlide?: () => Promise<unknown>;
+}
+
+/**
+ * How long a reply waits for the turns that slid out to be folded into memory. Past it the reply
+ * goes on without the slide (see prepare), and the run carries on in the background.
+ */
+export const SLIDE_WAIT_MS = 3 * 60_000;
+
+/** Whether `run` settled within SLIDE_WAIT_MS. A run that crashed counts as settled. */
+async function settledInTime(run: Promise<unknown>): Promise<boolean> {
+  let timer: NodeJS.Timeout | undefined;
+  const late = new Promise<false>((resolve) => {
+    timer = setTimeout(() => resolve(false), SLIDE_WAIT_MS);
+  });
+  const done = run.then(
+    () => true,
+    (err: unknown) => {
+      console.error("Updating memory after a slide failed:", err);
+      return true;
+    },
+  );
+  try {
+    return await Promise.race([done, late]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 /**
@@ -58,23 +87,32 @@ export interface Prepared {
 
 /**
  * The request for `path`: the system prompt with the chat's memory, and the part of the path the
- * window holds. With `keep`, a slide of the window is kept, memory is looked at afresh with it,
- * and `onSlide` is told; without, nothing is changed (for Inspect and the token count).
+ * window holds. With `keep`, a slide of the window is kept and memory is looked at afresh with it;
+ * without, nothing is changed and nothing waits (for Inspect and the token count).
+ *
+ * For a companion with memory, the turns that slide out are folded into memory first: `onSlide`
+ * runs, the reply waits for it (saying `remembering`), and only then is the new snapshot taken, so
+ * it holds them. A run that fails still lets the slide go ahead, on memory as it stands. A run still
+ * going after SLIDE_WAIT_MS doesn't: this reply keeps the window and snapshot it had, so the turns
+ * are still sent, and the next one tries again (joining the run if it is still going).
  *
  * A companion without memory sends its profile and its pins, and as much of the path as its far
  * larger window holds (chatWindow in write.ts). There is no memory to slide turns out into, so what
  * slides out is simply no longer sent, and `onSlide` is never told.
  */
-export function prepare(
-  context: Pick<TurnContext, "db" | "chatId" | "companion" | "memory" | "window" | "onSlide">,
+export async function prepare(
+  context: Pick<TurnContext, "db" | "chatId" | "companion" | "memory" | "window" | "onSlide"> &
+    Partial<Pick<TurnContext, "onEvent">>,
   path: Message[],
   next: { instruction: string | null } | undefined,
   keep: boolean,
-): Prepared {
+): Promise<Prepared> {
   const { db, chatId, companion, memory, window } = context;
   const { window_start: stored } = db.prepare("SELECT window_start FROM chats WHERE id = ?").get(chatId) as {
     window_start: number | null;
   };
+  const keepStart = (startId: number | null) =>
+    db.prepare("UPDATE chats SET window_start = ? WHERE id = ?").run(startId, chatId);
   if (!companion.memory) {
     const pins = pinsOf(db, companion.id);
     const system = buildSystem(companion, pins.length > 0 ? renderPins(companion, pins) : null);
@@ -82,18 +120,27 @@ export function prepare(
     const fixed = system.reduce((sum, block) => sum + Math.ceil(block.text.length / 4), 0);
     const room = (tokens: number) => Math.max(0, tokens - fixed);
     const at = windowFor(path, stored, room(window.tokens), window.chunk, room(window.slideTo ?? window.tokens));
-    if (keep && at.slid) db.prepare("UPDATE chats SET window_start = ? WHERE id = ?").run(at.startId, chatId);
+    if (keep && at.slid) keepStart(at.startId);
     return { system, messages: outgoing(path.slice(at.from), next) };
   }
-  const at = windowFor(path, stored, window.tokens, window.chunk);
+  let at = windowFor(path, stored, window.tokens, window.chunk);
   let snapshot: string;
   if (!keep) {
     snapshot = peekSnapshot(db, memory, chatId, companion);
   } else {
     if (at.slid) {
-      db.prepare("UPDATE chats SET window_start = ? WHERE id = ?").run(at.startId, chatId);
-      refreshSnapshot(db, memory, chatId, companion);
-      if (at.startId !== null) context.onSlide?.();
+      let folded = true;
+      if (at.startId !== null && context.onSlide) {
+        context.onEvent?.({ type: "remembering", about: "this" });
+        folded = await settledInTime(context.onSlide());
+      }
+      if (folded) {
+        keepStart(at.startId);
+        refreshSnapshot(db, memory, chatId, companion);
+      } else {
+        // Where the window started before: nothing is measured against a budget there.
+        at = windowFor(path, stored, Infinity, window.chunk);
+      }
     }
     snapshot = snapshotFor(db, memory, chatId, companion);
   }
@@ -103,7 +150,7 @@ export function prepare(
 /** Writes a reply to `path` and returns what to store, reporting it as it is written. */
 async function reply(context: TurnContext, path: Message[], instruction: string | null) {
   const { companion, write, onEvent, chatId } = context;
-  const { system, messages } = prepare(context, path, { instruction }, true);
+  const { system, messages } = await prepare(context, path, { instruction }, true);
   return write(system, asParams(messages), companion.settings, onEvent, {
     cacheKey: chatId,
     provider: companion.provider,

@@ -25,7 +25,8 @@ export function useChat(id: string, greet: boolean, onAnswered: { current: (mess
   const [incoming, setIncoming] = useState("");
   const [error, setError] = useState("");
   const [acting, setActing] = useState(false);
-  const [remembering, setRemembering] = useState(false);
+  // What memory is catching up on before the reply is written, if anything.
+  const [remembering, setRemembering] = useState<"others" | "this" | null>(null);
   const [filing, setFiling] = useState(false);
   const [filed, setFiled] = useState("");
   const greeted = useRef(false);
@@ -56,18 +57,18 @@ export function useChat(id: string, greet: boolean, onAnswered: { current: (mess
       setError("");
       setIncoming("");
       setThinking(false);
-      setRemembering(false);
+      setRemembering(null);
       let failed = false;
       let answered: Message | null = null;
       try {
         await streamReply(path, body, (event: StreamEvent) => {
-          if (event.type === "remembering") setRemembering(true);
+          if (event.type === "remembering") setRemembering(event.about);
           if (event.type === "thinking") {
-            setRemembering(false);
+            setRemembering(null);
             setThinking(true);
           }
           if (event.type === "delta") {
-            setRemembering(false);
+            setRemembering(null);
             setThinking(false);
             setIncoming((so_far) => so_far + event.text);
           }
@@ -89,7 +90,7 @@ export function useChat(id: string, greet: boolean, onAnswered: { current: (mess
       setWriting(null);
       setIncoming("");
       setThinking(false);
-      setRemembering(false);
+      setRemembering(null);
       void reload();
       if (!failed && answered) onAnswered.current(answered);
       return !failed;
