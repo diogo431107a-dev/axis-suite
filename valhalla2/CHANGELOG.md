@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.42 — 2026-11-26
+
 - **A long chat no longer forgets the turns that slide out of it for a while.** When a chat with
   memory grew past what is sent, its oldest turns stopped being sent before the memory model had
   filed them, so for a while the companion saw them neither in the chat nor in its memory. Now the
