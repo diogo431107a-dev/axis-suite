@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.46 — 2026-11-27
+
 - **Grok companions can now have memory.** A new Grok companion can be made with memory, as a
   Claude one can. Grok keeps it after each chat, in the same files, on the same Memory page, with
   canon and one-shot, likes' comments and topics to leave alone, and nothing of it goes to Claude. A

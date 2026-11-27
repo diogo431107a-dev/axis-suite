@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.229 — 2026-11-27
+
+Valhalla 2 0.0.46: Grok companions can have memory, kept by Grok. A new one can be made with it, and an existing one can have it turned on from its Pins page. Nothing to do by hand.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.33  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.46  |
+
 ## 0.0.227 — 2026-11-26
 
 Valhalla 2 0.0.44: its Chats page explains what to do when a reply steps out of character and refuses to go on, on Claude and on Grok. Documentation only; nothing to do by hand.
