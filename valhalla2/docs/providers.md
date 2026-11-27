@@ -54,7 +54,8 @@ differs is forced by xAI's API:
   per million against $2.00. A prompt of 200K tokens or more is billed at twice the rate, all of it.
 - **Only text is kept.** Grok's reasoning comes back encrypted and is not stored.
 - **There is no fallback model and no classifier category.** A reply xAI filters is stored as a
-  refusal, with whatever it said.
+  refusal, with whatever it said. What to do about one is in
+  [Chats: When a reply steps out of character](chats.md#when-a-reply-steps-out-of-character).
 - **A chat can't be counted before it is sent**: xAI has no counting endpoint. The context line
   under the composer shows what the last reply sent instead.
 - **Nothing is kept by xAI.** Requests go out with `store: false`.
