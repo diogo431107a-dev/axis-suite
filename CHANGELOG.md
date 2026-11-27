@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.227 — 2026-11-26
+
+Valhalla 2 0.0.44: its Chats page explains what to do when a reply steps out of character and refuses to go on, on Claude and on Grok. Documentation only; nothing to do by hand.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.33  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.44  |
+
 ## 0.0.225 — 2026-11-26
 
 Valhalla 2 0.0.42: switching a chat from canon to one-shot takes its events back out of the story, a long chat no longer forgets the turns that slide out of it for a while, and how everything works, memory above all, is explained in its new `docs/` folder. Nothing to do by hand.
