@@ -2,7 +2,8 @@
 //
 // A chat is folded into memory:
 //   - when you press "Remember now" (index.ts calls `now`);
-//   - when the oldest turns of a long chat slide out of the window (`soon`, from turn.ts);
+//   - when the oldest turns of a long chat slide out of the window (`now`, from turn.ts: the reply
+//     waits for it, so the chat's next look at memory holds them);
 //   - when you open a new chat with a companion whose other chats aren't all in memory yet
 //     (`othersOf`): the greeting waits for them, so it is written knowing everything;
 //   - when a chat has been quiet for a while (`idleMinutes`), checked once a minute — which also

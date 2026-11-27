@@ -13,7 +13,7 @@ export function Live({
   writing: Writing | null;
   thinking: boolean;
   incoming: string;
-  remembering: boolean;
+  remembering: "others" | "this" | null;
   companionName: string;
 }) {
   return (
@@ -37,8 +37,13 @@ export function Live({
           </Bubble>
         </article>
       ) : null}
-      {writing && remembering ? (
+      {writing && remembering === "others" ? (
         <p className="pr-6 text-sm text-faint sm:pr-16">{companionName} is catching up on your other chats first…</p>
+      ) : null}
+      {writing && remembering === "this" ? (
+        <p className="pr-6 text-sm text-faint sm:pr-16">
+          {companionName} is putting the oldest part of this chat into memory first…
+        </p>
       ) : null}
       {writing && !remembering && !thinking && !incoming ? (
         <p className="pr-6 text-sm text-faint sm:pr-16">Asking {companionName}…</p>

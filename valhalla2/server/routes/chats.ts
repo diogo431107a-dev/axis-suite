@@ -54,7 +54,10 @@ export function chatRoutes(s: Services): Router {
       companion,
       memory: s.memory,
       window: await chatWindow(companion),
-      onSlide: () => s.scheduler.soon(chat.id),
+      onSlide: async () => {
+        const outcome = await s.scheduler.now(chat.id);
+        if (outcome.kind === "failed") console.error(`Updating memory from chat ${chat.id} failed: ${outcome.error}`);
+      },
     };
     return { my, chat, companion, tree, base };
   }
@@ -62,14 +65,14 @@ export function chatRoutes(s: Services): Router {
   // The request exactly as it will be sent. Nothing is assembled out of sight.
   routes.get("/chats/:id/prompt", async (req: Request, res: Response) => {
     const { companion, tree, base } = await chatParts(req);
-    const { system, messages } = prepare(base, tree.activePath(), undefined, false);
+    const { system, messages } = await prepare(base, tree.activePath(), undefined, false);
     res.json(promptView(companion, system, messages));
   });
 
   // What this chat would send, against the model's context window.
   routes.get("/chats/:id/tokens", async (req: Request, res: Response) => {
     const { companion, tree, base } = await chatParts(req);
-    const { system, messages } = prepare(base, tree.activePath(), undefined, false);
+    const { system, messages } = await prepare(base, tree.activePath(), undefined, false);
     try {
       res.json(await tokensFor(system, asParams(messages), companion.settings, companion.provider));
     } catch (err) {
@@ -117,7 +120,7 @@ export function chatRoutes(s: Services): Router {
     await stream(res, release, async (tell) => {
       if (parentId === null && companion.memory && memoryBusy(companion.id)) {
         // A greeting is written knowing everything: it waits for memory to catch up first.
-        tell({ type: "remembering" });
+        tell({ type: "remembering", about: "others" });
         await withMemoryLock(companion.id, () => undefined);
       }
       const answered = await generate(context(tell), parentId);

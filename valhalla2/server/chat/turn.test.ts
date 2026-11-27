@@ -1,21 +1,28 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type Anthropic from "@anthropic-ai/sdk";
 import { DEFAULT_SETTINGS, blockText, type ContentBlock, type StreamEvent } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS, OPENER } from "../../shared/prompts.ts";
+import type { MemoryRunner } from "../claude/memory.ts";
 import type { Reply, Writer } from "../claude/reply.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
+import { consolidate } from "../memory/consolidate.ts";
 import { createMemory } from "../memory/store.ts";
+import { createChats } from "./chats.ts";
+import { generate, send, SLIDE_WAIT_MS, type TurnContext } from "./turn.ts";
 
 const LIMITS = { fileBytes: 8192, storyBytes: 16384, files: 20, viewChars: 16_000 };
-import { createChats } from "./chats.ts";
-import { generate, send, type TurnContext } from "./turn.ts";
 
-/** A writer that answers with the next of `lines`, and remembers every request it was given. */
+/**
+ * A writer that answers with the next of `lines`, and remembers every request it was given, and
+ * the system prompt of each.
+ */
 function scripted(...lines: string[]) {
   const asked: Anthropic.Beta.BetaMessageParam[][] = [];
-  const write: Writer = (_system, messages, settings, onEvent) => {
+  const systems: string[] = [];
+  const write: Writer = (system, messages, settings, onEvent) => {
     asked.push(messages);
+    systems.push(system.map((block) => block.text).join("\n\n"));
     const line = lines.shift();
     if (line === undefined) return Promise.reject(new Error("The API is down"));
     onEvent({ type: "delta", text: line });
@@ -32,7 +39,7 @@ function scripted(...lines: string[]) {
       },
     } satisfies Reply);
   };
-  return { write, asked };
+  return { write, asked, systems };
 }
 
 function setup(write: Writer) {
@@ -55,6 +62,10 @@ function setup(write: Writer) {
   };
   return { db, chats, tree, context, events };
 }
+
+const windowStart = (db: ReturnType<typeof setup>["db"]) =>
+  (db.prepare("SELECT window_start FROM chats WHERE id = 'chat-0001'").get() as { window_start: number | null })
+    .window_start;
 
 /** What a request said, message by message: "role: text". */
 const transcript = (messages: Anthropic.Beta.BetaMessageParam[]) =>
@@ -172,7 +183,7 @@ describe("a long chat", () => {
     const { write, asked } = scripted(...lines);
     const { context } = setup(write);
     let slides = 0;
-    const small = { ...context, window: { tokens: 1_500, chunk: 3 }, onSlide: () => slides++ };
+    const small = { ...context, window: { tokens: 1_500, chunk: 3 }, onSlide: async () => void slides++ };
     await generate(small, null);
     for (let n = 0; n < 12; n++) await send(small, `Message ${n} ${"x".repeat(400)}`);
     expect(slides).toBeGreaterThan(0);
@@ -180,5 +191,107 @@ describe("a long chat", () => {
     expect(last[0]).toMatch(/^user: Message \d+/);
     expect(last.join("\n")).not.toContain("Message 0 ");
     expect(last.at(-1)).toMatch(/^user: Message 11 /);
+  });
+
+  /** A long chat's turns, until `until` says to stop. */
+  async function talk(context: TurnContext, until: () => boolean) {
+    await generate(context, null);
+    for (let n = 0; n < 12 && !until(); n++) await send(context, `Message ${n} ${"x".repeat(400)}`);
+  }
+
+  /** A memory model that files the first of your messages it is given, word for word. */
+  const filing: MemoryRunner = async (request) => {
+    const heard = /\[USER\] (Message \d+)/.exec(request.prompt)?.[1] ?? "nothing";
+    await request.tool.run({
+      command: "insert",
+      path: "/memories/user.md",
+      insert_line: 3,
+      insert_text: `- Remembers ${heard}.`,
+    } as never);
+    return { stopReason: "end_turn", stopDetails: null, attempts: [], text: "Filed." };
+  };
+
+  it("folds what slid out into memory before the turn after the slide is written", async () => {
+    const lines = Array.from({ length: 30 }, (_, n) => `Reply ${n} ${"y".repeat(400)}`);
+    const { write, asked, systems } = scripted(...lines);
+    const { db, context, events } = setup(write);
+    const deps = { db, memory: context.memory, limits: LIMITS, run: filing, maxIterations: 8 };
+    let slidAt = -1;
+    const small: TurnContext = {
+      ...context,
+      window: { tokens: 1_500, chunk: 3 },
+      onSlide: () => {
+        slidAt = asked.length;
+        return consolidate(deps, "chat-0001", context.companion);
+      },
+    };
+    await talk(small, () => slidAt >= 0);
+    expect(slidAt).toBeGreaterThan(0);
+    // The turn that slid was written on memory that already holds the turns that slid out.
+    expect(systems[slidAt]).toContain("- Remembers Message 0.");
+    expect(systems[slidAt - 1]).not.toContain("Remembers");
+    expect(transcript(asked[slidAt]!).join("\n")).not.toContain("Message 0 ");
+    expect(events).toContainEqual({ type: "remembering", about: "this" });
+    expect(windowStart(db)).not.toBeNull();
+  });
+
+  it("still slides, on memory as it stands, when folding it in fails", async () => {
+    const lines = Array.from({ length: 30 }, (_, n) => `Reply ${n} ${"y".repeat(400)}`);
+    const { write, asked, systems } = scripted(...lines);
+    const { db, context } = setup(write);
+    const declined: MemoryRunner = () => Promise.reject(new Error("The API is down"));
+    const deps = { db, memory: context.memory, limits: LIMITS, run: declined, maxIterations: 8 };
+    let slidAt = -1;
+    const small: TurnContext = {
+      ...context,
+      window: { tokens: 1_500, chunk: 3 },
+      onSlide: () => {
+        slidAt = asked.length;
+        return consolidate(deps, "chat-0001", context.companion);
+      },
+    };
+    await talk(small, () => slidAt >= 0);
+    expect(slidAt).toBeGreaterThan(0);
+    expect(asked).toHaveLength(slidAt + 1);
+    expect(systems[slidAt]).toContain("<memory>");
+    expect(transcript(asked[slidAt]!).join("\n")).not.toContain("Message 0 ");
+    expect(windowStart(db)).not.toBeNull();
+  });
+
+  describe("when folding it in takes too long", () => {
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    it("keeps the window where it was, so nothing slides out unfiled, and tries again next turn", async () => {
+      vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] });
+      const lines = Array.from({ length: 30 }, (_, n) => `Reply ${n} ${"y".repeat(400)}`);
+      const { write, asked } = scripted(...lines);
+      const { db, context } = setup(write);
+      let tries = 0;
+      let stuck = true;
+      const small: TurnContext = {
+        ...context,
+        window: { tokens: 1_500, chunk: 3 },
+        onSlide: () => {
+          tries++;
+          return stuck ? new Promise(() => undefined) : Promise.resolve();
+        },
+      };
+      const waited = async (turn: Promise<unknown>) => {
+        await vi.advanceTimersByTimeAsync(SLIDE_WAIT_MS);
+        return turn;
+      };
+      await waited(generate(small, null));
+      for (let n = 0; n < 12; n++) await waited(send(small, `Message ${n} ${"x".repeat(400)}`));
+      expect(tries).toBeGreaterThan(1);
+      expect(windowStart(db)).toBeNull();
+      expect(transcript(asked.at(-1)!).join("\n")).toContain("Message 0 ");
+
+      stuck = false;
+      await send(small, "Message 12");
+      expect(windowStart(db)).not.toBeNull();
+      expect(transcript(asked.at(-1)!).join("\n")).not.toContain("Message 0 ");
+    });
   });
 });

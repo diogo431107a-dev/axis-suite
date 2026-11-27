@@ -97,7 +97,7 @@ A chat is folded into memory:
    minute, and once 5 seconds after it starts, which also picks up whatever was left when it last
    stopped.
 2. **When you press Remember now** in the chat.
-3. **When a long chat's oldest turns slide out** of what is sent (see
+3. **When a long chat's oldest turns slide out** of what is sent. The reply waits for it (see
    [The window](#the-window-long-chats-slide)).
 4. **When you open a new chat with the companion**: every _other_ chat of that companion that has
    something memory doesn't have yet is folded in. The new chat's greeting waits for them (the chat
@@ -318,13 +318,16 @@ exchanges always stay, and where it starts is kept with the chat, so every reque
 slide starts in the same place. A dashed line in the chat marks it. Branching off above that line
 measures the window again from the start.
 
-What slides out is not forgotten: the slide starts a memory run for the chat, so those turns are
-folded into memory.
+What slides out is not forgotten: it is folded into memory first. On the turn that slides, the
+reply waits while the memory model files the chat (the chat says the companion is putting the oldest
+part of this chat into memory first), and only then does the chat take its fresh look at memory. So
+the snapshot it goes on with already holds the turns that just stopped being sent.
 
-**Known gap.** The chat's fresh look happens at the moment of the slide, while that memory run is
-only just starting. So the snapshot the chat goes on with doesn't yet hold the turns that slid out.
-They reach this chat at its next fresh look (the next slide, a mode change, a pin, or a pause longer
-than the cache). Other chats are not affected.
+If that memory run fails (declined, say), the slide goes ahead anyway, on memory as it stands, and
+the run is in the Memory page's history like any other. If it is still going after three minutes
+(behind a rebuild of the companion's memory, say), this reply is written without the slide: the
+window and the snapshot stay as they were, so the oldest turns are still sent, and the next turn
+tries again. The run carries on in the background meanwhile.
 
 ## Pinned moments
 

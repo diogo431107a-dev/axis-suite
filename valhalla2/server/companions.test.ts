@@ -170,19 +170,19 @@ describe("a chat without memory", () => {
   const said = (messages: { content: unknown; hidden: boolean }[]) =>
     messages.filter((message) => !message.hidden).map((message) => JSON.stringify(message.content));
 
-  it("sends the whole chat, after the profile alone, while it fits the window", () => {
+  it("sends the whole chat, after the profile alone, while it fits the window", async () => {
     const { db, path, base } = chatWithout(grok);
-    const { system, messages } = prepare(base, path, undefined, true);
+    const { system, messages } = await prepare(base, path, undefined, true);
     expect(system.map((block) => block.text)).toEqual(["<personality>Hungry.</personality>"]);
     expect(messages.filter((message) => !message.hidden)).toHaveLength(40);
     expect(windowStart(db)).toBeNull();
   });
 
-  it("slides its oldest turns out once over the window, down to slideTo, telling nobody", () => {
+  it("slides its oldest turns out once over the window, down to slideTo, telling nobody", async () => {
     const { db, path, base } = chatWithout(grok);
     let slides = 0;
-    const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 }, onSlide: () => slides++ };
-    const { messages } = prepare(small, path, undefined, true);
+    const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 }, onSlide: async () => void slides++ };
+    const { messages } = await prepare(small, path, undefined, true);
     const sent = path.slice(path.findIndex((message) => message.id === windowStart(db)));
     expect(sent[0]!.role).toBe("user");
     expect(said(messages)).toEqual(sent.map((message) => JSON.stringify(message.content)));
@@ -193,10 +193,10 @@ describe("a chat without memory", () => {
     expect(slides).toBe(0);
   });
 
-  it("starts in the same place on the next turns, until it is over the window again", () => {
+  it("starts in the same place on the next turns, until it is over the window again", async () => {
     const { db, tree, path, base } = chatWithout(grok);
     const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 } };
-    prepare(small, path, undefined, true);
+    await prepare(small, path, undefined, true);
     const first = windowStart(db);
     let parent = path.at(-1)!.id;
     for (let n = 0; n < 4; n++) {
@@ -208,7 +208,7 @@ describe("a chat without memory", () => {
       path.push(message);
       parent = message.id;
     }
-    prepare(small, path, undefined, true);
+    await prepare(small, path, undefined, true);
     expect(windowStart(db)).toBe(first);
     for (let n = 0; n < 30; n++) {
       const message = tree.add({
@@ -219,16 +219,16 @@ describe("a chat without memory", () => {
       path.push(message);
       parent = message.id;
     }
-    prepare(small, path, undefined, true);
+    await prepare(small, path, undefined, true);
     expect(windowStart(db)).not.toBe(first);
   });
 
-  it("keeps nothing when only looked at (Inspect, the token count)", () => {
+  it("keeps nothing when only looked at (Inspect, the token count)", async () => {
     const { db, path, base } = chatWithout(grok);
     const small = { ...base, window: { tokens: 8_000, chunk: 2, slideTo: 4_000 } };
-    const looked = prepare(small, path, undefined, false);
+    const looked = await prepare(small, path, undefined, false);
     expect(windowStart(db)).toBeNull();
-    expect(said(looked.messages)).toEqual(said(prepare(small, path, undefined, true).messages));
+    expect(said(looked.messages)).toEqual(said((await prepare(small, path, undefined, true)).messages));
   });
 
   it("is sized under 200K tokens, or under a smaller model window less the reply", () => {
@@ -237,20 +237,20 @@ describe("a chat without memory", () => {
     expect(windowWithout(128_000, 8_000)).toEqual({ tokens: 96_000, slideTo: 72_000 });
   });
 
-  it("sends the pins after the profile, from the next turn", () => {
+  it("sends the pins after the profile, from the next turn", async () => {
     const { db, chats, path, base, companions } = chatWithout(grok);
     createPins(db, "odin", chats).add("chat-0001", {
       messageId: path[2]!.id,
       speaker: "Grendel",
       text: "The hall is too loud.",
     });
-    const { system } = prepare({ ...base, companion: companions.get("comp-0001") }, path, undefined, false);
+    const { system } = await prepare({ ...base, companion: companions.get("comp-0001") }, path, undefined, false);
     expect(system).toHaveLength(2);
     expect(system[1]!.text).toContain("<pinned_moments>");
     expect(system[1]!.text).toContain('"The hall is too loud."');
     expect(system[1]!.text).not.toContain("<memory>");
     expect(system[1]!.cache_control).toBeDefined();
-    expect(asParams(prepare(base, path, undefined, false).messages)).toHaveLength(41);
+    expect(asParams((await prepare(base, path, undefined, false)).messages)).toHaveLength(41);
   });
 
   it("is never folded into memory, by the scheduler or by anyone", async () => {
