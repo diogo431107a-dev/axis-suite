@@ -4,6 +4,15 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Grok Imagine makes pictures too.** Under **Pictures** on a companion's page, **Made by** chooses
+  CivitAI or Grok Imagine (xAI's image model) for any companion, Claude or Grok. It runs on the xAI
+  key the server already has. Its prompts are plain sentences in an anime illustration style,
+  written from their own **Picture instructions (Grok Imagine)**, and it has its own settings,
+  **Quality** and **Size** (auto and 1k to start). It has no seed and no negative prompt, so the
+  picture dialog hides them. A picture costs about 4¢, shown under it in the gallery. Every
+  companion stays on CivitAI until you choose otherwise, and its pictures are made exactly as
+  before.
+
 ## 0.0.56 — 2026-11-28
 
 - **Grok's voices for reading aloud.** Under **Voice** on a companion's page, Grok's voices (Eve,

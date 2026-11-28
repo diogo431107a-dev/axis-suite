@@ -384,6 +384,11 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE speech_usage_by_engine RENAME TO speech_usage;
     `);
   },
+  // v16: what each picture cost, when its engine says (Grok Imagine does, in dollars; CivitAI's Buzz
+  // isn't counted).
+  (db) => {
+    db.exec("ALTER TABLE pictures ADD COLUMN cost REAL");
+  },
 ];
 
 /**

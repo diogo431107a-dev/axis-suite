@@ -49,6 +49,8 @@ export const config = {
     model: modelFrom("PICTURE_MODEL", "urn:air:sdxl:checkpoint:civitai:827184@2883731"),
     /** The Claude model that writes a picture's prompt. */
     promptModel: modelFrom("PICTURE_PROMPT_MODEL", "claude-sonnet-5-5"),
+    /** The xAI image model a companion on Grok Imagine makes its pictures with. */
+    grokModel: modelFrom("GROK_PICTURE_MODEL", "grok-imagine-image-2.0"),
   },
   scene: {
     /** About how many tokens of the chat, up to the moment, the scene model reads to understand it. */

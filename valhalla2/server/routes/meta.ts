@@ -16,6 +16,7 @@ export function metaRoutes(s: Services): Router {
       apiKey: hasApiKey(),
       grok: hasGrokKey(),
       pictures: s.painter !== null,
+      pictureEngines: s.painter?.available ?? [],
       speech: s.speech !== null,
       voice: s.speech?.voice ?? null,
       defaults: config.defaults,

@@ -1,11 +1,12 @@
-// What makes a picture: CivitAI today, and later Grok's or OpenAI's image models.
+// What makes a picture: CivitAI or Grok Imagine (xAI's image model), and later OpenAI's.
 //
-// The painter (painter.ts) asks for a picture, keeps the engine's id for the job so a picture the
-// server stopped in the middle of can be picked up again, waits, and downloads it. An engine only
-// does those three things, each its own way. What differs most between engines is the prompt:
+// The painter (painter.ts) asks for a picture and keeps it. An engine either answers with a job to
+// wait for (CivitAI: its id is kept so a picture the server stopped in the middle of can be picked
+// up again, then the painter waits and downloads it), or with the picture itself (Grok Imagine,
+// which makes it within the one request). What differs most between engines is the prompt:
 // CivitAI's SDXL checkpoints read Danbooru tags (the "picture" instructions in shared/prompts.ts),
-// Grok's and OpenAI's image models read plain sentences, which will have instructions of their own.
-import type { PictureParams } from "../../shared/protocol.ts";
+// Grok Imagine reads plain sentences (the "grokPicture" instructions).
+import type { PictureEngineId, PictureParams } from "../../shared/protocol.ts";
 
 /** How an engine's prompts are written: Danbooru tags, or plain sentences. */
 export type PromptStyle = "tags" | "natural";
@@ -22,12 +23,20 @@ export interface EngineJob {
   id: string;
 }
 
+/** A finished picture's bytes, and what it cost when the engine says (in dollars). */
+export interface MadeImage {
+  bytes: Uint8Array;
+  type: string;
+  ext: string;
+  cost: number | null;
+}
+
 export interface PictureEngine {
   /** Kept with each picture, so one asked of another engine is never looked for here. */
-  readonly id: string;
+  readonly id: PictureEngineId;
   readonly promptStyle: PromptStyle;
-  /** Asks for a picture. The job may already be done when it answers. */
-  submit(order: PictureOrder): Promise<EngineJob>;
+  /** Asks for a picture: a job to wait for, or the picture itself. A job may already be done. */
+  submit(order: PictureOrder): Promise<{ job: EngineJob } | { image: MadeImage }>;
   /** Waits for a job (or the job with this id) to finish, and returns its image's address. */
   finish(job: EngineJob | string): Promise<string>;
   /** Downloads a finished image, refusing anything that isn't one. */

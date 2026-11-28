@@ -571,6 +571,9 @@ describe("Picture settings", () => {
     refused({ pictureSampler: "dpm++3m" });
     refused({ pictureClipSkip: 4 });
     refused({ pictureSeed: 10_000_000_000 });
+    refused({ pictureEngine: "dall-e" });
+    refused({ grokPictureQuality: "high" });
+    refused({ grokPictureResolution: "4k" });
 
     const before = companions.get("comp-0001");
     companions.setPictureSeed("comp-0001", 1_234_567_890);
@@ -580,6 +583,26 @@ describe("Picture settings", () => {
     // Another person's companion is left alone.
     createCompanions(db, "freya", DEFAULT_SETTINGS).setPictureSeed("comp-0001", 1);
     expect(companions.get("comp-0001").settings.pictureSeed).toBe(1_234_567_890);
+  });
+
+  it("choose CivitAI, auto quality and 1k to start, and can move to Grok Imagine", () => {
+    const { companions } = setup();
+    expect(companions.save("comp-0001", { name: "Freya" }).settings).toMatchObject({
+      pictureEngine: "civitai",
+      grokPictureQuality: "auto",
+      grokPictureResolution: "1k",
+    });
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      pictureEngine: "grok",
+      grokPictureQuality: "medium",
+      grokPictureResolution: "2k",
+    };
+    expect(companions.save("comp-0001", { name: "Freya", settings }).settings).toMatchObject({
+      pictureEngine: "grok",
+      grokPictureQuality: "medium",
+      grokPictureResolution: "2k",
+    });
   });
 
   it("are filled in for a companion saved before they existed", () => {
@@ -594,6 +617,12 @@ describe("Picture settings", () => {
       ...old
     } = companions.get("comp-0001").settings;
     db.prepare("UPDATE companions SET settings = ? WHERE id = ?").run(JSON.stringify(old), "comp-0001");
-    expect(companions.get("comp-0001").settings).toMatchObject({ pictureSteps: 20, pictureSeed: null });
+    expect(companions.get("comp-0001").settings).toMatchObject({
+      pictureSteps: 20,
+      pictureSeed: null,
+      pictureEngine: "civitai",
+      grokPictureQuality: "auto",
+      grokPictureResolution: "1k",
+    });
   });
 });

@@ -1,5 +1,5 @@
 // The models, what they cost, and the settings a companion sends with a request.
-import type { Sampler } from "./pictures.ts";
+import type { GrokQuality, GrokResolution, PictureEngineId, Sampler } from "./pictures.ts";
 
 /**
  * How much effort the model puts into a reply. This replaces the temperature slider other
@@ -108,6 +108,9 @@ export const DEFAULT_SETTINGS: Settings = {
   pictureSampler: "euler_a",
   pictureClipSkip: 2,
   pictureSeed: null,
+  pictureEngine: "civitai",
+  grokPictureQuality: "auto",
+  grokPictureResolution: "1k",
 };
 
 /** The tag and scene settings a Grok companion starts with: its own chat model, at low effort. */
@@ -166,4 +169,11 @@ export interface Settings {
    * picture, which rolls one; whatever seed a picture is made with becomes this.
    */
   pictureSeed: number | null;
+  /**
+   * What makes its pictures. One the server has no key for gives way to the other (pictureEngineOf).
+   */
+  pictureEngine: PictureEngineId;
+  /** Grok Imagine's quality and size for its pictures. */
+  grokPictureQuality: GrokQuality;
+  grokPictureResolution: GrokResolution;
 }

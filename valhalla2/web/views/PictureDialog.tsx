@@ -1,5 +1,5 @@
 // Asking for a picture: the companion's own API (Claude or Grok) writes the prompt, you look it over
-// and change what you like, and only then does CivitAI make it. With scenes (a companion with
+// and change what you like, and only then does its picture engine (CivitAI or Grok Imagine) make it. With scenes (a companion with
 // memory), a chat picture is drawn from the moment as its scene model worked it out, which you can
 // correct before writing the prompt again; without, from the message itself.
 import { useCallback, useEffect, useState } from "react";
@@ -8,6 +8,8 @@ import {
   hasScenes,
   LIMITS,
   ORIENTATIONS,
+  PICTURE_ENGINE_LABELS,
+  pictureEngineOf,
   type Companion,
   type Orientation,
   type Picture,
@@ -17,6 +19,7 @@ import {
 } from "../../shared/protocol.ts";
 import { api, describeError } from "../api.ts";
 import { SeedInput } from "../forms/PictureSettings.tsx";
+import { grokPriceNote } from "../ui/pictureEngine.ts";
 import { rollSeed } from "../ui/seed.ts";
 import { usePage } from "../page.ts";
 import { Button, Dialog, Field, inputStyle, Notice } from "../ui/bits.tsx";
@@ -48,7 +51,11 @@ export function PictureDialog({
   onClose: () => void;
   onMade: (picture: Picture) => void;
 }) {
-  const { reload } = usePage();
+  const { reload, health } = usePage();
+  /** What makes this picture: the companion's engine, or the one the server has. */
+  const engine = pictureEngineOf(companion.settings.pictureEngine, health.pictureEngines) ?? "civitai";
+  const engineName = PICTURE_ENGINE_LABELS[engine];
+  const grok = engine === "grok";
   const [draft, setDraft] = useState<PictureDraft | null>(start ?? null);
   /** The seed this picture is made with: the companion's, or a fresh roll. It becomes the companion's. */
   const [seed, setSeed] = useState<number | null>(() => companion.settings.pictureSeed ?? rollSeed());
@@ -102,7 +109,7 @@ export function PictureDialog({
     try {
       const picture = await api<Picture>(base, {
         method: "POST",
-        body: { kind, chatId, messageId, ...draft, ...(seed === null ? {} : { seed }) },
+        body: { kind, chatId, messageId, ...draft, ...(seed === null || grok ? {} : { seed }) },
       });
       onMade(picture);
       onClose();
@@ -132,7 +139,7 @@ export function PictureDialog({
 
         {draft ? (
           <>
-            <Field label="Prompt" hint="What CivitAI draws. Change anything before you make it.">
+            <Field label="Prompt" hint={`What ${engineName} draws. Change anything before you make it.`}>
               <textarea
                 className={`${inputStyle} min-h-32 resize-y font-mono text-xs leading-relaxed`}
                 value={draft.prompt}
@@ -141,15 +148,17 @@ export function PictureDialog({
                 onChange={(e) => change({ prompt: e.target.value })}
               />
             </Field>
-            <Field label="Leave out" hint="The negative prompt: what the picture should not have.">
-              <textarea
-                className={`${inputStyle} min-h-14 resize-y font-mono text-xs leading-relaxed`}
-                value={draft.negativePrompt}
-                maxLength={LIMITS.picturePrompt}
-                disabled={writing}
-                onChange={(e) => change({ negativePrompt: e.target.value })}
-              />
-            </Field>
+            {grok ? null : (
+              <Field label="Leave out" hint="The negative prompt: what the picture should not have.">
+                <textarea
+                  className={`${inputStyle} min-h-14 resize-y font-mono text-xs leading-relaxed`}
+                  value={draft.negativePrompt}
+                  maxLength={LIMITS.picturePrompt}
+                  disabled={writing}
+                  onChange={(e) => change({ negativePrompt: e.target.value })}
+                />
+              </Field>
+            )}
             <div className="flex flex-wrap items-end gap-4">
               <fieldset className="flex gap-3 text-sm">
                 <legend className="mb-1 text-sm font-medium">Shape</legend>
@@ -165,10 +174,12 @@ export function PictureDialog({
                   </label>
                 ))}
               </fieldset>
-              <label className="w-56">
-                <span className="mb-1 block text-sm font-medium">Seed</span>
-                <SeedInput value={seed} onChange={setSeed} placeholder="A new one" disabled={writing} />
-              </label>
+              {grok ? null : (
+                <label className="w-56">
+                  <span className="mb-1 block text-sm font-medium">Seed</span>
+                  <SeedInput value={seed} onChange={setSeed} placeholder="A new one" disabled={writing} />
+                </label>
+              )}
               <label className="min-w-48 flex-1">
                 <span className="mb-1 block text-sm font-medium">Caption</span>
                 <input
@@ -252,12 +263,16 @@ export function PictureDialog({
             disabled={!draft || !draft.prompt.trim() || writing || making}
             onClick={() => void make()}
           >
-            <ImagePlus size={15} /> {making ? "Asking CivitAI…" : "Make the picture"}
+            <ImagePlus size={15} /> {making ? `Asking ${engineName}…` : "Make the picture"}
           </Button>
           <Button kind="quiet" onClick={onClose}>
             Cancel
           </Button>
-          <span className="text-xs text-faint">CivitAI charges Buzz for each picture.</span>
+          <span className="text-xs text-faint">
+            {grok
+              ? `xAI charges ${grokPriceNote()} for each picture, even one it refuses.`
+              : "CivitAI charges Buzz for each picture."}
+          </span>
         </div>
       </div>
     </Dialog>

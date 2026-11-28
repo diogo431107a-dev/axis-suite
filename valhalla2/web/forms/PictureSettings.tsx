@@ -1,8 +1,22 @@
-// How CivitAI makes this companion's pictures: steps, CFG, sampler, clip skip, and the seed the next
-// picture starts from. Shown when the server can make pictures.
+// What makes this companion's pictures, and how: on CivitAI, steps, CFG, sampler, clip skip, and the
+// seed the next picture starts from; on Grok Imagine, the quality and the size. Shown when the
+// server can make pictures; the engine can be chosen when it has keys for both.
 import { Dices } from "lucide-react";
-import { LIMITS, SAMPLERS, type Sampler, type Settings } from "../../shared/protocol.ts";
+import {
+  GROK_QUALITIES,
+  GROK_RESOLUTIONS,
+  LIMITS,
+  PICTURE_ENGINE_LABELS,
+  pictureEngineOf,
+  SAMPLERS,
+  type GrokQuality,
+  type GrokResolution,
+  type PictureEngineId,
+  type Sampler,
+  type Settings,
+} from "../../shared/protocol.ts";
 import { Field, inputStyle } from "../ui/bits.tsx";
+import { grokPriceNote } from "../ui/pictureEngine.ts";
 import { rollSeed, seedFrom } from "../ui/seed.ts";
 
 /** The seed field with its dice, for here and for the picture dialog. */
@@ -41,16 +55,85 @@ export function SeedInput({
   );
 }
 
+const QUALITY_LABELS: Readonly<Record<GrokQuality, string>> = {
+  auto: "Auto (xAI's choice: low for a new picture)",
+  low: "Low",
+  medium: "Medium",
+};
+
 export function PictureSettings({
   settings,
   onChange,
+  available,
 }: {
   settings: Settings;
   onChange: (settings: Settings) => void;
+  /** The engines the server has keys for. */
+  available: readonly PictureEngineId[];
 }) {
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
+  const engine = pictureEngineOf(settings.pictureEngine, available) ?? settings.pictureEngine;
+  const choice =
+    available.length > 1 ? (
+      <Field
+        label="Made by"
+        hint="CivitAI draws from Danbooru tags on an anime SDXL checkpoint; Grok Imagine (xAI) draws from plain sentences. Each has its own picture instructions."
+      >
+        <select
+          className={inputStyle}
+          value={engine}
+          onChange={(e) => set("pictureEngine", e.target.value as PictureEngineId)}
+        >
+          {available.map((id) => (
+            <option key={id} value={id}>
+              {PICTURE_ENGINE_LABELS[id]}
+            </option>
+          ))}
+        </select>
+      </Field>
+    ) : null;
+
+  if (engine === "grok") {
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {choice}
+        <Field label="Quality" hint="Medium has finer detail; xAI bills a picture at the quality it is made at.">
+          <select
+            className={inputStyle}
+            value={settings.grokPictureQuality}
+            onChange={(e) => set("grokPictureQuality", e.target.value as GrokQuality)}
+          >
+            {GROK_QUALITIES.map((quality) => (
+              <option key={quality} value={quality}>
+                {QUALITY_LABELS[quality]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <Field label="Size" hint="About 1,000 or 2,000 pixels on the long side. 2k is sharper, larger and slower.">
+          <select
+            className={inputStyle}
+            value={settings.grokPictureResolution}
+            onChange={(e) => set("grokPictureResolution", e.target.value as GrokResolution)}
+          >
+            {GROK_RESOLUTIONS.map((resolution) => (
+              <option key={resolution} value={resolution}>
+                {resolution}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <p className="text-sm text-faint sm:col-span-2">
+          Each picture costs {grokPriceNote()} on the server&apos;s xAI account. Grok Imagine has no seed: every picture
+          is drawn afresh, so the profile&apos;s description is what keeps the companion looking alike.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
+      {choice}
       <Field
         label="Steps"
         hint={`${LIMITS.pictureStepsMin}–${LIMITS.pictureStepsMax}. More is finer, slower and costs more Buzz.`}

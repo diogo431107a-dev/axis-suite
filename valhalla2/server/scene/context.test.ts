@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type Companion, type Message } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS } from "../../shared/prompts.ts";
 import { draftOf } from "../pictures/draft.ts";
-import { backgroundOf, renderSheet, sceneRequest } from "./context.ts";
+import { backgroundOf, plainPictureRequest, renderSheet, sceneRequest } from "./context.ts";
 
 const companion: Companion = {
   id: "comp-0001",
@@ -68,6 +68,19 @@ describe("what Claude is given to write a picture's prompt", () => {
   it("uses the companion's own picture instructions when it has them", () => {
     const own = { ...companion, prompts: { picture: "Photographs only." } };
     expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000).system).toBe("Photographs only.");
+  });
+
+  it("uses the Grok Imagine instructions, in sentences, for an engine that reads them", () => {
+    const natural = sceneRequest(companion, { kind: "profile" }, "", nothing, 1000, undefined, "natural");
+    expect(natural.system).toBe(DEFAULT_PROMPTS.grokPicture);
+    expect(natural.system).toContain("anime illustration");
+    expect(plainPictureRequest(companion, { kind: "profile" }, "", "natural").system).toBe(DEFAULT_PROMPTS.grokPicture);
+    expect(plainPictureRequest(companion, { kind: "profile" }, "").system).toBe(DEFAULT_PROMPTS.picture);
+    const own = { ...companion, prompts: { grokPicture: "Watercolour only." } };
+    expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000, undefined, "natural").system).toBe(
+      "Watercolour only.",
+    );
+    expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000).system).toBe(DEFAULT_PROMPTS.picture);
   });
 
   it("always has the moment, even past the budget", () => {
