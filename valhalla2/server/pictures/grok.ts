@@ -131,9 +131,10 @@ export function grokImagineEngine(grok: GrokImagine): PictureEngine {
   };
   return {
     id: "grok",
-    promptStyle: "natural",
+    promptKey: "grokPicture",
+    takesNegative: false,
     async submit({ prompt, params }) {
-      if (!isGrokParams(params)) throw new GrokImagineError("This picture is for CivitAI, not Grok Imagine");
+      if (!isGrokParams(params)) throw new GrokImagineError("This picture is for another engine, not Grok Imagine");
       const { model, aspectRatio, resolution, quality } = params;
       return { image: await grok.generate({ model, prompt, aspectRatio, resolution, quality }) };
     },

@@ -8,7 +8,7 @@ import { tokensOf } from "../memory/history.ts";
 import { renderPins } from "../memory/inject.ts";
 import { renderFiles } from "../memory/render.ts";
 import type { MemoryFile } from "../memory/store.ts";
-import type { PromptStyle } from "../pictures/engine.ts";
+import type { PicturePrompt } from "../pictures/engine.ts";
 
 export interface SceneRequest {
   system: string;
@@ -97,7 +97,7 @@ export function plainPictureRequest(
   companion: Companion,
   scene: Scene,
   hint: string,
-  style: PromptStyle = "tags",
+  instructions: PicturePrompt = "picture",
 ): SceneRequest {
   const parts = [`<profile name="${quote(companion.name)}">\n${companion.profile.trim()}\n</profile>`];
   if (scene.kind === "profile") {
@@ -113,12 +113,12 @@ export function plainPictureRequest(
     );
   }
   if (hint.trim()) parts.push(`The user's note for this picture: ${hint.trim()}`);
-  return { system: pictureInstructions(companion, style), prompt: parts.join("\n\n") };
+  return { system: pictureInstructions(companion, instructions), prompt: parts.join("\n\n") };
 }
 
-/** The instructions for a picture's prompt, for the way its engine reads one: tags or sentences. */
-export const pictureInstructions = (companion: Pick<Companion, "prompts">, style: PromptStyle): string =>
-  promptOf(companion, style === "natural" ? "grokPicture" : "picture");
+/** The instructions for a picture's prompt, the ones its engine reads (PictureEngine.promptKey). */
+export const pictureInstructions = (companion: Pick<Companion, "prompts">, instructions: PicturePrompt): string =>
+  promptOf(companion, instructions);
 
 /**
  * The request for one picture's prompt. `background` is backgroundOf(); `budget` how many tokens
@@ -132,7 +132,7 @@ export function sceneRequest(
   background: string,
   budget: number,
   sheet?: SceneSheet,
-  style: PromptStyle = "tags",
+  instructions: PicturePrompt = "picture",
 ): SceneRequest {
   const parts = [background];
 
@@ -156,5 +156,5 @@ export function sceneRequest(
   }
 
   if (hint.trim()) parts.push(`The user's note for this picture: ${hint.trim()}`);
-  return { system: pictureInstructions(companion, style), prompt: parts.join("\n\n") };
+  return { system: pictureInstructions(companion, instructions), prompt: parts.join("\n\n") };
 }

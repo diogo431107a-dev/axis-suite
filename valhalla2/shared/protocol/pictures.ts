@@ -9,14 +9,15 @@ export const ORIENTATIONS = ["portrait", "landscape", "square"] as const;
 export type Orientation = (typeof ORIENTATIONS)[number];
 
 /**
- * What makes the pictures: CivitAI (an SDXL checkpoint, read in Danbooru tags) or Grok Imagine
- * (xAI's image model, read in plain sentences). Each companion chooses one.
+ * What makes the pictures: CivitAI (an SDXL checkpoint, read in Danbooru tags), Grok Imagine (xAI's
+ * image model) or OpenAI's image model, both read in plain sentences. Each companion chooses one.
  */
-export const PICTURE_ENGINES = ["civitai", "grok"] as const;
+export const PICTURE_ENGINES = ["civitai", "grok", "openai"] as const;
 export type PictureEngineId = (typeof PICTURE_ENGINES)[number];
 export const PICTURE_ENGINE_LABELS: Readonly<Record<PictureEngineId, string>> = {
   civitai: "CivitAI",
   grok: "Grok Imagine",
+  openai: "OpenAI",
 };
 
 /** The shape Grok Imagine is asked for, one per orientation: close to SDXL's sizes below. */
@@ -38,6 +39,26 @@ export type GrokResolution = (typeof GROK_RESOLUTIONS)[number];
 export const GROK_PICTURE_PRICES: Readonly<Record<string, number>> = {
   "grok-imagine-image-2.0": 0.04,
   "grok-imagine-image": 0.02,
+};
+
+/** The size OpenAI's image model is asked for, one per orientation: the three it makes. */
+export const OPENAI_SIZES: Readonly<Record<Orientation, string>> = {
+  portrait: "1024x1536",
+  landscape: "1536x1024",
+  square: "1024x1024",
+};
+
+/** OpenAI's quality: dearer and finer from low to high; auto is OpenAI's own choice. */
+export const OPENAI_QUALITIES = ["low", "medium", "high", "auto"] as const;
+export type OpenAiQuality = (typeof OPENAI_QUALITIES)[number];
+
+/**
+ * What OpenAI charges for its image model, in dollars per million tokens, as published on
+ * 2026-11-28. It bills a picture by tokens: the prompt's text in, the picture out.
+ */
+export const OPENAI_PICTURE_PRICES: Readonly<Record<string, { text: number; image: number; output: number }>> = {
+  "gpt-image-2.6-flare": { text: 5, image: 8, output: 30 },
+  "gpt-image-2.6-sunburst": { text: 5, image: 8, output: 30 },
 };
 
 /** The sizes SDXL was trained on, one per orientation. */
@@ -113,11 +134,27 @@ export interface GrokPictureParams {
   quality: GrokQuality;
 }
 
+/** What an OpenAI picture is made from, besides its prompt. It has no seed. */
+export interface OpenAiPictureParams {
+  engine: "openai";
+  model: string;
+  /** As OpenAI spells it: 1024x1536, 1536x1024, 1024x1024. */
+  size: string;
+  quality: OpenAiQuality;
+}
+
 /** What a picture is made from, besides its prompt: tell them apart by `engine`. */
-export type PictureParams = CivitaiParams | GrokPictureParams;
+export type PictureParams = CivitaiParams | GrokPictureParams | OpenAiPictureParams;
 
 /** Whether a picture's parameters are Grok Imagine's. */
 export const isGrokParams = (params: PictureParams): params is GrokPictureParams => params.engine === "grok";
+
+/** Whether a picture's parameters are OpenAI's. */
+export const isOpenAiParams = (params: PictureParams): params is OpenAiPictureParams => params.engine === "openai";
+
+/** Whether a picture's parameters are CivitAI's: those made before there were engines have none. */
+export const isCivitaiParams = (params: PictureParams): params is CivitaiParams =>
+  params.engine === undefined || params.engine === "civitai";
 
 /** A picture of a companion, made or being made. Its file is GET /api/pictures/:id/file. */
 export interface Picture extends PictureDraft {

@@ -159,7 +159,11 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
   // Each engine's picture instructions show only when the server has that engine.
-  const engineOnly: Partial<Record<PromptKey, PictureEngineId>> = { picture: "civitai", grokPicture: "grok" };
+  const engineOnly: Partial<Record<PromptKey, PictureEngineId>> = {
+    picture: "civitai",
+    grokPicture: "grok",
+    openaiPicture: "openai",
+  };
   const shownPrompts = PROMPT_KEYS.filter((key) => memory || !MEMORY_ONLY.includes(key)).filter((key) => {
     const engine = engineOnly[key];
     return !engine || health.pictureEngines.length === 0 || health.pictureEngines.includes(engine);

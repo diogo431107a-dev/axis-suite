@@ -45,8 +45,9 @@ A Claude companion's scene is read by Claude, a Grok companion's by Grok, a GPT 
 
 ## Pictures
 
-A picture of the moment, or of the companion, made by **CivitAI** or by **Grok Imagine** (xAI's image
-model), whichever the companion chose (see [Two engines](#two-engines) below). Under any message, the
+A picture of the moment, or of the companion, made by **CivitAI**, by **Grok Imagine** (xAI's image
+model) or by **OpenAI**'s image model, whichever the companion chose (see
+[Three engines](#three-engines) below). Under any message, the
 picture button works out the scene (above), or uses the one kept, and asks for a prompt for the
 image model from it (on Claude, `PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok or GPT, the
 companion's own model). For CivitAI it is the fewest Danbooru
@@ -80,12 +81,12 @@ made with becomes the companion's, so the next picture starts from it too, and p
 moment stay alike. The companion's seed can also be typed, or cleared, under **Pictures**; an empty
 one is rolled at the next picture. A seed Valhalla 2 rolls has ten digits.
 
-### Two engines
+### Three engines
 
-Under **Pictures** on a companion's page, **Made by** chooses CivitAI or Grok Imagine, for any
-companion, Claude or Grok alike. It is offered when the server has both keys; a server with only
-one makes every picture with that one, whatever the companion chose. Every companion starts on
-CivitAI.
+Under **Pictures** on a companion's page, **Made by** chooses CivitAI, Grok Imagine or OpenAI, for
+any companion, Claude, Grok or GPT alike. It offers the engines the server has keys for; a server
+with only one makes every picture with that one, and a companion whose engine the server has no key
+for gets the first it has. Every companion starts on CivitAI.
 
 - **CivitAI** draws on an anime SDXL checkpoint from Danbooru tags, with the steps, CFG, sampler,
   clip skip and seed above, and charges Buzz.
@@ -100,11 +101,21 @@ CivitAI.
   seconds. A picture costs about 4¢ on the server's xAI account, and its cost is shown with it.
   xAI checks every prompt against its own rules and may refuse one; the picture then says why, and
   xAI may still charge for it.
+- **OpenAI** (`OPENAI_PICTURE_MODEL`, `gpt-image-2.6-flare`) draws from plain sentences, on the
+  same OpenAI key GPT companions answer with. Its prompt is written from its own instructions,
+  **Picture instructions (OpenAI)**, which start as Grok Imagine's do: the anime illustration
+  opener and the same rules. Like Grok Imagine it has no negative prompt and no seed. Its one
+  setting is **Quality** (low, medium, high, or auto, OpenAI's own choice), medium to start; the
+  size follows the shape: 1024×1536, 1536×1024 or 1024×1024. It answers within the one request.
+  OpenAI bills a picture by the tokens it takes, not a fixed price: about 1¢ at low, 5¢ at medium
+  and 20¢ at high, and the exact cost, worked out from what OpenAI reports, is shown under each
+  picture. It is asked with OpenAI's least restrictive filtering (`moderation: "low"`), but OpenAI
+  still checks every prompt and may refuse one; the picture then says so.
 
-The shape Claude or Grok chose becomes Grok Imagine's 2:3 (portrait), 3:2 (landscape) or 1:1
-(square). Making a picture again uses the companion's engine as it is now. Each picture remembers
-which engine made it, and a picture Grok Imagine was making when the server stopped is marked as
-not made, since there is nothing to pick up.
+The shape the model chose becomes Grok Imagine's 2:3 (portrait), 3:2 (landscape) or 1:1 (square),
+or OpenAI's size for it. Making a picture again uses the companion's engine as it is now. Each
+picture remembers which engine made it, and a picture Grok Imagine or OpenAI was making when the
+server stopped is marked as not made, since there is nothing to pick up.
 
 Each companion's **Pictures** page, from its own page, has two shelves: **Profile pictures**, made
 there from the profile alone, and **Chat pictures**, each naming the chat it came from. Any picture

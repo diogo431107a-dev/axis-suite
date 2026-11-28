@@ -6,6 +6,7 @@ import {
   EFFORTS,
   GROK_QUALITIES,
   GROK_RESOLUTIONS,
+  OPENAI_QUALITIES,
   LIMITS,
   PICTURE_ENGINES,
   PROMPT_KEYS,
@@ -15,6 +16,7 @@ import {
   type Sampler,
   type CacheTtl,
   type GrokQuality,
+  type OpenAiQuality,
   type GrokResolution,
   type PictureEngineId,
   type Provider,
@@ -211,6 +213,11 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
       body.grokPictureResolution ?? defaults.grokPictureResolution,
       GROK_RESOLUTIONS,
       "The picture size",
+    ),
+    openaiPictureQuality: oneOf<OpenAiQuality>(
+      body.openaiPictureQuality ?? defaults.openaiPictureQuality,
+      OPENAI_QUALITIES,
+      "The picture quality",
     ),
   };
 }
