@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AUDIO_FORMAT, createAzureSpeech, SpeechError } from "./azure.ts";
+import { AUDIO_FORMAT, createAzureSpeech } from "./azure.ts";
+import { SpeechError } from "./engine.ts";
 
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 4, 0, 0]);
 
@@ -84,6 +85,7 @@ describe("Azure's voices", () => {
     expect(voices).toEqual([
       {
         id: "en-US-AvaMultilingualNeural",
+        engine: "azure",
         name: "Ava Multilingual",
         locale: "en-US",
         language: "English (United States)",
@@ -93,6 +95,7 @@ describe("Azure's voices", () => {
       },
       {
         id: "pt-BR-FranciscaNeural",
+        engine: "azure",
         name: "Francisca",
         locale: "pt-BR",
         language: "Portuguese (Brazil)",

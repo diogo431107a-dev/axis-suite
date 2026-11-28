@@ -1,11 +1,13 @@
 // Replies read aloud. Asking (POST) reads the reply if it isn't kept yet and says where the audio
 // is; the page then plays that file (GET), which an <audio> element can fetch by itself. A reply is
-// read in its companion's voice, or the server's when it names none, and with the feeling of each
-// line as its tags say (worked out the first time), unless the companion reads plainly; at the
-// companion's speed, pitch and speaking style either way. The voices to choose from, and a short
-// sample of one, are here too.
+// read in its companion's voice, or the server's when it names none, by that voice's engine (Azure
+// or Grok), and with the feeling of each line as its tags say (worked out the first time, with
+// sounds for a Grok voice), unless the companion reads plainly; at the companion's speed, pitch and
+// speaking style either way, as far as the engine reads them. The voices to choose from, and a
+// short sample of one, are here too.
 import { Router, type Request, type Response } from "express";
 import {
+  engineOfVoice,
   FEELINGS,
   LIMITS,
   type ApiError,
@@ -27,12 +29,11 @@ import {
 import { invalid, StoreError } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import type { Services } from "../services.ts";
-import { SpeechError } from "../speech/azure.ts";
-import { AUDIO_TYPES } from "../speech/engine.ts";
+import { AUDIO_TYPES, SpeechError } from "../speech/engine.ts";
 import { charsThisMonth, ownsSpeech } from "../speech/store.ts";
 import { toneRequest } from "../tone/request.ts";
 
-/** Azure's own failures as refusals the page shows, word for word. */
+/** A voice engine's own failures as refusals the page shows, word for word. */
 async function asked<T>(work: () => Promise<T>): Promise<T> {
   try {
     return await work();
@@ -46,22 +47,23 @@ export function speechRoutes(s: Services): Router {
   const routes = Router();
 
   /**
-   * How each line of the reply at the end of `path` is said: its tags, worked out the first time.
-   * When they can't be (the model is unreachable, say), the reply is read plainly rather than not
-   * at all.
+   * How each line of the reply at the end of `path` is said in `voice`: its tags, worked out the
+   * first time, with sounds for a Grok voice. When they can't be (the model is unreachable, say),
+   * the reply is read plainly rather than not at all.
    */
-  async function feelingOf(companion: Companion, path: readonly Message[]) {
+  async function feelingOf(companion: Companion, path: readonly Message[], voice: string) {
     const at = path.at(-1)!;
     try {
-      return (await s.tones.of(at.id, toneRequest(companion, path))).lines;
+      return (await s.tones.of(at.id, toneRequest(companion, path, engineOfVoice(voice) === "grok"))).lines;
     } catch (err) {
       console.warn(`Reading message ${at.id} plainly: its tags couldn't be read:`, (err as Error).message);
       return null;
     }
   }
 
-  /** Azure Speech, or a refusal when the server has no key for it. */
-  const needSpeech = () => s.speech ?? invalid("This Valhalla 2 has no Azure Speech key, so it can't read aloud");
+  /** Reading aloud, or a refusal when the server has no key for any voice. */
+  const needSpeech = () =>
+    s.speech ?? invalid("This Valhalla 2 has neither an Azure Speech key nor an xAI key, so it can't read aloud");
 
   routes.post("/chats/:id/messages/:messageId/speech", async (req: Request, res: Response) => {
     const read = needSpeech();
@@ -71,9 +73,10 @@ export function speechRoutes(s: Services): Router {
     const tree = my.chats.tree(id);
     const message = tree.get(messageId(req.params.messageId));
     const companion = my.companions.get(chat.companionId);
-    const lines = companion.voiceFeeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
-    const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines, companion.voiceTuning));
-    res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(s.db) } satisfies SpeechReply);
+    const voice = companion.voice ?? read.voice;
+    const lines = companion.voiceFeeling ? await feelingOf(companion, tree.pathTo(message.id), voice) : null;
+    const { file, engine } = await asked(() => read.of(message, voice, lines, companion.voiceTuning));
+    res.json({ url: `/api/speech/${file}`, engine, monthChars: charsThisMonth(s.db, engine) } satisfies SpeechReply);
   });
 
   // The audio itself, from disk, to its owner only. It never changes: other words are another file.
@@ -85,7 +88,7 @@ export function speechRoutes(s: Services): Router {
     sendStored(res, s.speechFiles.path(file), "No such audio", AUDIO_TYPES[file.split(".").pop() ?? ""]);
   });
 
-  /** The voices a companion can be read aloud in. */
+  /** The voices a companion can be read aloud in, from every engine the server has a key for. */
   routes.get("/voices", async (_req: Request, res: Response) => {
     const read = needSpeech();
     res.json({ voices: await asked(() => read.voices()), default: read.voice } satisfies VoiceList);
@@ -105,8 +108,8 @@ export function speechRoutes(s: Services): Router {
         ? null
         : oneOf<Feeling>(body.feeling, FEELINGS, "The feeling");
     const tuning = checkTuning(body.tuning);
-    const audio = await asked(() => read.sample(voice, text, feeling, tuning));
-    res.type(read.format.type).send(Buffer.from(audio));
+    const { audio, type } = await asked(() => read.sample(voice, text, feeling, tuning));
+    res.type(type).send(Buffer.from(audio));
   });
 
   return routes;

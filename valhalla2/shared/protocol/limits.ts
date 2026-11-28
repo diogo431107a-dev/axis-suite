@@ -56,13 +56,16 @@ export const LIMITS = {
   /** One field of a scene you correct (the place, someone's clothes…), and how many people it has. */
   sceneField: 1_000,
   scenePeople: 8,
-  /** An Azure voice name, such as en-US-AvaMultilingualNeural. */
+  /** A voice name, such as en-US-AvaMultilingualNeural or grok:eve. */
   voice: 100,
   /** What a voice reads when you try it. */
   voiceSample: 300,
   /** How much faster or slower a companion's voice reads, in percent: Azure takes half to double speed. */
   voiceRateMin: -50,
   voiceRateMax: 100,
+  /** The same for Grok's voices, which take 0.7 to 1.5 times their usual speed. */
+  grokRateMin: -30,
+  grokRateMax: 50,
   /** How much higher or lower it reads, in percent: Azure takes half to one and a half times the pitch. */
   voicePitchMin: -50,
   voicePitchMax: 50,

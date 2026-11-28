@@ -2,16 +2,19 @@
 // feeling. Worked out the first time the reply is read so, and kept.
 //
 // A reading holds while the reply's own words and the tone instructions are what it was read
-// from. Unlike the scene, the chat before the reply changing doesn't count: a new reading would
-// mean reading the reply aloud again, at Azure's price. One you corrected stays as you left it
+// from (for a Grok voice, with the note asking for sounds: request.ts). Unlike the scene, the chat
+// before the reply changing doesn't count: a new reading would mean reading the reply aloud again,
+// at the voice's price. One you corrected stays as you left it
 // until the reply's own words change, since its lines would no longer match. "Read it again" asks
 // afresh.
 import type { DatabaseSync } from "node:sqlite";
 import {
   FEELINGS,
+  SOUNDS,
   STRENGTHS,
   type Effort,
   type Feeling,
+  type Sound,
   type Strength,
   type ToneLine,
   type ToneView,
@@ -20,36 +23,46 @@ import { object } from "../check.ts";
 import { invalid, notFound } from "../errors.ts";
 import type { Reader } from "../reading.ts";
 import type { Line } from "../scene/lines.ts";
-import { hashOf, textOf, TONE_SCHEMA, type ToneRequest } from "./request.ts";
+import { hashOf, textOf, TONE_SCHEMA, TONE_SOUND_SCHEMA, type ToneRequest } from "./request.ts";
 
 const isFeeling = (value: unknown): value is Feeling => FEELINGS.includes(value as Feeling);
 const isStrength = (value: unknown): value is Strength => STRENGTHS.includes(value as Strength);
+const isSound = (value: unknown): value is Sound => SOUNDS.includes(value as Sound);
+
+/** How one line is said, as the model or you gave it. */
+interface Said {
+  feeling?: Feeling;
+  strength?: Strength;
+  sound?: Sound | null;
+}
 
 /** The lines, each said the way `said` gives for its number, or plainly. */
-export function directed(
-  lines: readonly Line[],
-  said: (n: number) => { feeling?: Feeling; strength?: Strength },
-): ToneLine[] {
+export function directed(lines: readonly Line[], said: (n: number) => Said): ToneLine[] {
   return lines.map((line, at) => {
     const how = said(at + 1);
     return {
       ...line,
       feeling: how.feeling ?? (line.action ? "narration" : "neutral"),
       strength: how.strength ?? 2,
+      sound: how.sound ?? null,
     };
   });
 }
 
-/** The model's answer as lines. Whatever is missing or unknown is said plainly; nothing is refused. */
-export function tonesOf(raw: unknown, lines: readonly Line[]): ToneLine[] {
+/**
+ * The model's answer as lines. Whatever is missing or unknown is said plainly; nothing is refused.
+ * Sounds are kept only when they were asked for (`sounds`).
+ */
+export function tonesOf(raw: unknown, lines: readonly Line[], sounds = false): ToneLine[] {
   const fields = (raw ?? {}) as Record<string, unknown>;
-  const said = new Map<number, { feeling?: Feeling; strength?: Strength }>();
+  const said = new Map<number, Said>();
   for (const entry of Array.isArray(fields.lines) ? fields.lines : []) {
     const line = (entry ?? {}) as Record<string, unknown>;
     if (typeof line.line !== "number") continue;
     said.set(line.line, {
       feeling: isFeeling(line.feeling) ? line.feeling : undefined,
       strength: isStrength(line.strength) ? line.strength : undefined,
+      sound: sounds && isSound(line.sound) ? line.sound : null,
     });
   }
   return directed(lines, (n) => said.get(n) ?? {});
@@ -65,7 +78,9 @@ export function correctedTones(body: unknown, lines: readonly Line[]): ToneLine[
     const line = object(given[n - 1]);
     if (!isFeeling(line.feeling)) invalid("A line's feeling isn't valid");
     if (!isStrength(line.strength)) invalid("A line's strength isn't valid");
-    return { feeling: line.feeling, strength: line.strength };
+    const sound = line.sound ?? null;
+    if (sound !== null && !isSound(sound)) invalid("A line's sound isn't valid");
+    return { feeling: line.feeling, strength: line.strength, sound };
   });
 }
 
@@ -82,9 +97,11 @@ interface Row {
   edited_at: string | null;
 }
 
-const viewOf = (row: Row): ToneView => ({
+/** A kept reading as the page sees it; `sounds` says whether it is for a voice that makes them. */
+const viewOf = (row: Row, sounds: boolean): ToneView => ({
   messageId: row.message_id,
-  lines: JSON.parse(row.lines) as ToneLine[],
+  lines: (JSON.parse(row.lines) as ToneLine[]).map((line) => ({ ...line, sound: line.sound ?? null })),
+  sounds,
   edited: row.edited_at !== null,
   model: row.model,
   effort: row.effort as Effort,
@@ -112,12 +129,12 @@ export function createTones({ db, read }: { db: DatabaseSync; read: Reader }) {
       system: request.system,
       background: request.background,
       moment: request.moment,
-      schema: TONE_SCHEMA as unknown as Record<string, unknown>,
+      schema: (request.sounds ? TONE_SOUND_SCHEMA : TONE_SCHEMA) as unknown as Record<string, unknown>,
       name: "tone",
       what: "this reply",
       cacheKey: request.cacheKey,
     });
-    const lines = tonesOf(answer.raw, request.lines);
+    const lines = tonesOf(answer.raw, request.lines, request.sounds);
     const sent = { system: request.system, prompt: `${request.background}\n\n${request.moment}` };
     try {
       db.prepare(
@@ -140,20 +157,20 @@ export function createTones({ db, read }: { db: DatabaseSync; read: Reader }) {
       if (String((err as Error).message).includes("FOREIGN KEY")) notFound("message");
       throw err;
     }
-    return viewOf(kept(messageId)!);
+    return viewOf(kept(messageId)!, request.sounds);
   }
 
   return {
     /** The kept reading while it still holds, or null. Nothing is asked. */
     peek(messageId: number, request: ToneRequest): ToneView | null {
       const row = kept(messageId);
-      return row && holds(row, request) ? viewOf(row) : null;
+      return row && holds(row, request) ? viewOf(row, request.sounds) : null;
     },
 
     /** The reading of a reply: the kept one while it holds, otherwise a new one. `fresh` always asks. */
     of(messageId: number, request: ToneRequest, fresh = false): Promise<ToneView> {
       const row = kept(messageId);
-      if (!fresh && row && holds(row, request)) return Promise.resolve(viewOf(row));
+      if (!fresh && row && holds(row, request)) return Promise.resolve(viewOf(row, request.sounds));
       const key = `${messageId}:${request.textHash}:${request.promptHash}:${fresh ? "fresh" : ""}`;
       let reading = underway.get(key);
       if (!reading) {
@@ -173,7 +190,7 @@ export function createTones({ db, read }: { db: DatabaseSync; read: Reader }) {
         new Date().toISOString(),
         messageId,
       );
-      return viewOf(kept(messageId)!);
+      return viewOf(kept(messageId)!, request.sounds);
     },
 
     /** The replies of a chat whose kept reading still matches their words. */

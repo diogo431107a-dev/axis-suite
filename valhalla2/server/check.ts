@@ -90,8 +90,9 @@ export function messageId(value: unknown): number {
 }
 
 /**
- * An Azure voice name, or null (nothing chosen: the server's voice). Like a model id, any name is
- * taken, not only those in the list: Azure says whether it knows it when it is asked to read.
+ * A voice name (Azure's, or `grok:` and Grok's), or null (nothing chosen: the server's voice). Like
+ * a model id, any name is taken, not only those in the list: the engine says whether it knows it
+ * when it is asked to read.
  */
 export function voice(value: unknown): string | null {
   if (value === undefined || value === null || value === "") return null;

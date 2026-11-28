@@ -10,7 +10,8 @@ import { StoreError } from "../errors.ts";
 import { createFileStore } from "../files.ts";
 import { linesOf } from "../scene/lines.ts";
 import type { AzureSpeech } from "./azure.ts";
-import { azureVoice } from "./engine.ts";
+import { azureVoice, grokVoice } from "./engine.ts";
+import type { GrokReading, GrokSpeech } from "./grok.ts";
 import {
   charsThisMonth,
   createSpeech,
@@ -29,6 +30,7 @@ afterEach(() => {
 const MP3 = new Uint8Array([0x49, 0x44, 0x33, 4, 0, 0]);
 const VOICE: Voice = {
   id: "pt-BR-FranciscaNeural",
+  engine: "azure",
   name: "Francisca",
   locale: "pt-BR",
   language: "Portuguese (Brazil)",
@@ -71,7 +73,7 @@ function setup(voice = "en-US-AvaMultilingualNeural") {
     dir,
     files,
     read,
-    speech: createSpeech({ db, engine: azureVoice(azure), files, voice }),
+    speech: createSpeech({ db, engines: { azure: azureVoice(azure) }, files, voice }),
   };
 }
 
@@ -85,9 +87,9 @@ describe("reading aloud", () => {
     expect(read[0]).toContain(">Waves. Hello.</voice>");
 
     const again = await speech.of(tree.get(hello.id));
-    expect(again).toEqual({ file: first.file, read: 0 });
+    expect(again).toEqual({ file: first.file, engine: "azure", read: 0 });
     expect(read).toHaveLength(1);
-    expect(charsThisMonth(db)).toBe(13);
+    expect(charsThisMonth(db, "azure")).toBe(13);
   });
 
   it("asked twice at once, reads once", async () => {
@@ -107,7 +109,7 @@ describe("reading aloud", () => {
     expect(readdirSync(dir)).toEqual([after.file]);
     expect(knownSpeechFiles(db)).toEqual(new Set([after.file]));
     // Both readings were paid for.
-    expect(charsThisMonth(db)).toBe("Waves. Hello.".length + "Good evening.".length);
+    expect(charsThisMonth(db, "azure")).toBe("Waves. Hello.".length + "Good evening.".length);
   });
 
   it("reads another voice again", async () => {
@@ -115,7 +117,7 @@ describe("reading aloud", () => {
     const kept = await first.speech.of(first.tree.get(first.hello.id));
     const other = createSpeech({
       db: first.db,
-      engine: azureVoice({ synthesize: async () => MP3, voices: async () => [] }),
+      engines: { azure: azureVoice({ synthesize: async () => MP3, voices: async () => [] }) },
       files: first.files,
       voice: "pt-BR-FranciscaNeural",
     });
@@ -165,15 +167,15 @@ describe("reading aloud", () => {
 
   it("reads a sample to try a voice, counts it, and keeps it for asking again", async () => {
     const { db, dir, read, speech } = setup();
-    expect(await speech.sample("pt-BR-FranciscaNeural", "*Smiles.* Olá!")).toEqual(MP3);
+    expect(await speech.sample("pt-BR-FranciscaNeural", "*Smiles.* Olá!")).toEqual({ audio: MP3, type: "audio/mpeg" });
     expect(read[0]).toContain('<voice name="pt-BR-FranciscaNeural">Smiles. Olá!</voice>');
-    expect(charsThisMonth(db)).toBe("Smiles. Olá!".length);
+    expect(charsThisMonth(db, "azure")).toBe("Smiles. Olá!".length);
     await speech.sample("pt-BR-FranciscaNeural", "*Smiles.* Olá!");
     expect(read).toHaveLength(1);
-    expect(charsThisMonth(db)).toBe("Smiles. Olá!".length);
+    expect(charsThisMonth(db, "azure")).toBe("Smiles. Olá!".length);
     // Nothing is kept on disk.
     expect(readdirSync(dir)).toEqual([]);
-    expect(() => speech.sample("pt-BR-FranciscaNeural", " * ")).toThrow(/Write something/);
+    await expect(speech.sample("pt-BR-FranciscaNeural", " * ")).rejects.toThrow(/Write something/);
   });
 
   it("reads a sample with a feeling, as another sample", async () => {
@@ -192,45 +194,17 @@ describe("reading aloud", () => {
     await expect(speech.of(tree.get(hello.id))).rejects.toThrow(/nothing to read/);
   });
 
-  it("keeps another engine's audio apart, in its own format", async () => {
-    const { db, tree, hello, files, speech } = setup();
-    const azure = await speech.of(tree.get(hello.id));
-    const asked: unknown[] = [];
-    const other = createSpeech({
-      db,
-      engine: {
-        id: "other",
-        format: { ext: "ogg", type: "audio/ogg" },
-        voices: async () => [],
-        read: async (reading) => {
-          asked.push(reading);
-          return MP3;
-        },
-      },
-      files,
-      voice: "en-US-AvaMultilingualNeural",
-    });
-    const read = await other.of(tree.get(hello.id), "en-US-AvaMultilingualNeural");
-    expect(read.file).toMatch(/\.ogg$/);
-    expect(read.file).not.toBe(azure.file);
-    expect(asked).toEqual([
-      expect.objectContaining({ voice: "en-US-AvaMultilingualNeural", text: "Waves. Hello.", lines: null }),
-    ]);
-    expect(db.prepare("SELECT engine FROM speech WHERE file = ?").get(read.file)).toEqual({ engine: "other" });
-    expect(other.format.type).toBe("audio/ogg");
-  });
-
   it("keeps nothing when Azure fails", async () => {
     const { db, tree, hello, dir, files } = setup();
     const failing = createSpeech({
       db,
-      engine: azureVoice({ synthesize: () => Promise.reject(new Error("down")), voices: async () => [] }),
+      engines: { azure: azureVoice({ synthesize: () => Promise.reject(new Error("down")), voices: async () => [] }) },
       files,
       voice: "v",
     });
     await expect(failing.of(tree.get(hello.id))).rejects.toThrow("down");
     expect(readdirSync(dir)).toEqual([]);
-    expect(charsThisMonth(db)).toBe(0);
+    expect(charsThisMonth(db, "azure")).toBe(0);
   });
 
   it("serves a file only to its owner", async () => {
@@ -265,7 +239,7 @@ describe("reading aloud at a companion's speed, pitch and style", () => {
     const { tree, hello, speech } = setup();
     const before = await speech.of(tree.get(hello.id));
     const same = await speech.of(tree.get(hello.id), undefined, null, { rate: 0, pitch: 0, style: null });
-    expect(same).toEqual({ file: before.file, read: 0 });
+    expect(same).toEqual({ file: before.file, engine: "azure", read: 0 });
   });
 
   it("reads again at another speed, pitch or style", async () => {
@@ -295,5 +269,104 @@ describe("reading aloud at a companion's speed, pitch and style", () => {
     const ssml = read.filter((what) => what.startsWith("<speak"));
     expect(ssml).toHaveLength(2);
     expect(ssml[1]).toContain('<prosody rate="-20%" pitch="+5%">Olá!</prosody>');
+  });
+});
+
+/** A server with both engines: Azure as in setup(), and a fake Grok that keeps what it was asked. */
+function withGrok() {
+  const base = setup();
+  const asked: GrokReading[] = [];
+  const grok: GrokSpeech = {
+    synthesize: async (reading: GrokReading) => {
+      asked.push(reading);
+      return MP3;
+    },
+    voices: async () => [
+      { ...VOICE, id: "grok:eve", engine: "grok", name: "Eve", styles: [], language: "Grok, any language" },
+    ],
+  };
+  const azure = azureVoice({ synthesize: async () => MP3, voices: async () => [VOICE] });
+  const speech = createSpeech({
+    db: base.db,
+    engines: { azure, grok: grokVoice(grok) },
+    files: base.files,
+    voice: "en-US-AvaMultilingualNeural",
+  });
+  return { ...base, asked, speech };
+}
+
+describe("reading aloud in Grok's voices", () => {
+  it("reads a grok: voice with Grok, apart from Azure, and counts it as Grok's", async () => {
+    const { db, tree, hello, asked, speech } = withGrok();
+    const azure = await speech.of(tree.get(hello.id));
+    const grok = await speech.of(tree.get(hello.id), "grok:eve");
+    expect(grok.engine).toBe("grok");
+    expect(grok.file).not.toBe(azure.file);
+    expect(asked).toEqual([{ text: "Waves. Hello.", voiceId: "eve", speed: 1 }]);
+    expect(db.prepare("SELECT engine FROM speech WHERE file = ?").get(grok.file)).toEqual({ engine: "grok" });
+    expect(charsThisMonth(db, "grok")).toBe("Waves. Hello.".length);
+    expect(charsThisMonth(db, "azure")).toBe("Waves. Hello.".length);
+  });
+
+  it("lists Grok's voices first, then Azure's", async () => {
+    const { speech } = withGrok();
+    expect((await speech.voices()).map((voice) => voice.id)).toEqual(["grok:eve", "pt-BR-FranciscaNeural"]);
+  });
+
+  it("still lists one engine's voices when the other can't be reached", async () => {
+    const { db, files } = setup();
+    const speech = createSpeech({
+      db,
+      engines: {
+        azure: azureVoice({ synthesize: async () => MP3, voices: () => Promise.reject(new Error("down")) }),
+        grok: grokVoice({ synthesize: async () => MP3, voices: async () => [] }),
+      },
+      files,
+      voice: "v",
+    });
+    expect(await speech.voices()).toEqual([]);
+  });
+
+  it("refuses a voice whose engine has no key", async () => {
+    const { tree, hello, speech } = setup();
+    await expect(speech.of(tree.get(hello.id), "grok:eve")).rejects.toThrow(/no xAI key/);
+    await expect(speech.sample("grok:eve", "Hi")).rejects.toThrow(/no xAI key/);
+  });
+
+  it("reads each line with Grok's tags and its sound", async () => {
+    const { tree, hello, asked, speech } = withGrok();
+    const lines = linesOf("*Waves.* Hello.").map((line, at) => ({
+      ...line,
+      feeling: at === 0 ? ("narration" as const) : ("whispering" as const),
+      strength: 2 as const,
+      sound: at === 1 ? ("sigh" as const) : null,
+    }));
+    await speech.of(tree.get(hello.id), "grok:eve", lines);
+    expect(asked[0]!.text).toBe("<soft>Waves.</soft> <whisper>[sigh] Hello.</whisper>");
+  });
+
+  it("reads at the companion's speed, within Grok's, and doesn't read again for pitch it ignores", async () => {
+    const { tree, hello, asked, speech } = withGrok();
+    const fast = await speech.of(tree.get(hello.id), "grok:eve", null, { rate: 80, pitch: 0, style: null });
+    expect(asked[0]!.speed).toBe(1.5);
+    const higher = await speech.of(tree.get(hello.id), "grok:eve", null, { rate: 80, pitch: 20, style: null });
+    expect(higher).toEqual({ file: fast.file, engine: "grok", read: 0 });
+    expect(asked).toHaveLength(1);
+  });
+
+  it("keeps the audio read before sounds existed, and reads a sound again", async () => {
+    const { tree, hello, speech } = withGrok();
+    const lines = linesOf("Hello.").map((line) => ({ ...line, feeling: "warm" as const, strength: 2 as const }));
+    tree.edit(hello.id, "Hello.");
+    const before = await speech.of(tree.get(hello.id), "grok:eve", lines);
+    const none = lines.map((line) => ({ ...line, sound: null }));
+    expect((await speech.of(tree.get(hello.id), "grok:eve", none)).read).toBe(0);
+    const sighed = lines.map((line) => ({ ...line, sound: "sigh" as const }));
+    expect((await speech.of(tree.get(hello.id), "grok:eve", sighed)).file).not.toBe(before.file);
+  });
+
+  it("serves a Grok sample as MP3", async () => {
+    const { speech } = withGrok();
+    expect(await speech.sample("grok:eve", "Olá!")).toEqual({ audio: MP3, type: "audio/mpeg" });
   });
 });

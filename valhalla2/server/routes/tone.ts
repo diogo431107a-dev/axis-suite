@@ -3,7 +3,7 @@
 // ask a model; reading (POST) uses the kept reading while it holds; reading again asks afresh; and
 // you can correct it (PUT).
 import { Router, type Request, type Response } from "express";
-import type { ToneList } from "../../shared/protocol.ts";
+import { engineOfVoice, type ToneList } from "../../shared/protocol.ts";
 import { id as checkId, messageId } from "../check.ts";
 import type { Services } from "../services.ts";
 import { toneRequest } from "../tone/request.ts";
@@ -19,7 +19,9 @@ export function toneRoutes(s: Services): Router {
     const tree = my.chats.tree(chat.id);
     const at = messageId(req.params.messageId);
     tree.get(at);
-    return { at, request: toneRequest(companion, tree.pathTo(at)) };
+    // Asked as the reply is read aloud: with sounds for a Grok voice (routes/speech.ts).
+    const voice = companion.voice ?? s.speech?.voice ?? "";
+    return { at, request: toneRequest(companion, tree.pathTo(at), engineOfVoice(voice) === "grok") };
   }
 
   routes.get("/chats/:id/tones", (req: Request, res: Response) => {

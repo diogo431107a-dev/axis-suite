@@ -3,7 +3,7 @@
 A picture of a moment is drawn from the **scene**; a reply read aloud with feeling follows its
 **tags**. They are two readings, each for its own purpose, by models you choose on the companion's
 page. Both are optional: without a CivitAI key Valhalla 2 makes no pictures, and without an Azure
-Speech key it reads nothing aloud.
+Speech key or an xAI key it reads nothing aloud.
 
 ## The scene
 
@@ -90,23 +90,32 @@ leaves its pictures in the gallery; a deleted companion takes its pictures with 
 
 ## Reading aloud
 
-A companion's replies can be read aloud, by Azure AI Speech's neural voices.
+A companion's replies can be read aloud, by Azure AI Speech's neural voices or by Grok's voices
+(xAI's text to speech). Azure reads on the server's Azure Speech key, Grok on the same xAI key Grok
+companions answer with; a server with only one of the keys offers only that one's voices. Any
+companion can choose either, Claude or Grok alike.
 
 - **Each companion has its own voice.** Under **Voice** on a companion's page you can choose any of
-  the voices Azure offers in the server's region (over five hundred, in some 150 languages), and
-  find one by name, language or gender. **Hear it** reads a line you can change, so you hear a voice
+  Grok's voices (listed first, two dozen or so: Eve, Ara, Rex, Leo, Sal…) or any of the voices
+  Azure offers in the server's region (over five hundred, in some 150 languages), and find one by
+  name, language or gender ("grok" finds Grok's). **Hear it** reads a line you can change, so you hear a voice
   before choosing it; that counts toward the month's characters like a reply, and hearing the same
   words again is free. A companion that chooses none is read in the server's voice, Ava
-  (`en-US-AvaMultilingualNeural`) unless `SPEECH_VOICE` says otherwise. A voice marked multilingual
-  also reads other languages, telling them from the text; any other voice reads in its own language.
-  Changing the voice reads a reply again, in the new voice, the next time you play it.
+  (`en-US-AvaMultilingualNeural`) unless `SPEECH_VOICE` says otherwise (`grok:eve` for Grok's Eve;
+  on a server with only an xAI key it is Eve). An Azure voice marked multilingual also reads other
+  languages, telling them from the text; any other Azure voice reads in its own language. Every Grok
+  voice reads every language, telling it from the text. Changing the voice reads a reply again, in
+  the new voice, the next time you play it.
 - **Speed, pitch and style.** Under the voice, **Speed** (from half to twice the voice's usual) and
   **Pitch** (up to half lower or higher) are kept with the companion, and **Hear it** reads at them
   before you save. A voice with styles of its own also offers a **Speaking style** (chat, friendly,
   calm…): every line is read in it, unless the line's feeling has a style of its own that fits
   better. Feelings are read on top of all three: a whisper is still slower than the companion's own
   speed. Changing any of them reads a reply again the next time you play it; audio read before they
-  existed is kept as long as they stay at the voice's usual.
+  existed is kept as long as they stay at the voice's usual. Grok's voices take only the speed, from
+  30% slower to half again as fast; they have no pitch setting and no styles, so the page shows only
+  **Speed** for them (a pitch kept from an Azure voice stays for when you go back, and changes
+  nothing on Grok).
 - **As replies arrive.** The speaker switch in a chat's header (**Aloud** / **Silent**) says whether
   each new reply, version or greeting is read as soon as it is written. It is remembered by the
   browser, not the companion — on at home, off on the phone in public — and starts on.
@@ -116,8 +125,10 @@ A companion's replies can be read aloud, by Azure AI Speech's neural voices.
   (most of them US English or Chinese; among the Brazilian Portuguese ones only Francisca, "calm"),
   and the voice finder shows them ("styles"). Every other line, on any voice, is read with speed,
   pitch and volume set for its feeling: a whisper softer and slower, anger louder and quicker.
-  Actions are read a little slower and quieter, as narration. If the tags can't be read (the model
-  unreachable), the reply is read plainly. **Hear it** can try a voice in any feeling.
+  Actions are read a little slower and quieter, as narration. On a Grok voice each feeling becomes
+  Grok's own tags instead (below), and the tone model may also give a line a **sound**. If the tags
+  can't be read (the model unreachable), the reply is read plainly. **Hear it** can try a voice in
+  any feeling.
 - **On demand.** The speaker button under any reply reads it; while it plays it becomes a stop
   button. Starting one reply stops the other, and leaving the chat stops it.
 
@@ -125,17 +136,36 @@ The whole reply is read in one voice, actions too: the asterisks around them are
 spoken. A phone's browser may refuse to start sound the page didn't get a tap for; the speaker
 button under the reply always works.
 
-**Each reply is read once.** The first time it is asked for, Azure reads it and the MP3 is kept on
-the server, about 0.4 MB a minute; playing it again is instant and costs nothing. An edited reply is
-read again, and the old audio deleted; so is a reply whose companion changed voice, or whose tags
-you corrected. Under the composer, after the first reading in a visit, is how many characters Azure
-has read this month for the whole server. Azure's free tier (F0) includes 500,000 characters a
-month; the paid tier (S0) bills per million characters. Everyone who can sign in to Heimdall reads
-on the server's key.
+**Each reply is read once.** The first time it is asked for, its voice's engine reads it and the MP3
+is kept on the server, about 0.4 MB a minute (Azure) or 0.5 MB (Grok); playing it again is instant
+and costs nothing. An edited reply is read again, and the old audio deleted; so is a reply whose
+companion changed voice, or whose tags you corrected. Under the composer, after the first reading
+in a visit, is how many characters the engine that read it (Azure or Grok, each counted apart) has
+read this month for the whole server. Azure's free tier (F0) includes 500,000 characters a month;
+the paid tier (S0) bills per million characters. xAI bills Grok's voices per character on the
+server's xAI account; its console shows the price. Everyone who can sign in to Heimdall reads on the
+server's keys.
+
+### Grok's voices
+
+Grok reads the words with tags of its own rather than Azure's speed, pitch and volume. Each line's
+feeling becomes one or more of them, more for a strong feeling than a slight one: **soft**,
+**whisper**, **loud**, **slow**, **fast**, **higher pitch**, **lower pitch**, **sing-song** (playful,
+teasing), **emphasis** (anger, sarcasm) and **build intensity** (shouting). A whisper is
+`<whisper>`, a strong sadness slower, softer and lower; narration is soft. Lines next to each other
+with the same feeling are wrapped together, since Grok reads a tag best over a whole phrase.
+
+Grok's voices can also make sounds that aren't words, at a point: a **sigh**, **laugh**,
+**chuckle**, **giggle**, **cry**, **breath**, **inhale**, **exhale**, **tsk**, **tongue click**,
+**lip smack**, **hum**, and a **pause** or **long pause**. For a companion on a Grok voice the tone
+model is asked for those too, only where the character would really make one (a sigh before a sad
+admission, a chuckle at their own tease), a few at most in a reply. The sound is made just before
+its line. The reply's own words are still read as written: brackets in them are read as
+parentheses, so nothing in a reply is taken for a tag.
 
 ### The tags
 
-How each line of a reply is said, for Azure: Valhalla 2 cuts the reply into lines (sentences,
+How each line of a reply is said, for either engine: Valhalla 2 cuts the reply into lines (sentences,
 actions apart from speech, so the words read are always the reply's own), and the companion's
 **Tone model** gives each a feeling (teasing, whispering, angry, tender…) and how strongly. It
 reads the profile and the chat just before the reply (**How much of the chat it reads**, 4,000
@@ -153,3 +183,8 @@ The tags work for every companion, with memory or without, on Claude or Grok; ea
 companion's own API. The model, its effort and how much of the chat it reads are under **Read with
 feeling**, with the voice. How it judges a line is one of the companion's own texts, **Tone
 instructions**.
+
+For a Grok voice, a short note asking for sounds is added after the Tone instructions, your own
+words or the default alike, and the tags dialog has a **sound** for each line to correct as well.
+Moving a companion to or from a Grok voice reads its tags again the next time a reply is played;
+a companion on an Azure voice is asked exactly what it was before.

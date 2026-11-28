@@ -5,8 +5,10 @@ import { useEffect, useState } from "react";
 import { RefreshCw, Volume2 } from "lucide-react";
 import {
   FEELINGS,
+  SOUNDS,
   STRENGTHS,
   type Feeling,
+  type Sound,
   type Strength,
   type ToneLine,
   type ToneView,
@@ -48,6 +50,8 @@ export function ToneDialog({
   }, [base, setError]);
 
   const changed = tone !== null && lines !== null && JSON.stringify(lines) !== JSON.stringify(tone.lines);
+  /** A Grok voice also makes a sound before a line now and then. */
+  const sounds = (tone?.sounds ?? false) || (lines ?? []).some((line) => line.sound);
   const setLine = (at: number, fields: Partial<ToneLine>) =>
     setLines((now) => (now ? now.map((line, n) => (n === at ? { ...line, ...fields } : line)) : now));
 
@@ -73,8 +77,12 @@ export function ToneDialog({
       ) : (
         <div className="space-y-4">
           <p className="text-sm text-faint">
-            The feeling each line is read with, and how strongly: Azure reads it louder, softer, quicker or slower to
-            match. Correct any line, and it is read that way from then on.
+            The feeling each line is read with, and how strongly: the voice reads it louder, softer, quicker or slower
+            to match.
+            {sounds
+              ? " Grok's voices can also make a sound just before a line: a sigh, a laugh, a breath, a pause."
+              : ""}{" "}
+            Correct any line, and it is read that way from then on.
           </p>
           <ol className="space-y-2">
             {lines.map((line, at) => (
@@ -104,6 +112,21 @@ export function ToneDialog({
                     </option>
                   ))}
                 </select>
+                {sounds ? (
+                  <select
+                    aria-label="Sound before it"
+                    className={`${inputStyle} w-auto py-1 text-sm`}
+                    value={line.sound ?? ""}
+                    onChange={(e) => setLine(at, { sound: e.target.value === "" ? null : (e.target.value as Sound) })}
+                  >
+                    <option value="">no sound</option>
+                    {SOUNDS.map((sound) => (
+                      <option key={sound} value={sound}>
+                        {sound.replace(/-/g, " ")} before
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
               </li>
             ))}
           </ol>

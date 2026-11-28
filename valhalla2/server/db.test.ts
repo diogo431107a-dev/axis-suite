@@ -1,4 +1,7 @@
 import { describe, expect, it } from "vitest";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { DEFAULT_SETTINGS } from "../shared/protocol.ts";
 import { createCompanions } from "./companions.ts";
 import { openDatabase, removeUnknownOwners, transaction } from "./db.ts";
@@ -78,5 +81,26 @@ describe("a companion", () => {
     expect(companions.list()[0]!.voice).toBe("pt-BR-FranciscaNeural");
     expect(companions.save("comp-0001", { name: "Freya", voice: "" }).voice).toBeNull();
     expect(() => companions.save("comp-0001", { name: "Freya", voice: "<voice/>" })).toThrow(/voice name/);
+  });
+});
+
+describe("what reading aloud has cost", () => {
+  it("keeps the months counted before Grok's voices as Azure's", () => {
+    const dir = mkdtempSync(join(tmpdir(), "valhalla2-db-"));
+    try {
+      const file = join(dir, "valhalla2.db");
+      const old = openDatabase(file, 14);
+      old.prepare("INSERT INTO speech_usage (month, chars) VALUES (?, ?)").run("2026-11", 1234);
+      old.close();
+      const db = openDatabase(file);
+      expect(db.prepare("SELECT month, engine, chars FROM speech_usage").all()).toEqual([
+        { month: "2026-11", engine: "azure", chars: 1234 },
+      ]);
+      db.prepare("INSERT INTO speech_usage (month, engine, chars) VALUES (?, ?, ?)").run("2026-11", "grok", 50);
+      expect(db.prepare("SELECT COUNT(*) AS n FROM speech_usage").get()).toEqual({ n: 2 });
+      db.close();
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
   });
 });

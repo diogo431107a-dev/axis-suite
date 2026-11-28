@@ -4,12 +4,10 @@
 // service the Speech SDK talks to, without the SDK's websockets and dependencies. The voices a
 // companion can choose from come from the same region's voice list.
 import type { Voice } from "../../shared/protocol.ts";
+import { SpeechError } from "./engine.ts";
 
 /** What Azure is asked for: MP3, 24 kHz mono at 48 kbit/s, which every browser plays. */
 export const AUDIO_FORMAT = "audio-24khz-48kbitrate-mono-mp3";
-
-/** A reply Azure refused or failed to read. */
-export class SpeechError extends Error {}
 
 export interface AzureSpeechOptions {
   key: string;
@@ -102,6 +100,7 @@ export function voiceOf(entry: unknown): Voice[] {
   return [
     {
       id,
+      engine: "azure",
       name: str(fields.DisplayName) || id,
       locale: str(fields.Locale),
       language: str(fields.LocaleName) || str(fields.Locale),

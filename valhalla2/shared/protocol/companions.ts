@@ -44,7 +44,7 @@ export interface Companion {
    */
   memory: boolean;
   prompts: Prompts;
-  /** The Azure voice its replies are read aloud in; null for the server's own. */
+  /** The voice its replies are read aloud in (Azure's, or `grok:` and Grok's); null for the server's own. */
   voice: string | null;
   /** Whether its replies are read with the feeling of each line (its tags, tone.ts), or plainly. */
   voiceFeeling: boolean;

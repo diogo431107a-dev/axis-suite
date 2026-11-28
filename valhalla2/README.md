@@ -27,7 +27,8 @@ Like Fafnir, Valhalla 2 calls outside the suite: every message goes to
 Grok companion asks goes to `api.x.ai` instead, on the server's xAI key, and never to Anthropic. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
 pays in Buzz. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
-the server's Azure key.
+the server's Azure key, or, for a companion that chose one of Grok's voices, by xAI's text to speech
+(`api.x.ai`) on the server's xAI key.
 
 ## Minimum interference
 
@@ -54,7 +55,7 @@ default. See [Chats](docs/chats.md#what-valhalla-2-adds-to-a-request).
   without memory; a Grok one can have memory turned on later. The two never mix: a Grok companion's
   memory is kept by Grok. See [providers](docs/providers.md).
 - **Pictures and reading aloud.** A picture of any moment, or of the companion, made by CivitAI;
-  replies read aloud by Azure AI Speech, each line with its feeling. See
+  replies read aloud by Azure AI Speech or in one of Grok's voices, each line with its feeling. See
   [Scenes, pictures and reading aloud](docs/scenes-pictures-speech.md).
 - **When the API declines a turn**, the refusal is kept and shown, and another model can answer
   instead. See [Chats](docs/chats.md#when-the-api-declines-a-turn).
@@ -92,7 +93,7 @@ For pictures, add the CivitAI key on a line of its own in the same file:
 echo 'CIVITAI_API_KEY=<your key>' >> valhalla2/data/secret.env
 ```
 
-For Grok, add the xAI key the same way:
+For Grok, add the xAI key the same way (it also reads aloud in Grok's voices):
 
 ```bash
 echo 'XAI_API_KEY=<your key>' >> valhalla2/data/secret.env
@@ -142,7 +143,7 @@ default.
 | `TONE_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion works out how lines are said aloud with. |
 | `VALHALLA_SCENE_TOKENS`       | `12000`                                          | About how much of the chat it reads, up to the moment.             |
 | `SPEECH_REGION`               | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.        |
-| `SPEECH_VOICE`                | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none of its own.            |
+| `SPEECH_VOICE`                | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none (`grok:eve` for Grok). |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 
@@ -168,7 +169,8 @@ if it is empty (an empty file means no pictures):
 read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-civitai.key && unset KEY
 ```
 
-**So does the xAI key**, which lets a companion answer on Grok; an empty file means no Grok:
+**So does the xAI key**, which lets a companion answer on Grok and read aloud in Grok's voices; an
+empty file means no Grok:
 
 ```
 read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-xai.key && unset KEY
