@@ -1,5 +1,5 @@
-// What makes this companion's pictures, and how: on CivitAI, steps, CFG, sampler, clip skip, and the
-// seed the next picture starts from; on Grok Imagine, the quality and the size; on OpenAI, the
+// What makes this companion's pictures, and how: on CivitAI, the checkpoint, whether its prompts are
+// written in tags or sentences, steps, CFG, sampler, clip skip, and the seed the next picture starts from; on Grok Imagine, the quality and the size; on OpenAI, the
 // quality. Shown when the server can make pictures; the engine can be chosen when it has keys for
 // more than one.
 import { Dices } from "lucide-react";
@@ -10,15 +10,20 @@ import {
   OPENAI_QUALITIES,
   PICTURE_ENGINE_LABELS,
   pictureEngineOf,
+  PROMPT_STYLE_LABELS,
+  PROMPT_STYLES,
   SAMPLERS,
   type GrokQuality,
   type GrokResolution,
   type OpenAiQuality,
   type PictureEngineId,
+  type PromptStyle,
   type Sampler,
   type Settings,
 } from "../../shared/protocol.ts";
+import { usePage } from "../page.ts";
 import { Field, inputStyle } from "../ui/bits.tsx";
+import { CheckpointPicker } from "./CheckpointPicker.tsx";
 import { grokPriceNote, OPENAI_PRICE_NOTE } from "../ui/pictureEngine.ts";
 import { rollSeed, seedFrom } from "../ui/seed.ts";
 
@@ -81,13 +86,14 @@ export function PictureSettings({
   /** The engines the server has keys for. */
   available: readonly PictureEngineId[];
 }) {
+  const { health } = usePage();
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   const engine = pictureEngineOf(settings.pictureEngine, available) ?? settings.pictureEngine;
   const choice =
     available.length > 1 ? (
       <Field
         label="Made by"
-        hint="CivitAI draws from Danbooru tags on an anime SDXL checkpoint; Grok Imagine (xAI) and OpenAI draw from plain sentences. Each has its own picture instructions."
+        hint="CivitAI draws on the SDXL checkpoint chosen below, from Danbooru tags or plain sentences; Grok Imagine (xAI) and OpenAI draw from plain sentences. Each has its own picture instructions."
       >
         <select
           className={inputStyle}
@@ -171,6 +177,27 @@ export function PictureSettings({
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {choice}
+      <CheckpointPicker
+        settings={settings}
+        defaults={health.defaults}
+        onPick={(checkpoint) => onChange({ ...settings, ...checkpoint })}
+      />
+      <Field
+        label="Prompt written as"
+        hint="Guessed from the base model when you choose a checkpoint: tags for Illustrious, Pony and NoobAI, sentences for the rest. A semi-realistic checkpoint is yours to judge."
+      >
+        <select
+          className={inputStyle}
+          value={settings.picturePromptStyle}
+          onChange={(e) => set("picturePromptStyle", e.target.value as PromptStyle)}
+        >
+          {PROMPT_STYLES.map((style) => (
+            <option key={style} value={style}>
+              {PROMPT_STYLE_LABELS[style]}
+            </option>
+          ))}
+        </select>
+      </Field>
       <Field
         label="Steps"
         hint={`${LIMITS.pictureStepsMin}–${LIMITS.pictureStepsMax}. More is finer, slower and costs more Buzz.`}
@@ -211,7 +238,10 @@ export function PictureSettings({
           ))}
         </select>
       </Field>
-      <Field label="Clip skip" hint="2 suits anime checkpoints such as WAI-illustrious.">
+      <Field
+        label="Clip skip"
+        hint="2 suits anime checkpoints such as Illustrious and Pony; many realistic ones want 1."
+      >
         <select
           className={inputStyle}
           value={settings.pictureClipSkip}

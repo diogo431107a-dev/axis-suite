@@ -50,13 +50,17 @@ model) or by **OpenAI**'s image model, whichever the companion chose (see
 [Three engines](#three-engines) below). Under any message, the
 picture button works out the scene (above), or uses the one kept, and asks for a prompt for the
 image model from it (on Claude, `PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok or GPT, the
-companion's own model). For CivitAI it is the fewest Danbooru
+companion's own model). For CivitAI in tags (the companion's **Prompt written as**) it is the fewest Danbooru
 tags that do the job, about 20 to 35, since every tag pulls the picture somewhere: the people the
 scene lists, their pose and how they are seen, the look and clothes that show, the expression, the
 place, the light and the colours. It draws only what the pose and view show: from behind, no face
 or expression, but the hair, shoulders and back; lying face down, nothing on the front of the
 clothes. It leaves out what can't be drawn (names, thoughts, the weather indoors unless it shows),
-and turns moods into what a picture shows (hopeful: a slight smile, looking up, warm light). A profile picture is written from the
+and turns moods into what a picture shows (hopeful: a slight smile, looking up, warm light). In
+sentences it is two or three short plain sentences, at most about 60 words, since SDXL reads only
+the first 75 or so tokens well, with a short negative prompt. Either way the writer is told the
+checkpoint's name and base model after its instructions, so it uses the words and quality tags
+that family expects. A profile picture is written from the
 profile and the memory. Nothing runs on ordinary replies; a prompt costs a cent or two, and only
 when you ask.
 
@@ -65,12 +69,20 @@ can then be written again from the correction.
 
 The prompt opens in a dialog for you to change, with a note for Claude ("at sunset", "from behind")
 if you want it written again. **Make the picture** sends it to the companion's engine. CivitAI makes
-it on the
-WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) with the companion's picture settings, at a size
+it on the companion's SDXL checkpoint with its picture settings, at a size
 SDXL was trained on for the shape Claude chose. It takes a few seconds to a minute; the picture
 appears under its message when it is done, only on that branch of the chat.
 
-**Picture settings** are under **Pictures** on the companion's page: **Steps** (10–60, 20 to
+**Picture settings** are under **Pictures** on the companion's page. **Checkpoint** is the SDXL
+checkpoint it draws on: WAI-illustrious-SDXL v17.0 (`PICTURE_MODEL`) to start. Paste the link to
+another one's page on CivitAI (or its AIR) and press **Look up**: the server asks CivitAI's public
+API what it is, refuses anything but an SDXL checkpoint (Illustrious, Pony, NoobAI, SDXL 1.0 and
+the like), then asks CivitAI, with a submission that makes nothing, whether it will make pictures
+on it and for how much Buzz. **Prompt written as** (Danbooru tags or plain sentences) is set from
+the base model when a checkpoint is chosen (tags for Illustrious, Pony and NoobAI), and can be
+changed: a semi-realistic checkpoint is yours to judge. Each style has its own instructions,
+**Picture instructions (CivitAI, tags)** and **(CivitAI, sentences)**; the page shows the one in
+use. Then **Steps** (10–60, 20 to
 start; more is finer, slower and dearer), **CFG** (1–15 in halves, 7 to start; higher follows the
 prompt more literally), **Sampler** (Euler a to start; the DPM++ ones cost a little more Buzz) and
 **Clip skip** (1–3, 2 to start, which suits anime checkpoints).
@@ -88,8 +100,8 @@ any companion, Claude, Grok or GPT alike. It offers the engines the server has k
 with only one makes every picture with that one, and a companion whose engine the server has no key
 for gets the first it has. Every companion starts on CivitAI.
 
-- **CivitAI** draws on an anime SDXL checkpoint from Danbooru tags, with the steps, CFG, sampler,
-  clip skip and seed above, and charges Buzz.
+- **CivitAI** draws on the companion's SDXL checkpoint, from Danbooru tags or plain sentences,
+  with the steps, CFG, sampler, clip skip and seed above, and charges Buzz.
 - **Grok Imagine** (`GROK_PICTURE_MODEL`, Grok Imagine 2.0) draws from plain sentences, on the same
   xAI key Grok companions answer with. Its prompt is written from its own instructions, **Picture
   instructions (Grok Imagine)**: two to five sentences that open with the style (an anime

@@ -8,7 +8,10 @@ import { tokensOf } from "../memory/history.ts";
 import { renderPins } from "../memory/inject.ts";
 import { renderFiles } from "../memory/render.ts";
 import type { MemoryFile } from "../memory/store.ts";
-import type { PicturePrompt } from "../pictures/engine.ts";
+import type { PictureInstructions } from "../pictures/engine.ts";
+
+/** The tag instructions, with nothing said after them. */
+const TAGS: PictureInstructions = { key: "picture", note: null };
 
 export interface SceneRequest {
   system: string;
@@ -97,7 +100,7 @@ export function plainPictureRequest(
   companion: Companion,
   scene: Scene,
   hint: string,
-  instructions: PicturePrompt = "picture",
+  instructions: PictureInstructions = TAGS,
 ): SceneRequest {
   const parts = [`<profile name="${quote(companion.name)}">\n${companion.profile.trim()}\n</profile>`];
   if (scene.kind === "profile") {
@@ -116,9 +119,14 @@ export function plainPictureRequest(
   return { system: pictureInstructions(companion, instructions), prompt: parts.join("\n\n") };
 }
 
-/** The instructions for a picture's prompt, the ones its engine reads (PictureEngine.promptKey). */
-export const pictureInstructions = (companion: Pick<Companion, "prompts">, instructions: PicturePrompt): string =>
-  promptOf(companion, instructions);
+/**
+ * The instructions for a picture's prompt, the ones its engine reads (PictureEngine.instructionsFor),
+ * and the line it says after them.
+ */
+export const pictureInstructions = (
+  companion: Pick<Companion, "prompts">,
+  { key, note }: PictureInstructions,
+): string => [promptOf(companion, key), note].filter(Boolean).join("\n\n");
 
 /**
  * The request for one picture's prompt. `background` is backgroundOf(); `budget` how many tokens
@@ -132,7 +140,7 @@ export function sceneRequest(
   background: string,
   budget: number,
   sheet?: SceneSheet,
-  instructions: PicturePrompt = "picture",
+  instructions: PictureInstructions = TAGS,
 ): SceneRequest {
   const parts = [background];
 

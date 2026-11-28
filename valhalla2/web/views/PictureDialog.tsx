@@ -142,7 +142,12 @@ export function PictureDialog({
 
         {draft ? (
           <>
-            <Field label="Prompt" hint={`What ${engineName} draws. Change anything before you make it.`}>
+            <Field
+              label="Prompt"
+              hint={`What ${engineName} draws${
+                civitai ? `, on ${companion.settings.pictureModelName || companion.settings.pictureModel}` : ""
+              }. Change anything before you make it.`}
+            >
               <textarea
                 className={`${inputStyle} min-h-32 resize-y font-mono text-xs leading-relaxed`}
                 value={draft.prompt}

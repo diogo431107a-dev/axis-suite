@@ -15,10 +15,24 @@ function count(name: string, fallback: number, min = 1): number {
 
 const modelFrom = (name: string, fallback: string): string => process.env[name]?.trim() || fallback;
 
+/**
+ * The checkpoint a companion starts on: PICTURE_MODEL, or WAI-illustrious. One set by hand has no
+ * name or base model until it is looked up from the companion's page.
+ */
+function pictureCheckpoint(): Pick<Settings, "pictureModel" | "pictureModelName" | "pictureBaseModel"> {
+  const air = modelFrom("PICTURE_MODEL", DEFAULT_SETTINGS.pictureModel);
+  if (air === DEFAULT_SETTINGS.pictureModel) {
+    const { pictureModel, pictureModelName, pictureBaseModel } = DEFAULT_SETTINGS;
+    return { pictureModel, pictureModelName, pictureBaseModel };
+  }
+  return { pictureModel: air, pictureModelName: "", pictureBaseModel: "" };
+}
+
 export const config = {
   /**
    * What a new Claude companion starts from: CHAT_MODEL answers in character, MEMORY_MODEL keeps
-   * memory, TONE_MODEL works out how a reply is said aloud, SCENE_MODEL a moment for a picture.
+   * memory, TONE_MODEL works out how a reply is said aloud, SCENE_MODEL a moment for a picture,
+   * PICTURE_MODEL the CivitAI checkpoint it is drawn on.
    */
   defaults: {
     ...DEFAULT_SETTINGS,
@@ -26,6 +40,7 @@ export const config = {
     memoryModel: modelFrom("MEMORY_MODEL", DEFAULT_SETTINGS.memoryModel),
     toneModel: modelFrom("TONE_MODEL", DEFAULT_SETTINGS.toneModel),
     sceneModel: modelFrom("SCENE_MODEL", DEFAULT_SETTINGS.sceneModel),
+    ...pictureCheckpoint(),
   } satisfies Settings,
   /** After this many swipes on one reply, ask why the replies aren't working. */
   swipeAsk: count("VALHALLA_SWIPE_ASK", 5),
@@ -47,8 +62,6 @@ export const config = {
   /** How many daily backups of the database are kept. */
   backupsKept: count("VALHALLA_BACKUPS_KEPT", 14),
   pictures: {
-    /** The CivitAI model that makes pictures, as an AIR. */
-    model: modelFrom("PICTURE_MODEL", "urn:air:sdxl:checkpoint:civitai:827184@2883731"),
     /** The Claude model that writes a picture's prompt. */
     promptModel: modelFrom("PICTURE_PROMPT_MODEL", "claude-sonnet-5-5"),
     /** The xAI image model a companion on Grok Imagine makes its pictures with. */

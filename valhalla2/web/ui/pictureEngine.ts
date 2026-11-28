@@ -36,5 +36,6 @@ export function pictureSummary(settings: Settings, available: readonly PictureEn
   if (engine === "openai") return `${PICTURE_ENGINE_LABELS.openai} · ${settings.openaiPictureQuality} quality`;
   const seed = settings.pictureSeed === null ? "" : ` · seed ${settings.pictureSeed}`;
   const name = available.length > 1 ? `${PICTURE_ENGINE_LABELS.civitai} · ` : "";
-  return `${name}${samplerLabel(settings.pictureSampler)} ·${settings.pictureSteps} steps · CFG ${settings.pictureCfg}${seed}`;
+  const checkpoint = settings.pictureModelName || settings.pictureModel;
+  return `${name}${checkpoint} · ${samplerLabel(settings.pictureSampler)} · ${settings.pictureSteps} steps · CFG ${settings.pictureCfg}${seed}`;
 }

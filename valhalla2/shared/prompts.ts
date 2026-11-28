@@ -92,12 +92,14 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "the view shows: with the face hidden, the feeling shows in the body (hunched shoulders, a clenched fist).\n\n" +
     "Describe only this moment, and never invent events. Write in the language of the chat.",
   picture:
-    "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
-    "an anime illustration style and reads Danbooru-style tags best. You are given a companion character's " +
+    "You write prompts for an SDXL checkpoint on CivitAI that reads Danbooru-style tags best, such as an anime " +
+    "checkpoint in the Illustrious or Pony family; which one is named at the end. You are given a companion character's " +
     "profile, what they remember, and either the moment to picture (with the scene worked out, or the chat " +
     "leading up to it) or a request for a portrait. Write the prompt for one picture.\n\n" +
     "- prompt: comma-separated Danbooru tags, the fewest that do the job: about 20 to 35. Every tag pulls the " +
-    'picture somewhere, and too many muddle it. Start with "masterpiece, best quality, amazing quality", then ' +
+    "picture somewhere, and too many muddle it. Start with the quality tags the checkpoint's family expects " +
+    '(Illustrious and NoobAI: "masterpiece, best quality, amazing quality"; Pony: "score_9, score_8_up, ' +
+    'score_7_up"), then ' +
     "the count of people (1girl, 1boy, 1girl 1boy, solo…), then the pose (lying on side, sitting, kneeling, arms " +
     "crossed), the view and framing (looking at viewer, from behind, from side, looking away, upper body, cowboy " +
     "shot, full body), then the look and clothes that show, the expression, the place, and the light and colour.\n" +
@@ -121,8 +123,42 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "looks, keep them plain, or show them from behind or only in part.\n" +
     "- Picture the chosen moment, not the whole chat. The scene and the chat decide; the memory fills in what " +
     "they leave out, and the chat wins where they differ.\n" +
-    '- negativePrompt: start with "bad quality, worst quality, worst detail, sketch, censor", then add what this ' +
+    "- negativePrompt: start with the family's low-quality tags (Illustrious and NoobAI: " +
+    '"bad quality, worst quality, worst detail, sketch, censor"; Pony: "score_6, score_5, score_4"), then add what this ' +
     "picture should avoid (extra people, the wrong hair colour…).\n" +
+    "- orientation: portrait for one figure or a close shot, landscape for two people, a figure lying down or a " +
+    "wide place, square when neither fits.\n" +
+    "- caption: one short plain sentence saying what the picture shows, for the gallery.\n\n" +
+    "If the user adds a note, follow it.",
+  civitaiSentencesPicture:
+    "You write prompts for an SDXL checkpoint on CivitAI that reads plain descriptive English, not tags; which " +
+    "one is named at the end. You are given a companion character's profile, what they remember, and either the " +
+    "moment to picture (with the scene worked out, or the chat leading up to it) or a request for a portrait. " +
+    "Write the prompt for one picture.\n\n" +
+    "- prompt: two or three short plain sentences, at most about 60 words: the checkpoint reads only the first " +
+    "75 or so tokens well, so the most important comes first. Open with the style and quality in a few words " +
+    "that suit the checkpoint (a photograph, a semi-realistic digital painting, an anime illustration). Then who " +
+    "is in it and how many (usually the character alone), their pose, how the picture sees them (facing the " +
+    "viewer, from behind, from the side, looking away) and the framing (a close-up, from the waist up, the full " +
+    "figure), then the look and clothes that show, the expression, the place, and the light and colour.\n" +
+    "- Draw only what the pose and the view show. From behind or looking away: say nothing of the face, the eyes " +
+    "or the expression; describe the hair, the shoulders, the back and the back of the clothes instead. Lying " +
+    "face down: nothing on the front of the clothes. A close-up: no shoes or legs.\n" +
+    "- Keep the pose the scene gives. Where nothing says, choose a plain one that fits the moment.\n" +
+    "- Take the companion's look from the profile (an <appearance> section if there is one) and describe it the " +
+    "same way from picture to picture: hair colour and style, eyes, build. Change it only as the scene does (wet " +
+    "hair, messy hair, tired).\n" +
+    "- Leave out what can't be drawn: names, the story, thoughts, sounds, smells, what was said. Never put words " +
+    "or captions in the picture.\n" +
+    "- Turn moods into what a picture shows: hopeful is a slight smile, looking up, in warm light; lonely is a " +
+    "small figure in a cold blue dusk. Turn the atmosphere into the light and the colours.\n" +
+    "- With a scene worked out, draw exactly the people it lists: usually the companion alone. Draw the user only " +
+    "when the scene lists them, from the profile's description of them; if it says nothing about their looks, " +
+    "keep them plain, or show them from behind or only in part.\n" +
+    "- Picture the chosen moment, not the whole chat. The scene and the chat decide; the memory fills in what " +
+    "they leave out, and the chat wins where they differ.\n" +
+    '- negativePrompt: a short comma-separated list, starting with "bad quality, worst quality, blurry, ' +
+    'deformed, extra fingers", then what this picture should avoid (extra people, the wrong hair colour…).\n' +
     "- orientation: portrait for one figure or a close shot, landscape for two people, a figure lying down or a " +
     "wide place, square when neither fits.\n" +
     "- caption: one short plain sentence saying what the picture shows, for the gallery.\n\n" +
@@ -277,8 +313,12 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
     hint: "What the scene model is told when it works out a moment before a picture of it: the place, the character and how they look, the atmosphere.",
   },
   picture: {
-    label: "Picture instructions (CivitAI)",
-    hint: "What the model is told when it writes the prompt for a CivitAI picture, in Danbooru tags: the image model's style, and how to fill in what the chat leaves vague.",
+    label: "Picture instructions (CivitAI, tags)",
+    hint: "What the model is told when it writes the prompt for a CivitAI picture in Danbooru tags: the style, and how to fill in what the chat leaves vague. The checkpoint's name and base model are said after it.",
+  },
+  civitaiSentencesPicture: {
+    label: "Picture instructions (CivitAI, sentences)",
+    hint: "What the model is told when it writes the prompt for a CivitAI picture in plain sentences: the style, and how to fill in what the chat leaves vague. The checkpoint's name and base model are said after it.",
   },
   grokPicture: {
     label: "Picture instructions (Grok Imagine)",

@@ -6,7 +6,8 @@ import { paramsFor } from "./params.ts";
 describe("what a new picture is made with", () => {
   it("is CivitAI's size, steps and seed on CivitAI", () => {
     expect(paramsFor("civitai", DEFAULT_SETTINGS, "portrait", 42)).toEqual({
-      model: config.pictures.model,
+      model: DEFAULT_SETTINGS.pictureModel,
+      modelName: "WAI-illustrious-SDXL v17.0",
       width: 832,
       height: 1216,
       steps: DEFAULT_SETTINGS.pictureSteps,

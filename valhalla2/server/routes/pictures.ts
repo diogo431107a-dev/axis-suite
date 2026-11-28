@@ -10,17 +10,28 @@ import {
   PICTURE_KINDS,
   pictureEngineOf,
   type ApiError,
+  type CheckpointLookup,
   type Companion,
   type Orientation,
   type PictureDraftReply,
   type PictureKind,
 } from "../../shared/protocol.ts";
 import { writePictureFor } from "../chat/write.ts";
-import { id as checkId, messageId, object, oneOf, required, seed as checkSeed, text } from "../check.ts";
+import {
+  id as checkId,
+  messageId,
+  object,
+  oneOf,
+  required,
+  seed as checkSeed,
+  settings as checkSettings,
+  text,
+} from "../check.ts";
 import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
-import { randomSeed } from "../pictures/civitai.ts";
+import { jobFor, randomSeed } from "../pictures/civitai.ts";
+import { EngineError } from "../pictures/engine.ts";
 import { paramsFor } from "../pictures/params.ts";
 import { backgroundOf, plainPictureRequest, sceneRequest, type Scene } from "../scene/context.ts";
 import type { Services } from "../services.ts";
@@ -59,6 +70,7 @@ export function pictureRoutes(s: Services): Router {
     // With scenes, a chat picture is drawn from the moment worked out: read once, kept, and yours to
     // correct. Without memory, from the message itself and the profile.
     const scenes = hasScenes(companion);
+    const instructions = engine.instructionsFor(companion.settings);
     const read = from && scenes ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
     const request = scenes
       ? sceneRequest(
@@ -68,9 +80,9 @@ export function pictureRoutes(s: Services): Router {
           backgroundOf(companion, s.remembered(companion.id)),
           config.scene.tokens,
           read?.sheet,
-          engine.promptKey,
+          instructions,
         )
-      : plainPictureRequest(companion, scene, hint, engine.promptKey);
+      : plainPictureRequest(companion, scene, hint, instructions);
     const draft = await writePictureFor(companion, request);
     res.json({ ...draft, scene: read } satisfies PictureDraftReply);
   });
@@ -109,6 +121,31 @@ export function pictureRoutes(s: Services): Router {
     if (seed !== null && seed !== settings.pictureSeed) my.companions.setPictureSeed(companion.id, seed);
     void painter.paint(picture.id, null);
     res.status(201).json(picture);
+  });
+
+  // A checkpoint for a companion's CivitAI pictures, from a pasted link: what it is, and that CivitAI
+  // will make pictures on it at the settings on the page, with what one costs. Nothing is saved: the
+  // page keeps it in the companion's settings.
+  routes.post("/pictures/checkpoint", async (req: Request, res: Response) => {
+    const checkpoints =
+      s.checkpoints ?? invalid("This Valhalla 2 has no CivitAI key, so it can't make pictures on CivitAI");
+    const body = object(req.body);
+    const found = await checkpoints.lookUp(required(body.link, 500, "The link"));
+    const settings = { ...checkSettings(body.settings, config.defaults), pictureModel: found.air };
+    let buzz: number | null;
+    try {
+      buzz = await checkpoints.estimate(
+        jobFor({
+          prompt: "1girl",
+          negativePrompt: "",
+          params: paramsFor("civitai", settings, "portrait", randomSeed()),
+        }),
+      );
+    } catch (err) {
+      if (!(err instanceof EngineError)) throw err;
+      invalid(`CivitAI won't make pictures on ${found.name}: ${err.message}`);
+    }
+    res.json({ ...found, buzz } satisfies CheckpointLookup);
   });
 
   routes.get("/companions/:id/pictures", (req: Request, res: Response) => {

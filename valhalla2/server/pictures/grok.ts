@@ -131,7 +131,7 @@ export function grokImagineEngine(grok: GrokImagine): PictureEngine {
   };
   return {
     id: "grok",
-    promptKey: "grokPicture",
+    instructionsFor: () => ({ key: "grokPicture", note: null }),
     takesNegative: false,
     async submit({ prompt, params }) {
       if (!isGrokParams(params)) throw new GrokImagineError("This picture is for another engine, not Grok Imagine");

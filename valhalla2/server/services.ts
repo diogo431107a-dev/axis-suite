@@ -98,6 +98,7 @@ export function createServices(db: DatabaseSync) {
     backupDir,
     pictureFiles: pictures.files,
     painter: pictures.painter,
+    checkpoints: pictures.checkpoints,
     speechFiles: speech.files,
     speech: speech.speech,
     /** Moments worked out for pictures, kept. */

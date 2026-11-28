@@ -1,7 +1,11 @@
 import { describe, expect, it } from "vitest";
+import { DEFAULT_SETTINGS } from "../../shared/protocol.ts";
+import { paramsFor } from "./params.ts";
 import {
   CivitaiError,
+  civitaiEngine,
   createCivitai,
+  jobFor,
   imagesOf,
   randomSeed,
   SEED_MAX,
@@ -37,6 +41,8 @@ function fake(...answers: (Response | Error)[]) {
   const civitai = createCivitai({ token: "secret", fetch, pollMs: 1, sleep: () => Promise.resolve() });
   return { civitai, asked };
 }
+
+const PONY = "urn:air:sdxl:checkpoint:civitai:257749@290640";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
@@ -106,6 +112,49 @@ describe("CivitAI", () => {
       fetch: (() => Promise.resolve(new Response(PNG))) as typeof fetch,
     });
     await expect(small.download("u")).rejects.toThrow(/larger/);
+  });
+
+  it("asks what a picture would cost without making it, and says when CivitAI won't run the checkpoint", async () => {
+    const { civitai, asked } = fake(
+      json({ id: "wf-3", status: "unassigned", transactions: { list: [{ type: "debit", amount: 3 }] } }),
+      json({ id: "wf-4", status: "unassigned" }),
+      json(
+        { errors: { messages: ["Resource urn:air:sdxl:checkpoint:civitai:1@9 does not exist or is not valid."] } },
+        400,
+      ),
+    );
+    await expect(civitai.estimate(job)).resolves.toBe(3);
+    expect(asked[0]!.url).toBe("https://orchestration.civitai.com/v2/consumer/workflows?whatif=true");
+    expect(JSON.parse(String(asked[0]!.init!.body)).steps[0].input.model).toBe(job.model);
+    await expect(civitai.estimate(job)).resolves.toBeNull();
+    await expect(civitai.estimate(job)).rejects.toThrow(/400: Resource .* does not exist or is not valid\.$/);
+  });
+
+  it("makes the picture on the checkpoint it was asked on, sending only its AIR", () => {
+    const params = paramsFor(
+      "civitai",
+      { ...DEFAULT_SETTINGS, pictureModel: PONY, pictureModelName: "Pony" },
+      "square",
+      7,
+    );
+    const sent = jobFor({ prompt: "p", negativePrompt: "n", params });
+    expect(sent.model).toBe(PONY);
+    expect(sent).not.toHaveProperty("modelName");
+  });
+
+  it("writes its prompts in the companion's style, and names the checkpoint to the writer", () => {
+    const engine = civitaiEngine(fake().civitai);
+    expect(engine.instructionsFor(DEFAULT_SETTINGS)).toEqual({
+      key: "picture",
+      note:
+        "The picture is made on the SDXL checkpoint WAI-illustrious-SDXL v17.0 (base model: Illustrious). " +
+        "Write the prompt in the words and quality tags it expects.",
+    });
+    const plain = { ...DEFAULT_SETTINGS, pictureModel: PONY, pictureModelName: "", pictureBaseModel: "" };
+    expect(engine.instructionsFor({ ...plain, picturePromptStyle: "sentences" })).toEqual({
+      key: "civitaiSentencesPicture",
+      note: `The picture is made on the SDXL checkpoint ${PONY}. Write the prompt in the words and quality tags it expects.`,
+    });
   });
 
   it("tells PNG, JPEG and WebP apart from anything else", () => {

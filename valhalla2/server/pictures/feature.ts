@@ -8,7 +8,8 @@ import { STATE_DIR } from "../db.ts";
 import { createFileStore, type FileStore } from "../files.ts";
 import { loadXaiKey } from "../grok/key.ts";
 import { loadOpenAiKey } from "../openai/key.ts";
-import { civitaiEngine, createCivitai } from "./civitai.ts";
+import { createCheckpointLookup } from "./checkpoint.ts";
+import { civitaiEngine, createCivitai, type Civitai } from "./civitai.ts";
 import type { PictureEngine } from "./engine.ts";
 import { createGrokImagine, grokImagineEngine } from "./grok.ts";
 import { loadCivitaiKey } from "./key.ts";
@@ -23,6 +24,8 @@ export interface PicturesFeature {
   files: FileStore;
   /** Makes pictures in the background; null when the server has no CivitAI, xAI or OpenAI key. */
   painter: ReturnType<typeof createPainter> | null;
+  /** Looks up a checkpoint and asks CivitAI what a picture on it costs; null without a CivitAI key. */
+  checkpoints: { lookUp: ReturnType<typeof createCheckpointLookup>; estimate: Civitai["estimate"] } | null;
 }
 
 export function startPictures(db: DatabaseSync): PicturesFeature {
@@ -34,7 +37,8 @@ export function startPictures(db: DatabaseSync): PicturesFeature {
   const xaiKey = loadXaiKey();
   const openaiKey = loadOpenAiKey();
   const engines: Partial<Record<PictureEngineId, PictureEngine>> = {};
-  if (civitaiKey) engines.civitai = civitaiEngine(createCivitai({ token: civitaiKey.token }));
+  const civitai = civitaiKey ? createCivitai({ token: civitaiKey.token }) : null;
+  if (civitai) engines.civitai = civitaiEngine(civitai);
   if (xaiKey) engines.grok = grokImagineEngine(createGrokImagine({ apiKey: xaiKey.apiKey }));
   if (openaiKey) engines.openai = openAiImagesEngine(createOpenAiImages({ apiKey: openaiKey.apiKey }));
 
@@ -55,5 +59,6 @@ export function startPictures(db: DatabaseSync): PicturesFeature {
     const resumed = painter.resume();
     if (resumed > 0) console.log(`Picking up ${resumed} picture(s) the last stop cut short`);
   }
-  return { files, painter };
+  const checkpoints = civitai ? { lookUp: createCheckpointLookup(), estimate: civitai.estimate } : null;
+  return { files, painter, checkpoints };
 }
