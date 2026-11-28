@@ -9,8 +9,8 @@ import {
   MODELS,
   PROMPT_KEYS,
   providerOf,
-  samplerLabel,
   type Companion,
+  type PictureEngineId,
   type PromptKey,
   type Prompts,
   type Settings,
@@ -21,6 +21,7 @@ import { api } from "../api.ts";
 import { usePage } from "../page.ts";
 import { SettingsForm, ToneSettings } from "./SettingsForm.tsx";
 import { PictureSettings } from "./PictureSettings.tsx";
+import { pictureSummary } from "../ui/pictureEngine.ts";
 import { VoicePicker } from "./VoicePicker.tsx";
 import { useAutosize } from "../ui/autosize.ts";
 import { Button, Field, Fold, inputStyle, Notice } from "../ui/bits.tsx";
@@ -156,7 +157,12 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const memory = companion?.memory ?? withMemory;
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
-  const shownPrompts = PROMPT_KEYS.filter((key) => memory || !MEMORY_ONLY.includes(key));
+  // Each engine's picture instructions show only when the server has that engine.
+  const engineOnly: Partial<Record<PromptKey, PictureEngineId>> = { picture: "civitai", grokPicture: "grok" };
+  const shownPrompts = PROMPT_KEYS.filter((key) => memory || !MEMORY_ONLY.includes(key)).filter((key) => {
+    const engine = engineOnly[key];
+    return !engine || health.pictureEngines.length === 0 || health.pictureEngines.includes(engine);
+  });
   const ownCount = shownPrompts.filter((key) => !isDefault(key, prompts[key])).length;
   const profileLines = profile.split("\n").length;
 
@@ -275,13 +281,8 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
       </Fold>
 
       {health.pictures ? (
-        <Fold
-          title="Pictures"
-          hint={`${samplerLabel(settings.pictureSampler)} · ${settings.pictureSteps} steps · CFG ${settings.pictureCfg}${
-            settings.pictureSeed === null ? "" : ` · seed ${settings.pictureSeed}`
-          }`}
-        >
-          <PictureSettings settings={settings} onChange={setSettings} />
+        <Fold title="Pictures" hint={pictureSummary(settings, health.pictureEngines)}>
+          <PictureSettings settings={settings} onChange={setSettings} available={health.pictureEngines} />
         </Fold>
       ) : null}
 

@@ -16,6 +16,7 @@ export const PROMPT_KEYS = [
   "cleanup",
   "scene",
   "picture",
+  "grokPicture",
   "tone",
 ] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];

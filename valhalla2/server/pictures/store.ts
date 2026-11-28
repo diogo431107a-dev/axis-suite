@@ -7,6 +7,7 @@ import {
   type Orientation,
   type Picture,
   type PictureDraft,
+  type PictureEngineId,
   type PictureKind,
   type PictureParams,
 } from "../../shared/protocol.ts";
@@ -24,13 +25,16 @@ interface Row {
   orientation: Orientation;
   caption: string;
   params: string;
+  engine: PictureEngineId;
+  cost: number | null;
   status: Picture["status"];
   error: string | null;
   created_at: string;
 }
 
 const SELECT = `SELECT p.id, p.companion_id, p.kind, p.chat_id, c.title AS chat_title, p.message_id, p.prompt,
-                       p.negative_prompt, p.orientation, p.caption, p.params, p.status, p.error, p.created_at
+                       p.negative_prompt, p.orientation, p.caption, p.params, p.engine, p.cost, p.status, p.error,
+                       p.created_at
                 FROM pictures p LEFT JOIN chats c ON c.id = p.chat_id`;
 
 const pictureOf = (row: Row): Picture => ({
@@ -45,6 +49,8 @@ const pictureOf = (row: Row): Picture => ({
   orientation: row.orientation,
   caption: row.caption,
   params: JSON.parse(row.params) as PictureParams,
+  engine: row.engine,
+  cost: row.cost,
   status: row.status,
   error: row.error,
   createdAt: row.created_at,
@@ -57,6 +63,8 @@ export interface NewPicture extends PictureDraft {
   chatId: string | null;
   messageId: number | null;
   params: PictureParams;
+  /** The engine that makes it. */
+  engine: PictureEngineId;
 }
 
 /** One person's pictures. The companion and chat a new one names are checked by the caller. */
@@ -103,8 +111,8 @@ export function createPictures(db: DatabaseSync, owner: string) {
       }
       db.prepare(
         `INSERT INTO pictures (id, companion_id, kind, chat_id, message_id, prompt, negative_prompt, orientation,
-                               caption, params, status, created_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'working', ?)`,
+                               caption, params, engine, status, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'working', ?)`,
       ).run(
         picture.id,
         picture.companionId,
@@ -116,6 +124,7 @@ export function createPictures(db: DatabaseSync, owner: string) {
         picture.orientation,
         picture.caption,
         JSON.stringify(picture.params),
+        picture.engine,
         new Date().toISOString(),
       );
       return get(picture.id);
@@ -180,14 +189,21 @@ export function unfinished(db: DatabaseSync): Unfinished[] {
   return rows.map((row) => ({ id: row.id, workflowId: row.workflow_id, engine: row.engine }));
 }
 
-/** What a picture is to be made from; null when it has been deleted meanwhile. */
+/** What a picture is to be made from, and by which engine; null when it has been deleted meanwhile. */
 export function jobOf(
   db: DatabaseSync,
   id: string,
-): { prompt: string; negativePrompt: string; params: PictureParams } | null {
-  const row = db.prepare("SELECT prompt, negative_prompt, params FROM pictures WHERE id = ?").get(id) as
-    { prompt: string; negative_prompt: string; params: string } | undefined;
-  return row ? { prompt: row.prompt, negativePrompt: row.negative_prompt, params: JSON.parse(row.params) } : null;
+): { prompt: string; negativePrompt: string; params: PictureParams; engine: PictureEngineId } | null {
+  const row = db.prepare("SELECT prompt, negative_prompt, params, engine FROM pictures WHERE id = ?").get(id) as
+    { prompt: string; negative_prompt: string; params: string; engine: PictureEngineId } | undefined;
+  return row
+    ? {
+        prompt: row.prompt,
+        negativePrompt: row.negative_prompt,
+        params: JSON.parse(row.params) as PictureParams,
+        engine: row.engine,
+      }
+    : null;
 }
 
 /** Keeps the engine's id for a picture's job, and which engine it was asked of. */
@@ -195,13 +211,23 @@ export function setWorkflow(db: DatabaseSync, id: string, workflowId: string, en
   db.prepare("UPDATE pictures SET workflow_id = ?, engine = ? WHERE id = ?").run(workflowId, engine, id);
 }
 
-/** Marks a picture done. False when it was deleted meanwhile, so its file has to go too. */
-export function markDone(db: DatabaseSync, id: string, file: string, bytes: number): boolean {
+/**
+ * Marks a picture done, with what it cost when the engine said. False when it was deleted
+ * meanwhile, so its file has to go too.
+ */
+export function markDone(
+  db: DatabaseSync,
+  id: string,
+  file: string,
+  bytes: number,
+  cost: number | null = null,
+): boolean {
   const { changes } = db
     .prepare(
-      "UPDATE pictures SET status = 'done', file = ?, bytes = ?, error = NULL, finished_at = ? WHERE id = ? AND status = 'working'",
+      `UPDATE pictures SET status = 'done', file = ?, bytes = ?, cost = ?, error = NULL, finished_at = ?
+       WHERE id = ? AND status = 'working'`,
     )
-    .run(file, bytes, new Date().toISOString(), id);
+    .run(file, bytes, cost, new Date().toISOString(), id);
   return changes > 0;
 }
 

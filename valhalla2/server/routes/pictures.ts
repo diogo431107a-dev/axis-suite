@@ -1,17 +1,21 @@
 // Pictures of a companion: a profile picture from its page, a chat picture from a message. A model
-// writes the prompt, you look it over, and CivitAI makes the picture in the background.
+// writes the prompt, you look it over, and the companion's picture engine (CivitAI or Grok Imagine)
+// makes the picture in the background.
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import {
+  GROK_ASPECT,
   hasScenes,
   LIMITS,
   ORIENTATIONS,
   PICTURE_KINDS,
   PICTURE_SIZES,
+  pictureEngineOf,
   type ApiError,
   type Companion,
   type Orientation,
   type PictureDraftReply,
+  type PictureParams,
   type PictureKind,
 } from "../../shared/protocol.ts";
 import { writePictureFor } from "../chat/write.ts";
@@ -26,9 +30,13 @@ import type { Services } from "../services.ts";
 export function pictureRoutes(s: Services): Router {
   const routes = Router();
 
-  /** CivitAI, or a refusal when the server has no key for it. */
-  function needPictures() {
-    return s.painter ?? invalid("This Valhalla 2 has no CivitAI key, so it can't make pictures");
+  /** The painter, and the engine this companion's pictures are made by; or a refusal without one. */
+  function needPictures(companion: Companion) {
+    const painter =
+      s.painter ?? invalid("This Valhalla 2 has no CivitAI key and no xAI key, so it can't make pictures");
+    const id = pictureEngineOf(companion.settings.pictureEngine, painter.available);
+    const engine = id ? painter.engines[id] : undefined;
+    return engine ? { painter, engine } : invalid("This Valhalla 2 can't make pictures");
   }
 
   /** The chat and message a chat picture is of, checked against the companion. */
@@ -43,8 +51,8 @@ export function pictureRoutes(s: Services): Router {
   }
 
   routes.post("/companions/:id/pictures/prompt", async (req: Request, res: Response) => {
-    needPictures();
     const companion = s.companionOf(req);
+    const { engine } = needPictures(companion);
     const body = object(req.body);
     const kind = oneOf<PictureKind>(body.kind, PICTURE_KINDS, "The kind of picture");
     const hint = body.hint === undefined ? "" : text(body.hint, LIMITS.pictureHint, "The note");
@@ -62,23 +70,45 @@ export function pictureRoutes(s: Services): Router {
           backgroundOf(companion, s.remembered(companion.id)),
           config.scene.tokens,
           read?.sheet,
+          engine.promptStyle,
         )
-      : plainPictureRequest(companion, scene, hint);
+      : plainPictureRequest(companion, scene, hint, engine.promptStyle);
     const draft = await writePictureFor(companion, request);
     res.json({ ...draft, scene: read } satisfies PictureDraftReply);
   });
 
   routes.post("/companions/:id/pictures", (req: Request, res: Response) => {
-    const paint = needPictures();
     const companion = s.companionOf(req);
+    const { painter, engine } = needPictures(companion);
     const body = object(req.body);
     const kind = oneOf<PictureKind>(body.kind, PICTURE_KINDS, "The kind of picture");
     const from = kind === "chat" ? sceneOf(req, companion, body) : null;
     const orientation = oneOf<Orientation>(body.orientation, ORIENTATIONS, "The orientation");
-    // The seed you chose, or the companion's, or a new one; whichever it is, the next picture
-    // carries on from it.
     const settings = companion.settings;
-    const seed = (body.seed === undefined ? null : checkSeed(body.seed)) ?? settings.pictureSeed ?? randomSeed();
+    // On CivitAI, the seed you chose, or the companion's, or a new one; whichever it is, the next
+    // picture carries on from it. Grok Imagine has no seed.
+    const seed =
+      engine.id === "civitai"
+        ? ((body.seed === undefined ? null : checkSeed(body.seed)) ?? settings.pictureSeed ?? randomSeed())
+        : null;
+    const params: PictureParams =
+      seed === null
+        ? {
+            engine: "grok",
+            model: config.pictures.grokModel,
+            aspectRatio: GROK_ASPECT[orientation],
+            resolution: settings.grokPictureResolution,
+            quality: settings.grokPictureQuality,
+          }
+        : {
+            model: config.pictures.model,
+            ...PICTURE_SIZES[orientation],
+            steps: settings.pictureSteps,
+            cfgScale: settings.pictureCfg,
+            sampler: settings.pictureSampler,
+            clipSkip: settings.pictureClipSkip,
+            seed,
+          };
     const my = s.ownedBy(req);
     const picture = my.pictures.create({
       id: randomUUID(),
@@ -87,21 +117,16 @@ export function pictureRoutes(s: Services): Router {
       chatId: from?.chat.id ?? null,
       messageId: from?.messageId ?? null,
       prompt: required(body.prompt, LIMITS.picturePrompt, "The prompt"),
-      negativePrompt: text(body.negativePrompt ?? "", LIMITS.picturePrompt, "The negative prompt"),
+      // Grok Imagine takes no negative prompt, so none is kept with its pictures.
+      negativePrompt:
+        engine.id === "grok" ? "" : text(body.negativePrompt ?? "", LIMITS.picturePrompt, "The negative prompt"),
       orientation,
       caption: text(body.caption ?? "", LIMITS.pictureCaption, "The caption"),
-      params: {
-        model: config.pictures.model,
-        ...PICTURE_SIZES[orientation],
-        steps: settings.pictureSteps,
-        cfgScale: settings.pictureCfg,
-        sampler: settings.pictureSampler,
-        clipSkip: settings.pictureClipSkip,
-        seed,
-      },
+      params,
+      engine: engine.id,
     });
-    if (seed !== settings.pictureSeed) my.companions.setPictureSeed(companion.id, seed);
-    void paint.paint(picture.id, null);
+    if (seed !== null && seed !== settings.pictureSeed) my.companions.setPictureSeed(companion.id, seed);
+    void painter.paint(picture.id, null);
     res.status(201).json(picture);
   });
 

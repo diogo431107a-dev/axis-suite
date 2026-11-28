@@ -4,12 +4,18 @@ import {
   DEFAULT_SETTINGS,
   DEFAULT_TUNING,
   EFFORTS,
+  GROK_QUALITIES,
+  GROK_RESOLUTIONS,
   LIMITS,
+  PICTURE_ENGINES,
   PROMPT_KEYS,
   providerOf,
   SAMPLER_IDS,
   type Sampler,
   type CacheTtl,
+  type GrokQuality,
+  type GrokResolution,
+  type PictureEngineId,
   type Provider,
   type Effort,
   type Prompts,
@@ -189,6 +195,21 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
       "The clip skip",
     ),
     pictureSeed: body.pictureSeed === undefined ? defaults.pictureSeed : seed(body.pictureSeed),
+    pictureEngine: oneOf<PictureEngineId>(
+      body.pictureEngine ?? defaults.pictureEngine,
+      PICTURE_ENGINES,
+      "The picture engine",
+    ),
+    grokPictureQuality: oneOf<GrokQuality>(
+      body.grokPictureQuality ?? defaults.grokPictureQuality,
+      GROK_QUALITIES,
+      "The picture quality",
+    ),
+    grokPictureResolution: oneOf<GrokResolution>(
+      body.grokPictureResolution ?? defaults.grokPictureResolution,
+      GROK_RESOLUTIONS,
+      "The picture size",
+    ),
   };
 }
 

@@ -105,7 +105,8 @@ export function Gallery({ companion }: { companion: Companion }) {
       </div>
       {health.pictures ? null : (
         <Notice kind="quiet">
-          This Valhalla 2 has no CivitAI key, so it can't make new pictures. The ones already made are still here.
+          This Valhalla 2 has no CivitAI key and no xAI key, so it can't make new pictures. The ones already made are
+          still here.
         </Notice>
       )}
       <Notice>{error}</Notice>

@@ -2,12 +2,14 @@ import { afterEach, describe, expect, it } from "vitest";
 import { existsSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { DEFAULT_SETTINGS, type PictureParams } from "../../shared/protocol.ts";
+import { DEFAULT_SETTINGS, type GrokPictureParams, type PictureParams } from "../../shared/protocol.ts";
 import { createChats } from "../chat/chats.ts";
 import { CivitaiError, civitaiEngine, jobFor, type Civitai } from "./civitai.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { createFileStore } from "../files.ts";
+import type { PictureEngine } from "./engine.ts";
+import { grokImagineEngine, type GrokImagine } from "./grok.ts";
 import { createPainter } from "./painter.ts";
 import { createPictures, knownFiles, setWorkflow, type NewPicture } from "./store.ts";
 
@@ -45,8 +47,29 @@ const newPicture = (id: string, fields: Partial<NewPicture> = {}): NewPicture =>
   orientation: "portrait",
   caption: "Freya",
   params,
+  engine: "civitai",
   ...fields,
 });
+
+const grokParams: GrokPictureParams = {
+  engine: "grok",
+  model: "grok-imagine-image-2.0",
+  aspectRatio: "2:3",
+  resolution: "1k",
+  quality: "auto",
+};
+
+/** A Grok Imagine that makes every picture within the request, at 4 cents, and says what it was asked. */
+function grokImagine(): GrokImagine & { asked: unknown[] } {
+  const fake = {
+    asked: [] as unknown[],
+    generate: (image: unknown) => {
+      fake.asked.push(image);
+      return Promise.resolve({ bytes: PNG, type: "image/png", ext: "png", cost: 0.04 });
+    },
+  };
+  return fake;
+}
 
 /** A CivitAI that makes every picture at once, or fails with `error`. */
 function civitai(error?: string): Civitai & { submitted: number } {
@@ -75,7 +98,7 @@ describe("pictures", () => {
   it("are made in the background, saved as a file, and marked done", async () => {
     const { db, pictures, files, dir } = setup();
     pictures.create(newPicture("pic-00001"));
-    await createPainter({ db, engine: civitaiEngine(civitai()), files }).paint("pic-00001", null);
+    await createPainter({ db, engines: { civitai: civitaiEngine(civitai()) }, files }).paint("pic-00001", null);
     expect(pictures.get("pic-00001").status).toBe("done");
     expect(pictures.fileOf("pic-00001")).toBe("pic-00001.png");
     expect(readdirSync(dir)).toEqual(["pic-00001.png"]);
@@ -84,7 +107,10 @@ describe("pictures", () => {
   it("say why when they weren't made", async () => {
     const { db, pictures, files } = setup();
     pictures.create(newPicture("pic-00001"));
-    await createPainter({ db, engine: civitaiEngine(civitai("No Buzz left")), files }).paint("pic-00001", null);
+    await createPainter({ db, engines: { civitai: civitaiEngine(civitai("No Buzz left")) }, files }).paint(
+      "pic-00001",
+      null,
+    );
     expect(pictures.get("pic-00001")).toMatchObject({ status: "failed", error: "No Buzz left" });
     expect(pictures.fileOf("pic-00001")).toBeNull();
   });
@@ -93,7 +119,10 @@ describe("pictures", () => {
     const { db, pictures, files, dir } = setup();
     pictures.create(newPicture("pic-00001"));
     setWorkflow(db, "pic-00001", "wf-1", "civitai");
-    const painting = createPainter({ db, engine: civitaiEngine(civitai()), files }).paint("pic-00001", "wf-1");
+    const painting = createPainter({ db, engines: { civitai: civitaiEngine(civitai()) }, files }).paint(
+      "pic-00001",
+      "wf-1",
+    );
     pictures.remove("pic-00001");
     await painting;
     expect(readdirSync(dir)).toEqual([]);
@@ -105,7 +134,7 @@ describe("pictures", () => {
     pictures.create(newPicture("pic-00002"));
     setWorkflow(db, "pic-00001", "wf-1", "civitai");
     const fake = civitai();
-    expect(createPainter({ db, engine: civitaiEngine(fake), files }).resume()).toBe(2);
+    expect(createPainter({ db, engines: { civitai: civitaiEngine(fake) }, files }).resume()).toBe(2);
     await new Promise((done) => setTimeout(done, 10));
     expect(fake.submitted).toBe(0);
     expect(pictures.get("pic-00001").status).toBe("done");
@@ -117,7 +146,7 @@ describe("pictures", () => {
     pictures.create(newPicture("pic-00001"));
     setWorkflow(db, "pic-00001", "job-1", "another");
     const fake = civitai();
-    createPainter({ db, engine: civitaiEngine(fake), files }).resume();
+    createPainter({ db, engines: { civitai: civitaiEngine(fake) }, files }).resume();
     await new Promise((done) => setTimeout(done, 10));
     expect(pictures.get("pic-00001")).toMatchObject({ status: "failed", error: expect.stringMatching(/another/) });
   });
@@ -131,6 +160,62 @@ describe("pictures", () => {
     const chosen = jobFor({ prompt: "p", negativePrompt: "n", params: { ...params, sampler: "dpm++2m", clipSkip: 1 } });
     expect(chosen).toMatchObject({ sampleMethod: "dpm++2m", clipSkip: 1 });
     expect(chosen).not.toHaveProperty("sampler");
+  });
+
+  it("made by Grok Imagine are kept straight from its answer, with their cost", async () => {
+    const { db, pictures, files, dir } = setup();
+    pictures.create(newPicture("pic-00001", { engine: "grok", params: grokParams, negativePrompt: "" }));
+    const fake = grokImagine();
+    const engines: Partial<Record<"civitai" | "grok", PictureEngine>> = {
+      civitai: civitaiEngine(civitai()),
+      grok: grokImagineEngine(fake),
+    };
+    await createPainter({ db, engines, files }).paint("pic-00001", null);
+    expect(fake.asked).toEqual([
+      {
+        model: "grok-imagine-image-2.0",
+        prompt: "1girl, gold hair",
+        aspectRatio: "2:3",
+        resolution: "1k",
+        quality: "auto",
+      },
+    ]);
+    expect(pictures.get("pic-00001")).toMatchObject({ status: "done", engine: "grok", cost: 0.04, params: grokParams });
+    expect(readdirSync(dir)).toEqual(["pic-00001.png"]);
+  });
+
+  it("made by CivitAI have no cost, and older ones read as CivitAI's", async () => {
+    const { db, pictures, files } = setup();
+    pictures.create(newPicture("pic-00001"));
+    await createPainter({ db, engines: { civitai: civitaiEngine(civitai()) }, files }).paint("pic-00001", null);
+    expect(pictures.get("pic-00001")).toMatchObject({ status: "done", engine: "civitai", cost: null });
+    expect(pictures.get("pic-00001").params).not.toHaveProperty("engine");
+  });
+
+  it("whose engine the server has no key for any more fail and say so", async () => {
+    const { db, pictures, files } = setup();
+    pictures.create(newPicture("pic-00001", { engine: "grok", params: grokParams }));
+    await createPainter({ db, engines: { civitai: civitaiEngine(civitai()) }, files }).paint("pic-00001", null);
+    expect(pictures.get("pic-00001")).toMatchObject({ status: "failed", error: expect.stringMatching(/Grok Imagine/) });
+  });
+
+  it("Grok Imagine was making when the server stopped fail, since there is nothing to pick up", () => {
+    const { db, pictures, files } = setup();
+    pictures.create(newPicture("pic-00001", { engine: "grok", params: grokParams }));
+    const fake = grokImagine();
+    createPainter({ db, engines: { grok: grokImagineEngine(fake) }, files }).resume();
+    expect(fake.asked).toEqual([]);
+    expect(pictures.get("pic-00001")).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/while Grok Imagine was making/),
+    });
+  });
+
+  it("go to each engine only with its own parameters", async () => {
+    expect(() => jobFor({ prompt: "p", negativePrompt: "", params: grokParams })).toThrow(/Grok Imagine/);
+    await expect(grokImagineEngine(grokImagine()).submit({ prompt: "p", negativePrompt: "", params })).rejects.toThrow(
+      /CivitAI/,
+    );
   });
 
   it("can't pile up: only a few are made at once", () => {

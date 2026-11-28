@@ -1,9 +1,37 @@
 // A picture as the chat and the gallery show it: small, or full size with how it was made.
 import { useState } from "react";
 import { Copy, ImagePlus, Maximize2, Trash2 } from "lucide-react";
-import { samplerLabel, type Picture } from "../../shared/protocol.ts";
+import {
+  isGrokParams,
+  PICTURE_ENGINE_LABELS,
+  samplerLabel,
+  type Picture,
+  type PictureParams,
+} from "../../shared/protocol.ts";
 import { Button, Dialog } from "./bits.tsx";
 import { fileOf } from "./watch.ts";
+
+/** A picture's shape, as CSS takes it: 832 / 1216 for CivitAI, 2 / 3 for Grok Imagine. */
+const shapeOf = (params: PictureParams): string =>
+  isGrokParams(params) ? params.aspectRatio.replace(":", " / ") : `${params.width} / ${params.height}`;
+
+/** What a picture cost, as the page shows it: 4.0¢. */
+const cents = (dollars: number): string => `${(dollars * 100).toFixed(1)}¢`;
+
+/** How a picture was made, in one line after its date. */
+function madeWith(picture: Picture): string {
+  const { params } = picture;
+  if (isGrokParams(params)) {
+    const cost = picture.cost === null ? "" : ` · ${cents(picture.cost)}`;
+    return ` · ${PICTURE_ENGINE_LABELS.grok} · ${params.aspectRatio} · ${params.resolution} · ${params.quality} quality${cost}`;
+  }
+  return [
+    ` · ${params.width}×${params.height} · ${params.steps} steps · CFG ${params.cfgScale}`,
+    params.sampler ? ` · ${samplerLabel(params.sampler)}` : "",
+    params.clipSkip ? ` · clip skip ${params.clipSkip}` : "",
+    ` · seed ${params.seed}`,
+  ].join("");
+}
 
 /** A picture, small: its image, or how far along it is. */
 export function Thumb({
@@ -15,13 +43,12 @@ export function Thumb({
   onOpen: () => void;
   className?: string;
 }) {
-  const { width, height } = picture.params;
   return (
     <button
       type="button"
       onClick={onOpen}
       title={picture.caption || "A picture"}
-      style={{ aspectRatio: `${width} / ${height}` }}
+      style={{ aspectRatio: shapeOf(picture.params) }}
       className={`block overflow-hidden rounded-md border border-rule bg-sheet hover:border-accent ${className}`}
     >
       {picture.status === "done" ? (
@@ -68,7 +95,9 @@ export function PictureView({
         {picture.status === "done" ? (
           <img src={fileOf(picture)} alt={picture.caption} className="mx-auto max-h-[60vh] rounded-md" />
         ) : picture.status === "working" ? (
-          <p className="animate-pulse text-sm text-faint">CivitAI is painting this picture…</p>
+          <p className="animate-pulse text-sm text-faint">
+            {PICTURE_ENGINE_LABELS[picture.engine]} is painting this picture…
+          </p>
         ) : (
           <p className="text-sm text-warn">This picture wasn't made: {picture.error ?? "no reason given"}</p>
         )}
@@ -76,10 +105,7 @@ export function PictureView({
         <p className="text-xs text-faint">
           {new Date(picture.createdAt).toLocaleString()}
           {picture.chatTitle ? ` · from "${picture.chatTitle}"` : picture.kind === "chat" ? " · its chat is gone" : ""}
-          {` · ${picture.params.width}×${picture.params.height} · ${picture.params.steps} steps · CFG ${picture.params.cfgScale}`}
-          {picture.params.sampler ? ` · ${samplerLabel(picture.params.sampler)}` : ""}
-          {picture.params.clipSkip ? ` · clip skip ${picture.params.clipSkip}` : ""}
-          {` · seed ${picture.params.seed}`}
+          {madeWith(picture)}
         </p>
         <details className="text-sm">
           <summary className="cursor-pointer text-faint hover:text-ink">The prompt</summary>

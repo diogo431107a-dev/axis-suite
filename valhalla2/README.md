@@ -26,7 +26,8 @@ Like Fafnir, Valhalla 2 calls outside the suite: every message goes to
 `api.anthropic.com`, on the server's API key, which whoever runs the suite pays for; everything a
 Grok companion asks goes to `api.x.ai` instead, on the server's xAI key, and never to Anthropic. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
-pays in Buzz. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
+pays in Buzz, or, for a companion that chose Grok Imagine, by xAI's image model (`api.x.ai`) on the
+server's xAI key. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
 the server's Azure key, or, for a companion that chose one of Grok's voices, by xAI's text to speech
 (`api.x.ai`) on the server's xAI key.
 
@@ -54,7 +55,8 @@ default. See [Chats](docs/chats.md#what-valhalla-2-adds-to-a-request).
 - **Claude or Grok.** A companion answers through the Claude API or through xAI's on Grok, with or
   without memory; a Grok one can have memory turned on later. The two never mix: a Grok companion's
   memory is kept by Grok. See [providers](docs/providers.md).
-- **Pictures and reading aloud.** A picture of any moment, or of the companion, made by CivitAI;
+- **Pictures and reading aloud.** A picture of any moment, or of the companion, made by CivitAI or
+  Grok Imagine;
   replies read aloud by Azure AI Speech or in one of Grok's voices, each line with its feeling. See
   [Scenes, pictures and reading aloud](docs/scenes-pictures-speech.md).
 - **When the API declines a turn**, the refusal is kept and shown, and another model can answer
@@ -139,6 +141,7 @@ default.
 | `VALHALLA_BACKUPS_KEPT`       | `14`                                             | How many daily backups of the database are kept.                   |
 | `PICTURE_MODEL`               | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                  |
 | `PICTURE_PROMPT_MODEL`        | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                          |
+| `GROK_PICTURE_MODEL`          | `grok-imagine-image-2.0`                         | The xAI image model a companion on Grok Imagine makes pictures on. |
 | `SCENE_MODEL`                 | `claude-haiku-5-5`                               | The model a new companion works out a picture's scene with.        |
 | `TONE_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion works out how lines are said aloud with. |
 | `VALHALLA_SCENE_TOKENS`       | `12000`                                          | About how much of the chat it reads, up to the moment.             |

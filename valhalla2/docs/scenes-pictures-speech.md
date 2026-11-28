@@ -2,8 +2,8 @@
 
 A picture of a moment is drawn from the **scene**; a reply read aloud with feeling follows its
 **tags**. They are two readings, each for its own purpose, by models you choose on the companion's
-page. Both are optional: without a CivitAI key Valhalla 2 makes no pictures, and without an Azure
-Speech key or an xAI key it reads nothing aloud.
+page. Both are optional: without a CivitAI key or an xAI key Valhalla 2 makes no pictures, and
+without an Azure Speech key or an xAI key it reads nothing aloud.
 
 ## The scene
 
@@ -45,9 +45,11 @@ A Claude companion's scene is read by Claude, a Grok companion's by Grok (see
 
 ## Pictures
 
-A picture of the moment, or of the companion. Under any message, the picture button works out the
-scene (above), or uses the one kept, and asks for a prompt for the image model from it (on Claude,
-`PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok, the companion's own model). It is the fewest Danbooru
+A picture of the moment, or of the companion, made by **CivitAI** or by **Grok Imagine** (xAI's image
+model), whichever the companion chose (see [Two engines](#two-engines) below). Under any message, the
+picture button works out the scene (above), or uses the one kept, and asks for a prompt for the
+image model from it (on Claude, `PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok, the companion's own
+model). For CivitAI it is the fewest Danbooru
 tags that do the job, about 20 to 35, since every tag pulls the picture somewhere: the people the
 scene lists, their pose and how they are seen, the look and clothes that show, the expression, the
 place, the light and the colours. It draws only what the pose and view show: from behind, no face
@@ -61,7 +63,8 @@ The dialog shows the scene the prompt was drawn from; **Correct the scene** open
 can then be written again from the correction.
 
 The prompt opens in a dialog for you to change, with a note for Claude ("at sunset", "from behind")
-if you want it written again. **Make the picture** sends it to CivitAI, which makes it on the
+if you want it written again. **Make the picture** sends it to the companion's engine. CivitAI makes
+it on the
 WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) with the companion's picture settings, at a size
 SDXL was trained on for the shape Claude chose. It takes a few seconds to a minute; the picture
 appears under its message when it is done, only on that branch of the chat.
@@ -76,6 +79,32 @@ companion's, or a new one if it has none yet. The dice rolls another. Whatever s
 made with becomes the companion's, so the next picture starts from it too, and pictures of the same
 moment stay alike. The companion's seed can also be typed, or cleared, under **Pictures**; an empty
 one is rolled at the next picture. A seed Valhalla 2 rolls has ten digits.
+
+### Two engines
+
+Under **Pictures** on a companion's page, **Made by** chooses CivitAI or Grok Imagine, for any
+companion, Claude or Grok alike. It is offered when the server has both keys; a server with only
+one makes every picture with that one, whatever the companion chose. Every companion starts on
+CivitAI.
+
+- **CivitAI** draws on an anime SDXL checkpoint from Danbooru tags, with the steps, CFG, sampler,
+  clip skip and seed above, and charges Buzz.
+- **Grok Imagine** (`GROK_PICTURE_MODEL`, Grok Imagine 2.0) draws from plain sentences, on the same
+  xAI key Grok companions answer with. Its prompt is written from its own instructions, **Picture
+  instructions (Grok Imagine)**: two to five sentences that open with the style (an anime
+  illustration, so a companion looks alike on either engine) and follow the same rules about the
+  pose, the view and what shows. It has no negative prompt and no seed, so the picture dialog shows
+  neither, and every picture is drawn afresh: the profile's description is what keeps the companion
+  looking alike. Its settings are **Quality** (auto, which xAI makes low for a new picture; low;
+  medium) and **Size** (1k or 2k), auto and 1k to start. It answers within the one request, in a few
+  seconds. A picture costs about 4¢ on the server's xAI account, and its cost is shown with it.
+  xAI checks every prompt against its own rules and may refuse one; the picture then says why, and
+  xAI may still charge for it.
+
+The shape Claude or Grok chose becomes Grok Imagine's 2:3 (portrait), 3:2 (landscape) or 1:1
+(square). Making a picture again uses the companion's engine as it is now. Each picture remembers
+which engine made it, and a picture Grok Imagine was making when the server stopped is marked as
+not made, since there is nothing to pick up.
 
 Each companion's **Pictures** page, from its own page, has two shelves: **Profile pictures**, made
 there from the profile alone, and **Chat pictures**, each naming the chat it came from. Any picture
