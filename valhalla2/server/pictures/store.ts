@@ -164,16 +164,20 @@ export function picturesOn(db: DatabaseSync, chatId: string, messageIds: readonl
 
 export interface Unfinished {
   id: string;
+  /** The engine's id for the job, once it was asked; `workflow_id` from when only CivitAI made them. */
   workflowId: string | null;
+  /** The engine it was asked of. */
+  engine: string;
 }
 
 /** The pictures still being made, e.g. when the server was stopped in the middle of them. */
 export function unfinished(db: DatabaseSync): Unfinished[] {
-  const rows = db.prepare("SELECT id, workflow_id FROM pictures WHERE status = 'working'").all() as {
+  const rows = db.prepare("SELECT id, workflow_id, engine FROM pictures WHERE status = 'working'").all() as {
     id: string;
     workflow_id: string | null;
+    engine: string;
   }[];
-  return rows.map((row) => ({ id: row.id, workflowId: row.workflow_id }));
+  return rows.map((row) => ({ id: row.id, workflowId: row.workflow_id, engine: row.engine }));
 }
 
 /** What a picture is to be made from; null when it has been deleted meanwhile. */
@@ -186,8 +190,9 @@ export function jobOf(
   return row ? { prompt: row.prompt, negativePrompt: row.negative_prompt, params: JSON.parse(row.params) } : null;
 }
 
-export function setWorkflow(db: DatabaseSync, id: string, workflowId: string): void {
-  db.prepare("UPDATE pictures SET workflow_id = ? WHERE id = ?").run(workflowId, id);
+/** Keeps the engine's id for a picture's job, and which engine it was asked of. */
+export function setWorkflow(db: DatabaseSync, id: string, workflowId: string, engine: string): void {
+  db.prepare("UPDATE pictures SET workflow_id = ?, engine = ? WHERE id = ?").run(workflowId, engine, id);
 }
 
 /** Marks a picture done. False when it was deleted meanwhile, so its file has to go too. */

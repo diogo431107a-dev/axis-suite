@@ -30,6 +30,15 @@ export const LIMITS = {
   pictureHint: 1_000,
   /** The one line under a picture in the gallery. */
   pictureCaption: 300,
+  /** A picture's steps, CFG (in halves) and clip skip, as CivitAI takes them for SDXL. */
+  pictureStepsMin: 10,
+  pictureStepsMax: 60,
+  pictureCfgMin: 1,
+  pictureCfgMax: 15,
+  pictureClipSkipMin: 1,
+  pictureClipSkipMax: 3,
+  /** The largest seed you can type: ten digits. One Valhalla 2 rolls stays within 32 bits. */
+  pictureSeedMax: 9_999_999_999,
   /** How many pictures one companion keeps. */
   pictures: 5_000,
   /** How many pictures one person can have being made at once. */

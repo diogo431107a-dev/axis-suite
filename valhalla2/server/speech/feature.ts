@@ -4,6 +4,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { config } from "../config.ts";
 import { createFileStore, type FileStore } from "../files.ts";
 import { createAzureSpeech } from "./azure.ts";
+import { azureVoice } from "./engine.ts";
 import { loadSpeechKey } from "./key.ts";
 import { createSpeech, knownSpeechFiles, SPEECH_DIR } from "./store.ts";
 
@@ -22,7 +23,7 @@ export function startSpeech(db: DatabaseSync): SpeechFeature {
   const speech = key
     ? createSpeech({
         db,
-        azure: createAzureSpeech({ key: key.key, region: config.speech.region }),
+        engine: azureVoice(createAzureSpeech({ key: key.key, region: config.speech.region })),
         files,
         voice: config.speech.voice,
       })

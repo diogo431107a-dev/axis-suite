@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DEFAULT_SETTINGS, type PictureParams } from "../../shared/protocol.ts";
 import { createChats } from "../chat/chats.ts";
-import { CivitaiError, type Civitai } from "./civitai.ts";
+import { CivitaiError, civitaiEngine, jobFor, type Civitai } from "./civitai.ts";
 import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import { createFileStore } from "../files.ts";
@@ -75,7 +75,7 @@ describe("pictures", () => {
   it("are made in the background, saved as a file, and marked done", async () => {
     const { db, pictures, files, dir } = setup();
     pictures.create(newPicture("pic-00001"));
-    await createPainter({ db, civitai: civitai(), files }).paint("pic-00001", null);
+    await createPainter({ db, engine: civitaiEngine(civitai()), files }).paint("pic-00001", null);
     expect(pictures.get("pic-00001").status).toBe("done");
     expect(pictures.fileOf("pic-00001")).toBe("pic-00001.png");
     expect(readdirSync(dir)).toEqual(["pic-00001.png"]);
@@ -84,7 +84,7 @@ describe("pictures", () => {
   it("say why when they weren't made", async () => {
     const { db, pictures, files } = setup();
     pictures.create(newPicture("pic-00001"));
-    await createPainter({ db, civitai: civitai("No Buzz left"), files }).paint("pic-00001", null);
+    await createPainter({ db, engine: civitaiEngine(civitai("No Buzz left")), files }).paint("pic-00001", null);
     expect(pictures.get("pic-00001")).toMatchObject({ status: "failed", error: "No Buzz left" });
     expect(pictures.fileOf("pic-00001")).toBeNull();
   });
@@ -92,8 +92,8 @@ describe("pictures", () => {
   it("deleted while being made leave no file behind", async () => {
     const { db, pictures, files, dir } = setup();
     pictures.create(newPicture("pic-00001"));
-    setWorkflow(db, "pic-00001", "wf-1");
-    const painting = createPainter({ db, civitai: civitai(), files }).paint("pic-00001", "wf-1");
+    setWorkflow(db, "pic-00001", "wf-1", "civitai");
+    const painting = createPainter({ db, engine: civitaiEngine(civitai()), files }).paint("pic-00001", "wf-1");
     pictures.remove("pic-00001");
     await painting;
     expect(readdirSync(dir)).toEqual([]);
@@ -103,13 +103,34 @@ describe("pictures", () => {
     const { db, pictures, files } = setup();
     pictures.create(newPicture("pic-00001"));
     pictures.create(newPicture("pic-00002"));
-    setWorkflow(db, "pic-00001", "wf-1");
+    setWorkflow(db, "pic-00001", "wf-1", "civitai");
     const fake = civitai();
-    expect(createPainter({ db, civitai: fake, files }).resume()).toBe(2);
+    expect(createPainter({ db, engine: civitaiEngine(fake), files }).resume()).toBe(2);
     await new Promise((done) => setTimeout(done, 10));
     expect(fake.submitted).toBe(0);
     expect(pictures.get("pic-00001").status).toBe("done");
     expect(pictures.get("pic-00002").status).toBe("failed");
+  });
+
+  it("asked of another engine aren't looked for here after a stop", async () => {
+    const { db, pictures, files } = setup();
+    pictures.create(newPicture("pic-00001"));
+    setWorkflow(db, "pic-00001", "job-1", "another");
+    const fake = civitai();
+    createPainter({ db, engine: civitaiEngine(fake), files }).resume();
+    await new Promise((done) => setTimeout(done, 10));
+    expect(pictures.get("pic-00001")).toMatchObject({ status: "failed", error: expect.stringMatching(/another/) });
+  });
+
+  it("go to CivitAI with their sampler and clip skip, or the defaults for an older one", () => {
+    expect(jobFor({ prompt: "p", negativePrompt: "n", params })).toMatchObject({
+      sampleMethod: "euler_a",
+      clipSkip: 2,
+      seed: 1,
+    });
+    const chosen = jobFor({ prompt: "p", negativePrompt: "n", params: { ...params, sampler: "dpm++2m", clipSkip: 1 } });
+    expect(chosen).toMatchObject({ sampleMethod: "dpm++2m", clipSkip: 1 });
+    expect(chosen).not.toHaveProperty("sampler");
   });
 
   it("can't pile up: only a few are made at once", () => {

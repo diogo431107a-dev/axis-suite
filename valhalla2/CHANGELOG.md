@@ -4,6 +4,38 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Picture settings for each companion.** Under **Pictures** on a companion's page: steps, CFG,
+  sampler and clip skip. A new companion, and every one you have, starts at 20 steps (pictures were
+  made at 30 before, so they are a little quicker and cheaper now), CFG 7, Euler a and clip skip 2.
+- **The seed carries on.** The picture dialog shows the seed the picture is made with, with a dice
+  for a new one. Whatever seed a picture is made with becomes the companion's, so the next picture
+  starts from it and pictures stay alike. Each picture shows its steps, CFG, sampler, clip skip and
+  seed.
+- **The companion page is one page of folding sections**: Profile (open), Model and memory,
+  Pictures, Voice and Valhalla 2's own words, each with a one-line summary of what is inside. Each of
+  Valhalla 2's own texts folds on its own, marked when it is your own words. The text boxes grow with
+  what you write (the profile starts at most of the window), the page is wider, and Save stays at
+  the bottom of the window.
+- **Pause memory in a chat**, to try something without it becoming part of who the companion is.
+  **Pause** in the chat's header holds memory back from everything written next; those messages say
+  **memory paused**. **Resume** asks whether memory should keep what happened meanwhile, or leave it
+  out for good. The companion isn't told, and nothing it is sent changes. For companions with
+  memory, Claude and Grok alike.
+- **Pictures keep the character's pose, and draw only what shows.** The scene now says how the
+  character holds their body (lying on her side, kneeling), carried forward from the chat like the
+  weather, and how the picture sees them (from behind, looking away), with what that shows and
+  hides. The picture prompt is shorter (about 20 to 35 tags instead of 40 to 70), starts from the
+  pose and the view, leaves out what the pose hides (no face from behind) and what can't be drawn
+  (the weather indoors, names, thoughts), and turns moods into what a picture shows. You can
+  correct the pose and the view in the scene dialog. Scenes already read are read again the next
+  time you make a picture of them, unless you had corrected them.
+- **By hand:** only if you rewrote a companion's **Scene reading instructions** or **Picture
+  instructions**: they keep your words, so the pose, the view and the shorter prompts reach that
+  companion only after **Back to the default** (or after you copy the new rules in).
+- Groundwork, with nothing to notice yet: pictures and reading aloud now go through an "engine",
+  CivitAI and Azure today, so Grok's and OpenAI's images and Grok's voice can be added later for any
+  companion. Each picture and each reading remembers which engine made it.
+
 ## 0.0.48 — 2026-11-28
 
 - **Reading aloud with feeling and the scene are now two separate things.** How each line of a

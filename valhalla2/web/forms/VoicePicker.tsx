@@ -159,10 +159,9 @@ export function VoicePicker({
   };
 
   return (
-    <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
+    <div className="space-y-4">
       <div>
-        <h2 className="font-display text-lg">Voice</h2>
-        <p className="mt-1 text-xs text-faint">
+        <p className="text-xs text-faint">
           The voice its replies are read aloud in, from every voice Azure offers, and how it speaks. A reply already
           read is read again in the new voice, speed, pitch or style the next time you play it.
         </p>
@@ -291,6 +290,6 @@ export function VoicePicker({
         <p className="text-sm text-faint">Asking Azure for its voices…</p>
       )}
       <Notice>{error}</Notice>
-    </section>
+    </div>
   );
 }

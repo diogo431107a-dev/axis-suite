@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_SETTINGS, type Companion, type Message } from "../../shared/protocol.ts";
 import { DEFAULT_PROMPTS } from "../../shared/prompts.ts";
 import { draftOf } from "../pictures/draft.ts";
-import { backgroundOf, sceneRequest } from "./context.ts";
+import { backgroundOf, renderSheet, sceneRequest } from "./context.ts";
 
 const companion: Companion = {
   id: "comp-0001",
@@ -109,5 +109,43 @@ describe("Claude's answer", () => {
   it("is refused when it isn't a prompt", () => {
     expect(() => draftOf("not json")).toThrow(/wasn't a picture prompt/);
     expect(() => draftOf(JSON.stringify({ prompt: "" }))).toThrow(/empty/);
+  });
+});
+
+describe("a scene as the picture prompt reads it", () => {
+  it("gives each person's pose and how they are seen, and skips what an older scene lacks", () => {
+    const person = {
+      name: "Freya",
+      appearance: "Gold hair, messy",
+      clothes: "A green wool dress",
+      action: "Resting",
+      pose: "Lying on her side, knees drawn up",
+      view: "From behind: her back and shoulders, not her face",
+      mood: "Tired",
+      expression: "",
+    };
+    const scene = renderSheet({
+      place: "Her room",
+      time: "Night",
+      weather: "",
+      light: "One candle",
+      atmosphere: "Warm and dim",
+      people: [person],
+    });
+    expect(scene).toContain(
+      "Freya: looks Gold hair, messy; wears A green wool dress; pose: Lying on her side, knees drawn up; " +
+        "seen From behind: her back and shoulders, not her face; doing: Resting; mood: Tired",
+    );
+    expect(scene).not.toContain("shows it as");
+    expect(
+      renderSheet({
+        place: "",
+        time: "",
+        weather: "",
+        light: "",
+        atmosphere: "",
+        people: [{ ...person, pose: "", view: "" }],
+      }),
+    ).not.toContain("pose:");
   });
 });

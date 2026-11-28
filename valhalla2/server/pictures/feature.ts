@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import { STATE_DIR } from "../db.ts";
 import { createFileStore, type FileStore } from "../files.ts";
-import { createCivitai } from "./civitai.ts";
+import { civitaiEngine, createCivitai } from "./civitai.ts";
 import { loadCivitaiKey } from "./key.ts";
 import { createPainter } from "./painter.ts";
 import { knownFiles } from "./store.ts";
@@ -25,7 +25,7 @@ export function startPictures(db: DatabaseSync): PicturesFeature {
   if (swept > 0) console.log(`Deleted ${swept} picture file(s) nothing refers to any more`);
 
   const key = loadCivitaiKey();
-  const painter = key ? createPainter({ db, civitai: createCivitai({ token: key.token }), files }) : null;
+  const painter = key ? createPainter({ db, engine: civitaiEngine(createCivitai({ token: key.token })), files }) : null;
   console.log(
     painter
       ? `Pictures: ${PICTURES_DIR}, made by CivitAI (key from ${key?.from === "credential" ? "the systemd credential" : "CIVITAI_API_KEY"})`

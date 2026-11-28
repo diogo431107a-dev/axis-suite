@@ -15,6 +15,30 @@ export const PICTURE_SIZES: Readonly<Record<Orientation, { width: number; height
   square: { width: 1024, height: 1024 },
 };
 
+/**
+ * The samplers CivitAI's SDXL engine takes, as it spells them, with a label for the page. Checked
+ * with a whatif submission on 2026-11-28. The DPM++ ones cost a little more Buzz.
+ */
+export const SAMPLERS = [
+  { id: "euler_a", label: "Euler a" },
+  { id: "euler", label: "Euler" },
+  { id: "dpm++2m", label: "DPM++ 2M" },
+  { id: "dpm++2mv2", label: "DPM++ 2M v2" },
+  { id: "dpm++2s_a", label: "DPM++ 2S a" },
+  { id: "heun", label: "Heun" },
+  { id: "dpm2", label: "DPM2" },
+  { id: "ipndm", label: "iPNDM" },
+  { id: "ipndm_v", label: "iPNDM v" },
+  { id: "ddim_trailing", label: "DDIM trailing" },
+  { id: "lcm", label: "LCM" },
+  { id: "tcd", label: "TCD" },
+  { id: "res_multistep", label: "Res multistep" },
+  { id: "res_2s", label: "Res 2S" },
+] as const;
+export type Sampler = (typeof SAMPLERS)[number]["id"];
+export const SAMPLER_IDS: readonly Sampler[] = SAMPLERS.map((entry) => entry.id);
+export const samplerLabel = (id: string): string => SAMPLERS.find((entry) => entry.id === id)?.label ?? id;
+
 /** A picture's prompt, written by Claude and yours to change before the picture is made. */
 export interface PictureDraft {
   prompt: string;
@@ -40,6 +64,9 @@ export interface PictureParams {
   steps: number;
   cfgScale: number;
   seed: number;
+  /** Absent on pictures made before they could be chosen (CivitAI's own default then). */
+  sampler?: Sampler;
+  clipSkip?: number;
 }
 
 /** A picture of a companion, made or being made. Its file is GET /api/pictures/:id/file. */

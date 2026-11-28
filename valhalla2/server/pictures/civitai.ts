@@ -5,10 +5,10 @@
 // are separate, so a picture the server was stopped in the middle of can be picked up again from
 // the workflow's id.
 
-const API = "https://orchestration.civitai.com/v2/consumer/workflows";
+import { DEFAULT_SETTINGS } from "../../shared/protocol.ts";
+import { EngineError, type PictureEngine, type PictureOrder } from "./engine.ts";
 
-/** What every picture is made with, from the model's own sample images. */
-export const PICTURE_DEFAULTS = { steps: 30, cfgScale: 7 } as const;
+const API = "https://orchestration.civitai.com/v2/consumer/workflows";
 
 /** One picture to make. */
 export interface PictureJob {
@@ -19,6 +19,9 @@ export interface PictureJob {
   height: number;
   steps: number;
   cfgScale: number;
+  /** CivitAI's spelling of the sampler: euler_a, dpm++2m… */
+  sampleMethod: string;
+  clipSkip: number;
   seed: number;
 }
 
@@ -29,7 +32,7 @@ export interface Workflow {
 }
 
 /** A picture that CivitAI refused, failed to make, or took too long over. */
-export class CivitaiError extends Error {}
+export class CivitaiError extends EngineError {}
 
 const FINISHED = new Set(["succeeded", "failed", "expired", "canceled"]);
 
@@ -48,8 +51,13 @@ export const imagesOf = (workflow: Workflow): string[] =>
     (step.output?.images ?? step.output?.blobs ?? []).flatMap((image) => (image.url ? [image.url] : [])),
   );
 
-/** A seed for a new picture, so the same prompt can make a different one. */
-export const randomSeed = (): number => Math.floor(Math.random() * 2 ** 31);
+/**
+ * A seed for a new picture: always ten digits, from 1,000,000,000 to 4,294,967,295, so it also
+ * fits anything that reads a seed as an unsigned 32-bit number.
+ */
+export const SEED_MIN = 1_000_000_000;
+export const SEED_MAX = 2 ** 32 - 1;
+export const randomSeed = (): number => SEED_MIN + Math.floor(Math.random() * (SEED_MAX - SEED_MIN + 1));
 
 export interface CivitaiOptions {
   token: string;
@@ -146,3 +154,30 @@ export function createCivitai(options: CivitaiOptions) {
 }
 
 export type Civitai = ReturnType<typeof createCivitai>;
+
+/**
+ * The CivitAI job for a kept picture. One asked for before the sampler and clip skip could be
+ * chosen gets what a new companion starts with.
+ */
+export function jobFor({ prompt, negativePrompt, params }: PictureOrder): PictureJob {
+  const { sampler, clipSkip, ...rest } = params;
+  return {
+    prompt,
+    negativePrompt,
+    ...rest,
+    sampleMethod: sampler ?? DEFAULT_SETTINGS.pictureSampler,
+    clipSkip: clipSkip ?? DEFAULT_SETTINGS.pictureClipSkip,
+  };
+}
+
+/** CivitAI as a picture engine: SDXL checkpoints, which read Danbooru tags. */
+export function civitaiEngine(civitai: Civitai): PictureEngine {
+  return {
+    id: "civitai",
+    promptStyle: "tags",
+    submit: (order) => civitai.submit(jobFor(order)),
+    // A job it answered is a workflow; the painter only ever hands back what submit gave it.
+    finish: (job) => civitai.finish(typeof job === "string" ? job : (job as Workflow)),
+    download: (url) => civitai.download(url),
+  };
+}

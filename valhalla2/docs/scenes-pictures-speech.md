@@ -15,9 +15,15 @@ and the chat up to the moment (about `VALHALLA_SCENE_TOKENS` of it), and works o
 - **the setting**: place, time of day, the weather and what it has done, the light;
 - **the atmosphere**: the colours and mood the picture should carry (warm reds for anger, a cold
   blue dusk for loneliness);
-- **the character**: their look right now, their clothes and their state (soaked, torn), what they
-  are doing, their mood with a few words of why, and **how it shows** in a drawing (flushed
-  cheeks, an anger vein, tears).
+- **the character**: their look right now as the facts make it (dishevelled after a long journey,
+  wet after the rain), their clothes and their state (soaked, torn), what they are doing, their
+  mood with a few words of why, and **how it shows** in a drawing (flushed cheeks, an anger vein,
+  tears);
+- **the pose**: how they hold their body right now (lying on her side, knees drawn up), carried
+  forward like the weather: if she lay down three messages ago and hasn't got up, she is still
+  lying down;
+- **the view**: how the picture sees them from that pose, and so what shows and what is hidden (from
+  behind: her back and shoulders, not her face).
 
 It focuses on the character alone. You are in the picture only if you add yourself: **Someone
 else** in the scene dialog adds anyone you want drawn, the user included.
@@ -41,10 +47,13 @@ A Claude companion's scene is read by Claude, a Grok companion's by Grok (see
 
 A picture of the moment, or of the companion. Under any message, the picture button works out the
 scene (above), or uses the one kept, and asks for a prompt for the image model from it (on Claude,
-`PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok, the companion's own model): the people the scene lists
-and what they look like, their expressions, what they are doing, the place, the light, the
-colours. The image model invents whatever a prompt leaves unsaid, so Claude is told to
-state all of it, choosing something plain where nothing says. A profile picture is written from the
+`PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok, the companion's own model). It is the fewest Danbooru
+tags that do the job, about 20 to 35, since every tag pulls the picture somewhere: the people the
+scene lists, their pose and how they are seen, the look and clothes that show, the expression, the
+place, the light and the colours. It draws only what the pose and view show: from behind, no face
+or expression, but the hair, shoulders and back; lying face down, nothing on the front of the
+clothes. It leaves out what can't be drawn (names, thoughts, the weather indoors unless it shows),
+and turns moods into what a picture shows (hopeful: a slight smile, looking up, warm light). A profile picture is written from the
 profile and the memory. Nothing runs on ordinary replies; a prompt costs a cent or two, and only
 when you ask.
 
@@ -53,13 +62,26 @@ can then be written again from the correction.
 
 The prompt opens in a dialog for you to change, with a note for Claude ("at sunset", "from behind")
 if you want it written again. **Make the picture** sends it to CivitAI, which makes it on the
-WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) at 30 steps and CFG 7, at a size SDXL was trained
-on for the shape Claude chose. It takes a few seconds to a minute; the picture appears under its
-message when it is done, only on that branch of the chat.
+WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) with the companion's picture settings, at a size
+SDXL was trained on for the shape Claude chose. It takes a few seconds to a minute; the picture
+appears under its message when it is done, only on that branch of the chat.
+
+**Picture settings** are under **Pictures** on the companion's page: **Steps** (10–60, 20 to
+start; more is finer, slower and dearer), **CFG** (1–15 in halves, 7 to start; higher follows the
+prompt more literally), **Sampler** (Euler a to start; the DPM++ ones cost a little more Buzz) and
+**Clip skip** (1–3, 2 to start, which suits anime checkpoints).
+
+**The seed carries on.** The picture dialog shows the seed the picture will be made with: the
+companion's, or a new one if it has none yet. The dice rolls another. Whatever seed a picture is
+made with becomes the companion's, so the next picture starts from it too, and pictures of the same
+moment stay alike. The companion's seed can also be typed, or cleared, under **Pictures**; an empty
+one is rolled at the next picture. A seed Valhalla 2 rolls has ten digits.
 
 Each companion's **Pictures** page, from its own page, has two shelves: **Profile pictures**, made
 there from the profile alone, and **Chat pictures**, each naming the chat it came from. Any picture
-can be opened full size, made again from the same prompt with a new seed, or deleted. How Claude
+can be opened full size, made again from the same prompt (the dialog shows the seed, and the dice
+rolls a new one), or deleted. Under each picture are the steps, CFG, sampler, clip skip and seed it
+was made with. How Claude
 writes the prompts is one of the companion's own texts, **Picture instructions**, which you can
 rewrite like the others.
 

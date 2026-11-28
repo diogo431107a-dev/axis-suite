@@ -211,6 +211,29 @@ describe("companions from before the choice existed", () => {
     expect(JSON.parse(tones[0]!.lines as string)).toEqual([line]);
     db.close();
   });
+
+  it("keep their chats with memory running, and every message on the record", () => {
+    const dir = mkdtempSync(join(tmpdir(), "valhalla2-migrate-"));
+    made.push(dir);
+    const file = join(dir, "valhalla2.db");
+    const old = openDatabase(file, 12);
+    old.exec(`
+      INSERT INTO companions (id, name, profile, settings, prompts, created_at, updated_at, owner)
+        VALUES ('comp-0001', 'Freya', '', '{"model":"claude-haiku-5-5"}', '{}', 'then', 'then', 'odin');
+      INSERT INTO chats (id, companion_id, title, created_at, last_activity_at)
+        VALUES ('chat-0001', 'comp-0001', 'The hall', 'then', 'then');
+      INSERT INTO messages (id, chat_id, role, content, created_at)
+        VALUES (1, 'chat-0001', 'assistant', '[{"type":"text","text":"Hi."}]', 'then');
+      UPDATE chats SET active_leaf_id = 1;
+    `);
+    old.close();
+    const db = openDatabase(file);
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    const chats = createChats(db, "odin", companions, 5);
+    expect(chats.get("chat-0001").memoryPaused).toBe(false);
+    expect(chats.page("chat-0001").offRecord).toEqual({ paused: [], leftOut: [] });
+    db.close();
+  });
 });
 
 describe("a chat without memory", () => {
@@ -513,5 +536,64 @@ describe("a companion's voice speed, pitch and style", () => {
     expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { pitch: -51 } })).toThrow(/pitch/);
     expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { rate: 2.5 } })).toThrow(/whole/);
     expect(() => companions.save("comp-0001", { name: "Freya", voiceTuning: { style: '"><x' } })).toThrow(/style/);
+  });
+});
+
+describe("Picture settings", () => {
+  it("start from the defaults, are checked, and keep the seed of the last picture", () => {
+    const { db, companions } = setup();
+    expect(companions.save("comp-0001", { name: "Freya" }).settings).toMatchObject({
+      pictureSteps: 20,
+      pictureCfg: 7,
+      pictureSampler: "euler_a",
+      pictureClipSkip: 2,
+      pictureSeed: null,
+    });
+    const settings = {
+      ...DEFAULT_SETTINGS,
+      pictureSteps: 28,
+      pictureCfg: 5.5,
+      pictureSampler: "dpm++2m",
+      pictureSeed: 9_999_999_999,
+    };
+    expect(companions.save("comp-0001", { name: "Freya", settings }).settings).toMatchObject({
+      pictureSteps: 28,
+      pictureCfg: 5.5,
+      pictureSampler: "dpm++2m",
+      pictureSeed: 9_999_999_999,
+    });
+    const refused = (fields: Record<string, unknown>) =>
+      expect(() =>
+        companions.save("comp-0001", { name: "Freya", settings: { ...DEFAULT_SETTINGS, ...fields } }),
+      ).toThrow(StoreError);
+    refused({ pictureSteps: 61 });
+    refused({ pictureCfg: 7.25 });
+    refused({ pictureSampler: "dpm++3m" });
+    refused({ pictureClipSkip: 4 });
+    refused({ pictureSeed: 10_000_000_000 });
+
+    const before = companions.get("comp-0001");
+    companions.setPictureSeed("comp-0001", 1_234_567_890);
+    const after = companions.get("comp-0001");
+    expect(after.settings).toEqual({ ...before.settings, pictureSeed: 1_234_567_890 });
+    expect(after.updatedAt).toBe(before.updatedAt);
+    // Another person's companion is left alone.
+    createCompanions(db, "freya", DEFAULT_SETTINGS).setPictureSeed("comp-0001", 1);
+    expect(companions.get("comp-0001").settings.pictureSeed).toBe(1_234_567_890);
+  });
+
+  it("are filled in for a companion saved before they existed", () => {
+    const { db, companions } = setup();
+    companions.save("comp-0001", { name: "Freya" });
+    const {
+      pictureSteps: _s,
+      pictureCfg: _c,
+      pictureSampler: _m,
+      pictureClipSkip: _k,
+      pictureSeed: _d,
+      ...old
+    } = companions.get("comp-0001").settings;
+    db.prepare("UPDATE companions SET settings = ? WHERE id = ?").run(JSON.stringify(old), "comp-0001");
+    expect(companions.get("comp-0001").settings).toMatchObject({ pictureSteps: 20, pictureSeed: null });
   });
 });

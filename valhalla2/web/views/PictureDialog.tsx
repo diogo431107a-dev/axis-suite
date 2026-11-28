@@ -16,6 +16,9 @@ import {
   type SceneView,
 } from "../../shared/protocol.ts";
 import { api, describeError } from "../api.ts";
+import { SeedInput } from "../forms/PictureSettings.tsx";
+import { rollSeed } from "../ui/seed.ts";
+import { usePage } from "../page.ts";
 import { Button, Dialog, Field, inputStyle, Notice } from "../ui/bits.tsx";
 import { SceneDialog } from "./chat/SceneDialog.tsx";
 
@@ -45,7 +48,10 @@ export function PictureDialog({
   onClose: () => void;
   onMade: (picture: Picture) => void;
 }) {
+  const { reload } = usePage();
   const [draft, setDraft] = useState<PictureDraft | null>(start ?? null);
+  /** The seed this picture is made with: the companion's, or a fresh roll. It becomes the companion's. */
+  const [seed, setSeed] = useState<number | null>(() => companion.settings.pictureSeed ?? rollSeed());
   const [cost, setCost] = useState<number | null>(null);
   const [hint, setHint] = useState("");
   const [writing, setWriting] = useState(false);
@@ -94,9 +100,14 @@ export function PictureDialog({
     setMaking(true);
     setError("");
     try {
-      const picture = await api<Picture>(base, { method: "POST", body: { kind, chatId, messageId, ...draft } });
+      const picture = await api<Picture>(base, {
+        method: "POST",
+        body: { kind, chatId, messageId, ...draft, ...(seed === null ? {} : { seed }) },
+      });
       onMade(picture);
       onClose();
+      // The seed used is now the companion's: the page fetches it for the next picture.
+      void reload();
     } catch (err) {
       setError(describeError(err));
       setMaking(false);
@@ -154,6 +165,10 @@ export function PictureDialog({
                   </label>
                 ))}
               </fieldset>
+              <label className="w-56">
+                <span className="mb-1 block text-sm font-medium">Seed</span>
+                <SeedInput value={seed} onChange={setSeed} placeholder="A new one" disabled={writing} />
+              </label>
               <label className="min-w-48 flex-1">
                 <span className="mb-1 block text-sm font-medium">Caption</span>
                 <input
@@ -180,7 +195,9 @@ export function PictureDialog({
                 ["Atmosphere", scene.sheet.atmosphere],
                 ...scene.sheet.people.map((person) => [
                   person.name,
-                  [person.appearance, person.clothes, person.action, person.expression].filter(Boolean).join("; "),
+                  [person.pose, person.view, person.appearance, person.clothes, person.action, person.expression]
+                    .filter(Boolean)
+                    .join("; "),
                 ]),
               ].map(([label, value], at) => (
                 <div key={at}>

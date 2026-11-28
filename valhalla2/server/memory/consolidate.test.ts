@@ -324,6 +324,93 @@ describe("consolidation", () => {
   });
 });
 
+describe("pausing memory", () => {
+  /** A chat filed up to a greeting and a hello, then paused, then tried two ways. */
+  async function paused() {
+    const all = setup();
+    const { db, companion, chats, memory, tree } = all;
+    const likes = createLikes(db, chats);
+    const greeting = put(tree, null, "assistant", "Welcome, cup-bearer.");
+    const hello = put(tree, greeting, "user", "Hello, my queen.");
+    const model = scriptedModel(() => []);
+    const deps = { db, memory, limits: LIMITS, run: model.run, maxIterations: 8 };
+    await consolidate(deps, "chat-0001", companion);
+    chats.pause("chat-0001");
+    const bold = put(tree, hello, "assistant", "A failed try at a reply.");
+    const tried = put(tree, bold, "user", "Something I'd rather forget.");
+    likes.like("chat-0001", bold, "Liked while trying.");
+    chats.feedback("chat-0001", hello, "A reason given while paused.");
+    return { ...all, deps, model, greeting, hello, bold, tried };
+  }
+
+  it("holds back what is written while paused, and tells the page", async () => {
+    const { db, chats, deps, companion, model, bold, tried } = await paused();
+    expect(chats.get("chat-0001").memoryPaused).toBe(true);
+    expect(chats.page("chat-0001").offRecord).toEqual({ paused: [bold, tried], leftOut: [] });
+    expect(hasPending(db, "chat-0001")).toBe(false);
+    expect(await consolidate(deps, "chat-0001", companion)).toMatchObject({ kind: "nothing" });
+    expect(model.asked).toHaveLength(1);
+  });
+
+  it("files it as usual when you resume and keep it", async () => {
+    const { db, chats, deps, companion, model } = await paused();
+    chats.resume("chat-0001", true);
+    expect(chats.get("chat-0001").memoryPaused).toBe(false);
+    expect(chats.page("chat-0001").offRecord).toEqual({ paused: [], leftOut: [] });
+    expect(hasPending(db, "chat-0001")).toBe(true);
+    await consolidate(deps, "chat-0001", companion);
+    const read = model.asked[1]!.prompt;
+    expect(read).toContain("A failed try at a reply.");
+    expect(read).toContain("Something I'd rather forget.");
+    expect(read).toContain("Liked while trying.");
+    expect(read).toContain("A reason given while paused.");
+  });
+
+  it("never reads it when you resume and leave it out, not even as context", async () => {
+    const { db, chats, deps, companion, model, tree, tried } = await paused();
+    chats.resume("chat-0001", false);
+    expect(chats.page("chat-0001").offRecord.leftOut).toHaveLength(2);
+    expect(hasPending(db, "chat-0001")).toBe(false);
+    put(tree, tried, "assistant", "What comes after resuming.");
+    await consolidate(deps, "chat-0001", companion);
+    const read = model.asked[1]!.prompt;
+    expect(read).toContain("What comes after resuming.");
+    expect(read).toContain("Hello, my queen.");
+    for (const hidden of ["A failed try", "rather forget", "Liked while trying", "while paused"]) {
+      expect(read).not.toContain(hidden);
+    }
+    // A rebuild leaves it out too, and leaves nothing pending.
+    await rebuild({ ...deps, partTokens: 20_000 }, companion);
+    expect(model.asked[2]!.prompt).not.toContain("A failed try");
+    expect(model.asked[2]!.prompt).toContain("What comes after resuming.");
+    expect(hasPending(db, "chat-0001")).toBe(false);
+  });
+
+  it("keeps a swipe of a filed reply, made while paused, out of what replaced it", async () => {
+    const { chats, deps, companion, model, tree, hello } = await paused();
+    chats.resume("chat-0001", true);
+    await consolidate(deps, "chat-0001", companion);
+    // The filed reply is swiped away while paused: memory hears it was abandoned, not for what.
+    chats.pause("chat-0001");
+    put(tree, hello, "assistant", "A swipe while paused.");
+    chats.resume("chat-0001", false);
+    await consolidate(deps, "chat-0001", companion);
+    const read = model.asked[2]!.prompt;
+    expect(read).toContain("was left on an abandoned branch, with nothing in its place");
+    expect(read).not.toContain("A swipe while paused.");
+  });
+
+  it("can't be paused for a companion without memory", () => {
+    const { db, companion } = setup();
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    companions.save("comp-0002", { name: "Grendel", memory: false });
+    const chats = createChats(db, "odin", companions, 5);
+    chats.create({ id: "chat-0002", companionId: "comp-0002" });
+    expect(() => chats.pause("chat-0002")).toThrow(/no memory/);
+    expect(companion.memory).toBe(true);
+  });
+});
+
 describe("the window", () => {
   const messages = (count: number): Message[] =>
     Array.from({ length: count }, (_, n) => ({

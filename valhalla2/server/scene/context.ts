@@ -70,11 +70,20 @@ export function renderSheet(sheet: SceneSheet): string {
     `Light: ${sheet.light}`,
     `Atmosphere: ${sheet.atmosphere}`,
     sheet.people.length === 1 ? "In the picture, alone:" : "In the picture:",
-    ...sheet.people.map(
-      (person) =>
-        `${person.name}: looks ${person.appearance}; wears ${person.clothes}; ${person.action}; ${person.mood}; ` +
-        `shows it as ${person.expression}`,
-    ),
+    ...sheet.people.map((person) => {
+      const said = [
+        ["looks", person.appearance],
+        ["wears", person.clothes],
+        ["pose:", person.pose],
+        ["seen", person.view],
+        ["doing:", person.action],
+        ["mood:", person.mood],
+        ["shows it as", person.expression],
+      ]
+        .filter(([, value]) => value)
+        .map(([label, value]) => `${label} ${value}`);
+      return `${person.name}: ${said.join("; ")}`;
+    }),
   ];
   return `<scene>\n${lines.join("\n")}\n</scene>`;
 }

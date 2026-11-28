@@ -13,6 +13,7 @@ import type { Chats } from "./chat/chats.ts";
 import { createTree } from "./chat/tree.ts";
 import { text as checkText } from "./check.ts";
 import { invalid } from "./errors.ts";
+import { heldBack } from "./memory/record.ts";
 
 interface Row {
   id: number;
@@ -65,12 +66,13 @@ interface PraiseRow extends Row {
 
 function praiseOf(db: DatabaseSync, chatId: string, row: PraiseRow, kind: Praise["kind"], onPath: Set<number>): Praise {
   const tree = createTree(db, chatId);
+  const held = heldBack(db, chatId);
   const passedOver =
     kind === "withdrawn"
       ? []
       : tree
           .siblingsOf({ parentId: row.parent_id, role: "assistant" })
-          .filter((id) => id !== row.message_id)
+          .filter((id) => id !== row.message_id && !held.has(id))
           .slice(-PASSED_OVER)
           .map((id) => cut(wordsOf(tree.get(id)), PASSED_OVER_CHARS))
           .filter(Boolean);
@@ -92,7 +94,7 @@ const praiseRows = (db: DatabaseSync, chatId: string): PraiseRow[] =>
       `SELECT l.id, l.message_id, l.text, l.comment, l.filed_comment, l.withdrawn_at,
               m.parent_id, m.is_greeting, m.deleted_at
        FROM likes l JOIN messages m ON m.id = l.message_id
-       WHERE l.chat_id = ? ORDER BY l.id`,
+       WHERE l.chat_id = ? AND m.off_record = 0 ORDER BY l.id`,
     )
     .all(chatId) as unknown as PraiseRow[];
 

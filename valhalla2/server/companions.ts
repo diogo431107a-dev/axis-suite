@@ -204,6 +204,16 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       return get(id);
     },
 
+    /**
+     * Keeps the seed a picture was made with as the companion's, so the next one carries on from
+     * it. Only that one setting changes, and not when the companion was last edited.
+     */
+    setPictureSeed(id: string, seed: number): void {
+      db.prepare(
+        "UPDATE companions SET settings = json_set(settings, '$.pictureSeed', ?) WHERE id = ? AND owner = ?",
+      ).run(seed, id, owner);
+    },
+
     /** Deletes a companion with every chat it had. */
     remove(id: string): void {
       get(id);

@@ -2,8 +2,8 @@
 
 Every chat with a companion feeds one memory, so the companion stays the same person with a growing
 history without the old chats being sent again. This page explains all of it: what the memory is,
-who writes it and when, what a chat sees of it, how canon and one-shot chats differ, and how it is
-kept tidy, corrected and rebuilt.
+who writes it and when, what a chat sees of it, how canon and one-shot chats differ, how to pause it,
+and how it is kept tidy, corrected and rebuilt.
 
 Only a companion **with memory** has one, Claude or Grok. A Grok companion's memory is kept by a
 Grok model and works the same way; what differs is in
@@ -262,6 +262,36 @@ fails changes nothing, and the switch is re-filed at the next try.
 
 Switching back and forth before memory has read the chat again costs nothing: if the chat ends up
 in the mode it was filed under, there is nothing to re-file.
+
+## Pausing memory
+
+**Pause** in a chat's header holds memory back from what you write next, so you can try something
+(a line you aren't sure of, a turn the story may not take) without it shaping who the companion
+becomes. It is for one chat at a time, and only for a companion with memory. A one-shot is
+different: it is still filed, and keeps what it shows about the two of you; what is written while
+memory is paused isn't read at all.
+
+While memory is paused:
+
+- every message written in the chat (yours, replies, other versions, greetings), and any reason you
+  give after the fifth swipe, is marked as written while paused, and the message's header says
+  **memory paused**;
+- the memory model never reads them: not as new messages, not as the messages shown for context, not
+  as what replaced a message it had read, nor a like or the other versions shown with one. What came
+  before the pause is filed as usual, by the same runs, at the same times;
+- the companion is not told, and nothing it is sent changes, so pausing and resuming cost the cache
+  nothing. It still sees what you write while paused, as long as it is in what is sent;
+- editing a message written before the pause is still a correction, filed as usual.
+
+**Resume** asks what to do with the messages on the selected path written while memory was paused:
+
+- **Keep what happened while paused**: they are filed at the next run like any other message.
+- **Leave it out**: the memory model never reads them, nor the likes and reasons given for them, and
+  their headers say **left out of memory**. The chat keeps them; you can go on from them, or branch
+  away. A rebuild leaves them out too.
+
+When no message on the path was written while paused (you tried something and branched away from
+it), Resume doesn't ask, and what was tried stays left out.
 
 ## How a run is kept, or thrown away
 

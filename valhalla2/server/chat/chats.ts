@@ -10,9 +10,10 @@ import {
 } from "../../shared/protocol.ts";
 import { id as checkId, object, oneOf, text } from "../check.ts";
 import type { Companions } from "../companions.ts";
-import { conflict, notFound, tooMany } from "../errors.ts";
+import { conflict, invalid, notFound, tooMany } from "../errors.ts";
 import { likedAmong } from "../likes.ts";
 import { hasPending } from "../memory/consolidate.ts";
+import { OFF_RECORD_NOW, offRecordAmong, pause as pauseMemory, resume as resumeMemory } from "../memory/record.ts";
 import { picturesOn } from "../pictures/store.ts";
 import { pinnedAmong } from "../pins.ts";
 import { createTree } from "./tree.ts";
@@ -23,6 +24,7 @@ interface Row {
   title: string;
   mode: ChatMode;
   active_leaf_id: number | null;
+  memory_paused: number;
   created_at: string;
   last_activity_at: string;
 }
@@ -33,6 +35,7 @@ const chatOf = (row: Row): Chat => ({
   title: row.title,
   mode: row.mode,
   activeLeafId: row.active_leaf_id,
+  memoryPaused: row.memory_paused === 1,
   createdAt: row.created_at,
   lastActivityAt: row.last_activity_at,
 });
@@ -42,7 +45,8 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
   function get(id: string): Chat {
     const row = db
       .prepare(
-        `SELECT c.id, c.companion_id, c.title, c.mode, c.active_leaf_id, c.created_at, c.last_activity_at
+        `SELECT c.id, c.companion_id, c.title, c.mode, c.active_leaf_id, c.memory_paused, c.created_at,
+                c.last_activity_at
          FROM chats c JOIN companions p ON p.id = c.companion_id
          WHERE c.id = ? AND p.owner = ?`,
       )
@@ -147,6 +151,7 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
         pictures: picturesOn(db, id, onPath),
         pinned: pinnedAmong(db, id, onPath),
         liked: likedAmong(db, id, onPath),
+        offRecord: offRecordAmong(db, id, onPath),
       };
     },
 
@@ -158,9 +163,26 @@ export function createChats(db: DatabaseSync, owner: string, companions: Compani
       const tree = createTree(db, get(id).id);
       if (parentId !== null) tree.get(parentId);
       db.prepare(
-        `INSERT INTO swipe_feedback (chat_id, parent_id, reason, created_at) VALUES (?, ?, ?, ?)
-         ON CONFLICT (chat_id, ifnull(parent_id, 0)) DO UPDATE SET reason = excluded.reason, consolidated_at = NULL`,
-      ).run(id, parentId, reason, new Date().toISOString());
+        `INSERT INTO swipe_feedback (chat_id, parent_id, reason, created_at, off_record)
+         VALUES (?, ?, ?, ?, ${OFF_RECORD_NOW})
+         ON CONFLICT (chat_id, ifnull(parent_id, 0))
+         DO UPDATE SET reason = excluded.reason, consolidated_at = NULL, off_record = excluded.off_record`,
+      ).run(id, parentId, reason, new Date().toISOString(), id);
+    },
+
+    /** Pauses memory in a chat: what is written from now on is held back from it (memory/record.ts). */
+    pause(id: string): Chat {
+      const chat = get(id);
+      if (!companions.get(chat.companionId).memory) invalid("This companion has no memory to pause");
+      pauseMemory(db, id);
+      return get(id);
+    },
+
+    /** Resumes memory, keeping what was written while paused or leaving it out for good. */
+    resume(id: string, keep: boolean): Chat {
+      get(id);
+      resumeMemory(db, id, keep);
+      return get(id);
     },
   };
 }

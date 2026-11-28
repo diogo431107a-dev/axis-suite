@@ -15,11 +15,11 @@ import {
   type PictureKind,
 } from "../../shared/protocol.ts";
 import { writePictureFor } from "../chat/write.ts";
-import { id as checkId, messageId, object, oneOf, required, text } from "../check.ts";
+import { id as checkId, messageId, object, oneOf, required, seed as checkSeed, text } from "../check.ts";
 import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
-import { PICTURE_DEFAULTS, randomSeed } from "../pictures/civitai.ts";
+import { randomSeed } from "../pictures/civitai.ts";
 import { backgroundOf, plainPictureRequest, sceneRequest, type Scene } from "../scene/context.ts";
 import type { Services } from "../services.ts";
 
@@ -75,7 +75,12 @@ export function pictureRoutes(s: Services): Router {
     const kind = oneOf<PictureKind>(body.kind, PICTURE_KINDS, "The kind of picture");
     const from = kind === "chat" ? sceneOf(req, companion, body) : null;
     const orientation = oneOf<Orientation>(body.orientation, ORIENTATIONS, "The orientation");
-    const picture = s.ownedBy(req).pictures.create({
+    // The seed you chose, or the companion's, or a new one; whichever it is, the next picture
+    // carries on from it.
+    const settings = companion.settings;
+    const seed = (body.seed === undefined ? null : checkSeed(body.seed)) ?? settings.pictureSeed ?? randomSeed();
+    const my = s.ownedBy(req);
+    const picture = my.pictures.create({
       id: randomUUID(),
       companionId: companion.id,
       kind,
@@ -88,10 +93,14 @@ export function pictureRoutes(s: Services): Router {
       params: {
         model: config.pictures.model,
         ...PICTURE_SIZES[orientation],
-        ...PICTURE_DEFAULTS,
-        seed: randomSeed(),
+        steps: settings.pictureSteps,
+        cfgScale: settings.pictureCfg,
+        sampler: settings.pictureSampler,
+        clipSkip: settings.pictureClipSkip,
+        seed,
       },
     });
+    if (seed !== settings.pictureSeed) my.companions.setPictureSeed(companion.id, seed);
     void paint.paint(picture.id, null);
     res.status(201).json(picture);
   });

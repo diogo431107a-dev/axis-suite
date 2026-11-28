@@ -1,4 +1,5 @@
 // The models, what they cost, and the settings a companion sends with a request.
+import type { Sampler } from "./pictures.ts";
 
 /**
  * How much effort the model puts into a reply. This replaces the temperature slider other
@@ -102,6 +103,11 @@ export const DEFAULT_SETTINGS: Settings = {
   toneTokens: 4_000,
   sceneModel: "claude-haiku-5-5",
   sceneEffort: "low",
+  pictureSteps: 20,
+  pictureCfg: 7,
+  pictureSampler: "euler_a",
+  pictureClipSkip: 2,
+  pictureSeed: null,
 };
 
 /** The tag and scene settings a Grok companion starts with: its own chat model, at low effort. */
@@ -147,4 +153,17 @@ export interface Settings {
   /** The model that works out a moment for a picture of it (with memory only), and its effort. */
   sceneModel: string;
   sceneEffort: Effort;
+  /** How many steps CivitAI takes over a picture: more is finer, slower and dearer. */
+  pictureSteps: number;
+  /** How closely the picture follows its prompt (CFG): higher is more literal, lower freer. */
+  pictureCfg: number;
+  /** How CivitAI's sampler steps from noise to picture. One of SAMPLERS. */
+  pictureSampler: Sampler;
+  /** How many of the text encoder's last layers are skipped: 2 suits anime checkpoints. */
+  pictureClipSkip: number;
+  /**
+   * The seed the next picture starts from, so pictures carry on alike. Null until the first
+   * picture, which rolls one; whatever seed a picture is made with becomes this.
+   */
+  pictureSeed: number | null;
 }

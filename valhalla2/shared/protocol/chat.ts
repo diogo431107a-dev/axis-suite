@@ -18,6 +18,11 @@ export interface Chat {
   mode: ChatMode;
   /** The end of the path through the chat that is "what happened". Null in an empty chat. */
   activeLeafId: number | null;
+  /**
+   * Memory is paused in this chat: what is written now is held back from the memory model until
+   * you resume, and then filed or left out for good. The companion is not told.
+   */
+  memoryPaused: boolean;
   createdAt: string;
   lastActivityAt: string;
 }
@@ -107,6 +112,8 @@ export interface ChatPage {
   pinned: number[];
   /** The replies on the selected path you liked, with what you said about them. */
   liked: Liked[];
+  /** The messages on the selected path memory doesn't read: written while paused, or left out for good. */
+  offRecord: { paused: number[]; leftOut: number[] };
 }
 
 /** A chat as the list shows it: enough to name it without reading its messages. */
