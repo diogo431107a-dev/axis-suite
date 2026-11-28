@@ -1,49 +1,70 @@
-// The kept readings of moments (`scenes`): where and when a moment happens, who is there and how,
-// and how each line of a reply is said. A picture of the moment and reading it aloud share one.
+// The kept readings of moments (`scenes`), for pictures: where and when a moment happens, who is in
+// it and how they look, and its atmosphere. By default the character alone; you add anyone else.
+// How a reply is read aloud is apart (../tone/).
 //
 // A reading is kept per message and used again while what it was read from still holds: the chat
 // up to the moment, and the instructions. The memory changing doesn't count, or every filing of a
 // chat would read its moments again. One you corrected stays as you left it until the message's
-// own words change, since its lines would no longer match.
-import { createHash } from "node:crypto";
+// own words change.
 import type { DatabaseSync } from "node:sqlite";
 import {
-  blockText,
-  FEELINGS,
   LIMITS,
-  STRENGTHS,
   type Companion,
-  type Feeling,
+  type Effort,
   type Message,
-  type SceneLine,
+  type Provider,
   type ScenePerson,
   type SceneSheet,
   type SceneView,
-  type Strength,
 } from "../../shared/protocol.ts";
 import { promptOf } from "../../shared/prompts.ts";
 import { object, text } from "../check.ts";
-import type { SceneReader } from "../claude/scene.ts";
 import { invalid, notFound } from "../errors.ts";
+import type { Reader } from "../reading.ts";
+import { hashOf, textOf } from "../tone/request.ts";
 import { backgroundOf, chatUpTo, type Remembered } from "./context.ts";
-import { linesOf, numbered, type Line } from "./lines.ts";
 
-const hash = (value: string): string => createHash("sha256").update(value).digest("hex");
-const textOf = (message: Message): string => message.content.map(blockText).join("").trim();
+const str = { type: "string" } as const;
+
+/** The shape the scene model answers in. */
+export const SCENE_SCHEMA = {
+  type: "object",
+  properties: {
+    place: str,
+    time: str,
+    weather: str,
+    light: str,
+    atmosphere: str,
+    people: {
+      type: "array",
+      items: {
+        type: "object",
+        properties: { name: str, appearance: str, clothes: str, action: str, mood: str, expression: str },
+        required: ["name", "appearance", "clothes", "action", "mood", "expression"],
+        additionalProperties: false,
+      },
+    },
+  },
+  required: ["place", "time", "weather", "light", "atmosphere", "people"],
+  additionalProperties: false,
+} as const;
 
 /** What is asked about one moment, and what decides whether a kept reading still holds. */
 export interface MomentRequest {
+  provider: Provider;
+  model: string;
+  effort: Effort;
   system: string;
   background: string;
   moment: string;
-  lines: Line[];
+  cacheKey: string;
   /** Of the instructions and the chat up to the moment; the memory aside. */
   contextHash: string;
   /** Of the message's own words. */
   textHash: string;
 }
 
-/** The request about the moment at the end of `path`. Only a companion's reply has lines to direct. */
+/** The request about the moment at the end of `path`. */
 export function momentRequest(
   companion: Companion,
   remembered: Remembered,
@@ -51,93 +72,53 @@ export function momentRequest(
   budget: number,
 ): MomentRequest {
   const message = path.at(-1) ?? invalid("There is no moment to read");
-  const lines = message.role === "assistant" ? linesOf(textOf(message)) : [];
-  const chat = chatUpTo(companion, path, budget);
-  const moment =
-    lines.length > 0
-      ? `${chat}\n\n<lines>\n${numbered(lines)}\n</lines>\n\n` +
-        "Work out the moment marked <moment>, and how each of its numbered lines is said."
-      : `${chat}\n\nWork out the moment marked <moment>. It has no lines to direct: answer with an empty list of lines.`;
+  const moment = `${chatUpTo(companion, path, budget)}\n\nWork out the moment marked <moment>, for a picture of it.`;
   const system = promptOf(companion, "scene");
   return {
+    provider: companion.provider,
+    model: companion.settings.sceneModel,
+    effort: companion.settings.sceneEffort,
     system,
     background: backgroundOf(companion, remembered),
     moment,
-    lines,
-    contextHash: hash(`${system}\n${moment}`),
-    textHash: hash(textOf(message)),
+    cacheKey: `scene:${companion.id}`,
+    contextHash: hashOf(`${system}\n${moment}`),
+    textHash: hashOf(textOf(message)),
   };
 }
 
-const isFeeling = (value: unknown): value is Feeling => FEELINGS.includes(value as Feeling);
-const isStrength = (value: unknown): value is Strength => STRENGTHS.includes(value as Strength);
+const PERSON_FIELDS = ["name", "appearance", "clothes", "action", "mood", "expression"] as const;
+const SHEET_FIELDS = ["place", "time", "weather", "light", "atmosphere"] as const;
 
-/** The lines, each said the way `said` gives for its number, or plainly. */
-function directed(lines: Line[], said: (n: number) => { feeling?: Feeling; strength?: Strength }): SceneLine[] {
-  return lines.map((line, at) => {
-    const how = said(at + 1);
-    return {
-      ...line,
-      feeling: how.feeling ?? (line.action ? "narration" : "neutral"),
-      strength: how.strength ?? 2,
-    };
-  });
-}
-
-/** Claude's answer as a sheet. Whatever is missing or unknown is said plainly; nothing is refused. */
-export function sheetOf(raw: unknown, lines: Line[]): SceneSheet {
+/** The model's answer as a sheet. Whatever is missing or unknown is left empty; nothing is refused. */
+export function sheetOf(raw: unknown): SceneSheet {
   const fields = (raw ?? {}) as Record<string, unknown>;
   const str = (value: unknown): string => (typeof value === "string" ? value.trim().slice(0, LIMITS.sceneField) : "");
   const people: ScenePerson[] = (Array.isArray(fields.people) ? fields.people : [])
     .slice(0, LIMITS.scenePeople)
     .map((entry) => {
       const person = (entry ?? {}) as Record<string, unknown>;
-      return {
-        name: str(person.name),
-        appearance: str(person.appearance),
-        clothes: str(person.clothes),
-        action: str(person.action),
-        mood: str(person.mood),
-      };
+      return Object.fromEntries(PERSON_FIELDS.map((key) => [key, str(person[key])])) as unknown as ScenePerson;
     });
-  const said = new Map<number, { feeling?: Feeling; strength?: Strength }>();
-  for (const entry of Array.isArray(fields.lines) ? fields.lines : []) {
-    const line = (entry ?? {}) as Record<string, unknown>;
-    if (typeof line.line !== "number") continue;
-    said.set(line.line, {
-      feeling: isFeeling(line.feeling) ? line.feeling : undefined,
-      strength: isStrength(line.strength) ? line.strength : undefined,
-    });
-  }
   return {
-    place: str(fields.place),
-    time: str(fields.time),
-    weather: str(fields.weather),
-    light: str(fields.light),
+    ...(Object.fromEntries(SHEET_FIELDS.map((key) => [key, str(fields[key])])) as Omit<SceneSheet, "people">),
     people,
-    lines: directed(lines, (n) => said.get(n) ?? {}),
   };
 }
 
-/**
- * A sheet you corrected, checked. Its lines stay the reply's own words, as Valhalla 2 cuts them:
- * only how each is said can change.
- */
-export function correctedSheet(body: unknown, lines: Line[]): SceneSheet {
+/** A sheet you corrected, checked. */
+export function correctedSheet(body: unknown): SceneSheet {
   const fields = object(body);
   const field = (value: unknown, what: string) => text(value ?? "", LIMITS.sceneField, what);
   const people = fields.people ?? [];
   if (!Array.isArray(people)) invalid("The people aren't valid");
   if (people.length > LIMITS.scenePeople) invalid(`${LIMITS.scenePeople} people at most`);
-  const given = fields.lines ?? [];
-  if (!Array.isArray(given) || given.length !== lines.length) {
-    invalid("The lines don't match the reply any more. Read the moment again.");
-  }
   return {
     place: field(fields.place, "The place"),
     time: field(fields.time, "The time"),
     weather: field(fields.weather, "The weather"),
     light: field(fields.light, "The light"),
+    atmosphere: field(fields.atmosphere, "The atmosphere"),
     people: people.map((entry) => {
       const person = object(entry);
       return {
@@ -146,13 +127,8 @@ export function correctedSheet(body: unknown, lines: Line[]): SceneSheet {
         clothes: field(person.clothes, "The clothes"),
         action: field(person.action, "What someone is doing"),
         mood: field(person.mood, "A mood"),
+        expression: field(person.expression, "An expression"),
       };
-    }),
-    lines: directed(lines, (n) => {
-      const line = object(given[n - 1]);
-      if (!isFeeling(line.feeling)) invalid("A line's feeling isn't valid");
-      if (!isStrength(line.strength)) invalid("A line's strength isn't valid");
-      return { feeling: line.feeling, strength: line.strength };
     }),
   };
 }
@@ -169,9 +145,10 @@ interface Row {
   edited_at: string | null;
 }
 
+// A sheet kept before atmosphere and expression existed (one you corrected then) reads as empty there.
 const viewOf = (row: Row): SceneView => ({
   messageId: row.message_id,
-  sheet: JSON.parse(row.sheet) as SceneSheet,
+  sheet: sheetOf(JSON.parse(row.sheet)),
   edited: row.edited_at !== null,
   model: row.model,
   cost: row.cost,
@@ -185,24 +162,30 @@ const holds = (row: Row, request: MomentRequest): boolean =>
 
 export interface ScenesOptions {
   db: DatabaseSync;
-  read: SceneReader;
-  /** The Claude model that reads moments. */
-  model: string;
+  read: Reader;
 }
 
-export function createScenes({ db, read, model }: ScenesOptions) {
-  /** Readings under way, so a picture and reading aloud asking at once pay once. */
+export function createScenes({ db, read }: ScenesOptions) {
+  /** Readings under way, so two pictures asked at once pay once. */
   const underway = new Map<string, Promise<SceneView>>();
 
   const kept = (messageId: number): Row | undefined =>
     db.prepare("SELECT * FROM scenes WHERE message_id = ?").get(messageId) as Row | undefined;
 
   async function ask(messageId: number, request: MomentRequest): Promise<SceneView> {
-    const answer = await read(
-      { system: request.system, background: request.background, moment: request.moment },
-      model,
-    );
-    const sheet = sheetOf(answer.raw, request.lines);
+    const answer = await read({
+      provider: request.provider,
+      model: request.model,
+      effort: request.effort,
+      system: request.system,
+      background: request.background,
+      moment: request.moment,
+      schema: SCENE_SCHEMA as unknown as Record<string, unknown>,
+      name: "scene",
+      what: "this moment",
+      cacheKey: request.cacheKey,
+    });
+    const sheet = sheetOf(answer.raw);
     const sent = { system: request.system, prompt: `${request.background}\n\n${request.moment}` };
     try {
       db.prepare(
@@ -220,7 +203,7 @@ export function createScenes({ db, read, model }: ScenesOptions) {
         new Date().toISOString(),
       );
     } catch (err) {
-      // The message was deleted with its chat while Claude was reading it.
+      // The message was deleted with its chat while it was being read.
       if (String((err as Error).message).includes("FOREIGN KEY")) notFound("message");
       throw err;
     }
@@ -251,7 +234,7 @@ export function createScenes({ db, read, model }: ScenesOptions) {
     save(messageId: number, request: MomentRequest, body: unknown): SceneView {
       const row = kept(messageId);
       if (!row || row.text_hash !== request.textHash) invalid("Read the moment again before correcting it");
-      const sheet = correctedSheet(body, request.lines);
+      const sheet = correctedSheet(body);
       db.prepare("UPDATE scenes SET sheet = ?, edited_at = ? WHERE message_id = ?").run(
         JSON.stringify(sheet),
         new Date().toISOString(),

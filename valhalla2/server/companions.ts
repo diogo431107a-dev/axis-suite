@@ -6,7 +6,15 @@
 // change: the API it talks to (Claude or Grok), and whether it has memory. Nothing a Grok companion
 // says goes to Anthropic, and nothing a Claude one says goes to xAI.
 import type { DatabaseSync } from "node:sqlite";
-import { LIMITS, hasScenes, providerOf, type Companion, type Provider, type Settings } from "../shared/protocol.ts";
+import {
+  LIMITS,
+  grokReadingDefaults,
+  hasScenes,
+  providerOf,
+  type Companion,
+  type Provider,
+  type Settings,
+} from "../shared/protocol.ts";
 import {
   object,
   prompts as checkPrompts,
@@ -37,12 +45,30 @@ interface Row {
   updated_at: string;
 }
 
+/**
+ * A companion's settings as kept. One saved before a setting existed has none of it, and gets what
+ * a new one on its API would start with: no temperature, and its tone and scene read at low effort,
+ * by the server's models on Claude and by its own chat model on Grok.
+ */
+function settingsOf(row: Row): Settings {
+  const kept = JSON.parse(row.settings) as Partial<Settings> & Pick<Settings, "model">;
+  const readings =
+    row.provider === "xai"
+      ? grokReadingDefaults(kept.model)
+      : {
+          toneModel: config.defaults.toneModel,
+          toneEffort: config.defaults.toneEffort,
+          sceneModel: config.defaults.sceneModel,
+          sceneEffort: config.defaults.sceneEffort,
+        };
+  return { ...config.defaults, temperature: null, ...readings, ...kept };
+}
+
 export const companionOf = (row: Row): Companion => ({
   id: row.id,
   name: row.name,
   profile: row.profile,
-  // A companion saved before temperature existed has none in its settings.
-  settings: { temperature: null, ...(JSON.parse(row.settings) as Omit<Settings, "temperature">) },
+  settings: settingsOf(row),
   provider: row.provider === "xai" ? "xai" : "anthropic",
   memory: row.memory === 1,
   prompts: JSON.parse(row.prompts) as Companion["prompts"],

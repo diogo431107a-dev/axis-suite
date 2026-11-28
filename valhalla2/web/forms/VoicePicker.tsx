@@ -1,7 +1,7 @@
 // The voice a companion's replies are read aloud in: any of the voices Azure offers, found by
 // name or language, and heard before it is chosen; its speed, pitch and speaking style; and
-// whether replies are read with the feeling of each line, as the scene works it out.
-import { useEffect, useMemo, useRef, useState } from "react";
+// whether replies are read with the feeling of each line, as the tone model works it out.
+import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LoaderCircle, RotateCcw, Volume2 } from "lucide-react";
 import { FEELINGS, LIMITS, type Feeling, type Voice, type VoiceList, type VoiceTuning } from "../../shared/protocol.ts";
 import { api, apiBlob, describeError } from "../api.ts";
@@ -83,7 +83,7 @@ export function VoicePicker({
   onTuning,
   feeling,
   onFeeling,
-  withFeeling = true,
+  children,
 }: {
   value: string | null;
   onChange: (voice: string | null) => void;
@@ -93,8 +93,8 @@ export function VoicePicker({
   /** Whether replies are read with the feeling of each line. */
   feeling: boolean;
   onFeeling: (feeling: boolean) => void;
-  /** Whether feeling is offered at all: a companion without memory has no scene, so reads plainly. */
-  withFeeling?: boolean;
+  /** Shown under "Read with feeling" while it is on: who works out the feelings, and how. */
+  children?: ReactNode;
 }) {
   const [list, setList] = useState<VoiceList | null>(null);
   const [error, setError] = useState("");
@@ -242,24 +242,21 @@ export function VoicePicker({
               </select>
             </Field>
           ) : null}
-          {withFeeling ? null : (
-            <p className="text-xs text-faint">
-              Without memory there is no scene to read a reply's feeling from, so replies are read plainly, as written.
-            </p>
-          )}
-          <label className={withFeeling ? "flex items-start gap-2 text-sm" : "hidden"}>
+          <label className="flex items-start gap-2 text-sm">
             <input type="checkbox" className="mt-1" checked={feeling} onChange={(e) => onFeeling(e.target.checked)} />
             <span>
               Read with feeling
               <span className="mt-0.5 block text-xs text-faint">
-                Before a reply is read, Claude works out the scene (the clapperboard under it) and how each line is
-                said: teasing, whispered, angry. A fraction of a cent a reply, and a moment's wait the first time.{" "}
+                The first time a reply is read, the tone model works out how each line is said (teasing, whispered,
+                angry) from the profile and the chat just before it. A fraction of a cent a reply on a cheap model, and
+                a moment's wait the first time; the button with sound waves under the reply shows it then.{" "}
                 {chosen && chosen.styles.length > 0
                   ? `${chosen.name} has styles of its own (${chosen.styles.join(", ")}), which sound the most natural; other feelings are read with speed, pitch and volume, on top of the speed and pitch above.`
                   : "This voice has no styles of its own, so feelings are read with speed, pitch and volume, on top of the speed and pitch above. Type “styles” above to find voices that have them."}
               </span>
             </span>
           </label>
+          {feeling ? children : null}
           <Field
             label="Try it"
             hint="Read by Azure like a reply, so it counts toward this month's characters; hearing the same words again is free."
@@ -273,7 +270,6 @@ export function VoicePicker({
               />
               <select
                 aria-label="Read it"
-                hidden={!withFeeling}
                 className={`${inputStyle} w-auto`}
                 value={sampleFeeling ?? ""}
                 onChange={(e) => setSampleFeeling(e.target.value === "" ? null : (e.target.value as Feeling))}

@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import type { SceneLine } from "../../shared/protocol.ts";
+import type { ToneLine } from "../../shared/protocol.ts";
 import { directedSsml, styleFor } from "./direct.ts";
 
-const line = (text: string, feeling: SceneLine["feeling"], strength: SceneLine["strength"] = 2, more = {}) =>
-  ({ text, action: false, paragraph: false, feeling, strength, ...more }) satisfies SceneLine;
+const line = (text: string, feeling: ToneLine["feeling"], strength: ToneLine["strength"] = 2, more = {}) =>
+  ({ text, action: false, paragraph: false, feeling, strength, ...more }) satisfies ToneLine;
 
 describe("a reply read with feeling", () => {
   it("uses the voice's own style when it has one that fits, at the line's strength", () => {

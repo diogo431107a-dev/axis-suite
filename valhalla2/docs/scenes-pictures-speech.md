@@ -1,43 +1,49 @@
 # Scenes, pictures and reading aloud
 
-A picture of a moment and a reply read aloud both start from the same reading of the moment: the
-**scene**. Both are optional: without a CivitAI key Valhalla 2 makes no pictures, and without an
-Azure Speech key it reads nothing aloud.
+A picture of a moment is drawn from the **scene**; a reply read aloud with feeling follows its
+**tags**. They are two readings, each for its own purpose, by models you choose on the companion's
+page. Both are optional: without a CivitAI key Valhalla 2 makes no pictures, and without an Azure
+Speech key it reads nothing aloud.
 
 ## The scene
 
-A picture of a moment and reading a reply aloud both need to understand the moment: where and when
-it happens, who is there and in what state, and whether a line is a joke, a tease or meant. One
-message alone rarely says: the rain was thirty messages ago, and "fine" can be cold or fond. So
-before either, Claude (`SCENE_MODEL`, Haiku 5.5) reads the companion's profile, its memory and
-pinned moments, and the chat up to the moment (about `VALHALLA_SCENE_TOKENS` of it), and works out
-the scene:
+A picture needs to understand the moment: where and when it happens, how the character looks right
+now, and what they feel. One message alone rarely says: the rain was thirty messages ago. So
+before a picture, the companion's **Scene model** reads its profile, its memory and pinned moments,
+and the chat up to the moment (about `VALHALLA_SCENE_TOKENS` of it), and works out the scene:
 
 - **the setting**: place, time of day, the weather and what it has done, the light;
-- **who is there**: for each, their look right now, their clothes and their state (soaked, torn),
-  what they are doing, and their mood and intent, with a few words of why;
-- **how it is said**, for a reply: every line (Valhalla 2 cuts it into sentences, actions apart from
-  speech, so the words are always the reply's own) with its feeling (teasing, whispering, angry,
-  tender…) and how strongly.
+- **the atmosphere**: the colours and mood the picture should carry (warm reds for anger, a cold
+  blue dusk for loneliness);
+- **the character**: their look right now, their clothes and their state (soaked, torn), what they
+  are doing, their mood with a few words of why, and **how it shows** in a drawing (flushed
+  cheeks, an anger vein, tears).
 
-It is read once per message and kept, a fraction of a cent each, and nothing is added to the chat
-itself: what the companion is sent each turn doesn't change. It is read again when the chat up to
-the moment changes (an edit, another version), not when only the memory does.
+It focuses on the character alone. You are in the picture only if you add yourself: **Someone
+else** in the scene dialog adds anyone you want drawn, the user included.
 
-The clapperboard under any message opens it: correct anything, from the weather to the feeling of
-one line, and save, and it stays as you left it until the message's own words change. **Read it
-again** asks afresh. What was sent and what it cost are under it. How Claude reads a scene is one of
-the companion's own texts, **Scene reading instructions**.
+It is read once per message and kept, and nothing is added to the chat itself: what the companion
+is sent each turn doesn't change. It is read again when the chat up to the moment changes (an
+edit, another version), not when only the memory does. Its cost depends on the model: about 15–25K
+tokens in, so about 0.3¢ on Haiku 5.5 and about 5¢ on Sonnet 5.5 or Grok 4.7.
 
-The scene needs memory, and Claude: a companion without memory has none, and neither has a Grok
-companion yet, with memory or without (see [providers](providers.md)).
+The clapperboard under any message opens it: correct anything and save, and it stays as you left
+it until the message's own words change. **Read it again** asks afresh. Which model read it, what
+was sent and what it cost are under it. How the scene is read is one of the companion's own texts,
+**Scene reading instructions**; the model and its effort are **Scene model** and **Scene effort**
+under Settings.
+
+The scene needs memory. A companion without memory draws its pictures from the message itself.
+A Claude companion's scene is read by Claude, a Grok companion's by Grok (see
+[providers](providers.md)).
 
 ## Pictures
 
 A picture of the moment, or of the companion. Under any message, the picture button works out the
-scene (above), or uses the one kept, and asks Claude (`PICTURE_PROMPT_MODEL`, Sonnet 5.5) to write a
-prompt for the image model from it: who is there and what they look like, what they are doing, the
-place, the light. The image model invents whatever a prompt leaves unsaid, so Claude is told to
+scene (above), or uses the one kept, and asks for a prompt for the image model from it (on Claude,
+`PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok, the companion's own model): the people the scene lists
+and what they look like, their expressions, what they are doing, the place, the light, the
+colours. The image model invents whatever a prompt leaves unsaid, so Claude is told to
 state all of it, choosing something plain where nothing says. A profile picture is written from the
 profile and the memory. Nothing runs on ordinary replies; a prompt costs a cent or two, and only
 when you ask.
@@ -83,12 +89,12 @@ A companion's replies can be read aloud, by Azure AI Speech's neural voices.
   each new reply, version or greeting is read as soon as it is written. It is remembered by the
   browser, not the companion — on at home, off on the phone in public — and starts on.
 - **With feeling.** Unless **Read with feeling** is off on the companion's page, a reply is read the
-  way its scene says each line is said (above), worked out the first time it is read. A line whose
+  way its tags say each line is said (below), worked out the first time it is read. A line whose
   feeling matches one of the voice's own styles is read in it; only about fifty voices have styles
   (most of them US English or Chinese; among the Brazilian Portuguese ones only Francisca, "calm"),
   and the voice finder shows them ("styles"). Every other line, on any voice, is read with speed,
   pitch and volume set for its feeling: a whisper softer and slower, anger louder and quicker.
-  Actions are read a little slower and quieter, as narration. If the scene can't be read (Claude
+  Actions are read a little slower and quieter, as narration. If the tags can't be read (the model
   unreachable), the reply is read plainly. **Hear it** can try a voice in any feeling.
 - **On demand.** The speaker button under any reply reads it; while it plays it becomes a stop
   button. Starting one reply stops the other, and leaving the chat stops it.
@@ -99,8 +105,29 @@ button under the reply always works.
 
 **Each reply is read once.** The first time it is asked for, Azure reads it and the MP3 is kept on
 the server, about 0.4 MB a minute; playing it again is instant and costs nothing. An edited reply is
-read again, and the old audio deleted; so is a reply whose companion changed voice, or whose scene
+read again, and the old audio deleted; so is a reply whose companion changed voice, or whose tags
 you corrected. Under the composer, after the first reading in a visit, is how many characters Azure
 has read this month for the whole server. Azure's free tier (F0) includes 500,000 characters a
 month; the paid tier (S0) bills per million characters. Everyone who can sign in to Heimdall reads
 on the server's key.
+
+### The tags
+
+How each line of a reply is said, for Azure: Valhalla 2 cuts the reply into lines (sentences,
+actions apart from speech, so the words read are always the reply's own), and the companion's
+**Tone model** gives each a feeling (teasing, whispering, angry, tender…) and how strongly. It
+reads the profile and the chat just before the reply (**How much of the chat it reads**, 4,000
+tokens unless you change it), not the memory: how a line is said depends on who says it and what
+came just before. That is about 5K tokens, so about 0.05¢ a reply on Haiku 5.5 and about 1.5¢ on
+Sonnet 5.5.
+
+It is read the first time a reply is read aloud with feeling, and kept. Then the button with sound
+waves appears under the reply: it opens the tags, line by line, to correct any and save, **Save and
+hear it**, or **Read it again**; which model read them, at what effort, what was sent and what it
+cost are under them. A correction stays until the reply's own words change. Tags are not read again
+when only the chat before the reply changes, since that would mean reading the reply aloud again.
+
+The tags work for every companion, with memory or without, on Claude or Grok; each is read on the
+companion's own API. The model, its effort and how much of the chat it reads are under **Read with
+feeling**, with the voice. How it judges a line is one of the companion's own texts, **Tone
+instructions**.

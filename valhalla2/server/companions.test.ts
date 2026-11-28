@@ -65,15 +65,37 @@ describe("Claude or Grok, with or without memory", () => {
     expect(config.grokWindowTokens).toBeGreaterThan(config.windowTokens);
   });
 
-  it("gives scenes to a Claude companion with memory only", () => {
+  it("gives scenes to a companion with memory, Claude or Grok", () => {
     const { companions } = setup();
     const claude = companions.save("comp-0001", { name: "Hrothgar" });
     const without = companions.save("comp-0002", { name: "Wealhtheow", memory: false });
     const grokWith = companions.save("comp-0003", { name: "Grendel", settings: grok, memory: true });
     expect(needScenes(claude)).toBe(claude);
     expect(() => needScenes(without)).toThrow(/no scenes/);
-    expect(() => needScenes(grokWith)).toThrow(/no scenes/);
-    expect(hasScenes(grokWith)).toBe(false);
+    expect(needScenes(grokWith)).toBe(grokWith);
+    expect(hasScenes(grokWith)).toBe(true);
+  });
+
+  it("reads tags and scenes on the companion's own API", () => {
+    const { companions } = setup();
+    const grokWith = companions.save("comp-0001", { name: "Grendel", settings: grok, memory: true });
+    expect(grokWith.settings).toMatchObject({
+      toneModel: "grok-4.7",
+      sceneModel: "grok-4.7",
+      toneEffort: "low",
+      sceneEffort: "low",
+    });
+    const claude = companions.save("comp-0002", {
+      name: "Hrothgar",
+      settings: { ...DEFAULT_SETTINGS, toneModel: "claude-sonnet-5-5", sceneEffort: "high", toneTokens: 2000 },
+    });
+    expect(claude.settings).toMatchObject({ toneModel: "claude-sonnet-5-5", sceneEffort: "high", toneTokens: 2000 });
+    expect(() =>
+      companions.save("comp-0002", { name: "Hrothgar", settings: { ...DEFAULT_SETTINGS, sceneModel: "grok-4.7" } }),
+    ).toThrow(/scene model has to be a Claude model/);
+    expect(() =>
+      companions.save("comp-0002", { name: "Hrothgar", settings: { ...DEFAULT_SETTINGS, toneTokens: 50 } }),
+    ).toThrow(/How much of the chat/);
   });
 
   it("lets a Claude companion move between Claude models, never to Grok", () => {
@@ -129,7 +151,7 @@ describe("companions from before the choice existed", () => {
     for (const dir of made.splice(0)) rmSync(dir, { recursive: true, force: true });
   });
 
-  it("become Claude companions with memory, with no temperature", () => {
+  it("become Claude companions with memory, with no temperature, reading tags and scenes on Haiku", () => {
     const dir = mkdtempSync(join(tmpdir(), "valhalla2-migrate-"));
     made.push(dir);
     const file = join(dir, "valhalla2.db");
@@ -146,9 +168,47 @@ describe("companions from before the choice existed", () => {
     expect(createCompanions(db, "odin", DEFAULT_SETTINGS).get("comp-0001")).toMatchObject({
       provider: "anthropic",
       memory: true,
-      settings: { temperature: null },
+      settings: {
+        temperature: null,
+        toneModel: config.defaults.toneModel,
+        toneEffort: "low",
+        toneTokens: 4000,
+        sceneModel: config.defaults.sceneModel,
+        sceneEffort: "low",
+      },
       voiceTuning: { rate: 0, pitch: 0, style: null },
     });
+    db.close();
+  });
+
+  it("keep how their replies were already read aloud, as tags apart from the scene", () => {
+    const dir = mkdtempSync(join(tmpdir(), "valhalla2-migrate-"));
+    made.push(dir);
+    const file = join(dir, "valhalla2.db");
+    const old = openDatabase(file, 11);
+    old.exec(`
+      INSERT INTO companions (id, name, profile, settings, prompts, created_at, updated_at, owner)
+        VALUES ('comp-0001', 'Freya', '', '{"model":"claude-haiku-5-5"}', '{}', 'then', 'then', 'odin');
+      INSERT INTO chats (id, companion_id, title, created_at, last_activity_at)
+        VALUES ('chat-0001', 'comp-0001', 'The hall', 'then', 'then');
+      INSERT INTO messages (id, chat_id, role, content, created_at)
+        VALUES (1, 'chat-0001', 'assistant', '[{"type":"text","text":"Hi."}]', 'then'),
+               (2, 'chat-0001', 'user', '[{"type":"text","text":"Hello."}]', 'then');
+    `);
+    const line = { text: "Hi.", action: false, paragraph: true, feeling: "warm", strength: 2 };
+    const insert = old.prepare(
+      `INSERT INTO scenes (message_id, context_hash, text_hash, sheet, model, cost, request, created_at, edited_at)
+       VALUES (?, 'c', ?, ?, 'claude-haiku-5-5', 0.002, '{"system":"","prompt":""}', 'then', ?)`,
+    );
+    insert.run(1, "t1", JSON.stringify({ place: "Hall", people: [], lines: [line] }), "fixed");
+    insert.run(2, "t2", JSON.stringify({ place: "Hall", people: [], lines: [] }), null);
+    old.close();
+
+    const db = openDatabase(file);
+    const tones = db.prepare("SELECT * FROM tones").all() as Record<string, unknown>[];
+    expect(tones).toHaveLength(1);
+    expect(tones[0]).toMatchObject({ message_id: 1, text_hash: "t1", effort: "low", edited_at: "fixed", cost: 0.002 });
+    expect(JSON.parse(tones[0]!.lines as string)).toEqual([line]);
     db.close();
   });
 });

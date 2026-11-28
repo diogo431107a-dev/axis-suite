@@ -68,20 +68,20 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "Work in as few commands as you can — rewriting a whole file with `create` is fine. When done, answer with " +
     "one short line saying what you tidied.",
   scene:
-    "You read one moment of a story chat between the user and a companion character: to describe the scene for " +
-    "a picture of it, and to direct how the companion's words are read aloud. You are given the companion's " +
-    "profile, what they remember, the chat up to the moment (marked <moment>), and, for a reply of the " +
-    "companion's, its lines, numbered.\n\n" +
+    "You read one moment of a story chat between the user and a companion character, to describe it for a " +
+    "picture: the character and the place around them. You are given the companion's profile, what they " +
+    "remember, and the chat up to the moment (marked <moment>).\n\n" +
     "- place, time, weather, light: where and when the moment happens, as the chat and the memory establish it. " +
     "Carry facts forward: if it rained earlier and nothing has changed, they are still wet. Where nothing says, " +
     "choose something plain that fits, and say it in a few words.\n" +
-    "- people: everyone present at the moment, the user included. For each: their look right now (hair, build, " +
+    "- atmosphere: the colours and atmosphere that carry the mood of the moment, as a picture would show them " +
+    "(warm reds and gold for anger or passion, a cold blue dusk for loneliness, a soft haze for tenderness).\n" +
+    "- people: the focus should be on the character alone, without the user. Her look right now (hair, build, " +
     "anything that has changed), their clothes and their state (soaked, torn, half-buttoned), what they are doing " +
     "and where, and their mood and intent with a few words of why (teasing: she laughed just before). Use the " +
     "names the story uses; call the user by theirs if the story gives one, otherwise the user.\n" +
-    "- lines: for every numbered line, the feeling it is said with and how strongly (1 slight, 2 clear, 3 " +
-    "strong). Judge it in context: who is speaking, what came just before, and whether it is a joke, a tease, " +
-    "sarcasm or meant. An action line (in asterisks) is narration, unless it is itself whispered or shouted.\n\n" +
+    "- expression: for each person, how their feeling shows in a drawing, in the terms an anime illustrator " +
+    "uses: flushed cheeks, an anger vein, tears at the corners of the eyes, a pout, a clenched fist.\n\n" +
     "Describe only this moment, and never invent events. Write in the language of the chat.",
   picture:
     "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
@@ -94,11 +94,15 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "action and expression, then the place, time of day, lighting, mood and framing (close-up, cowboy shot, full " +
     "body, from side…).\n" +
     "- Take the companion's look from the profile (an <appearance> section if there is one) and keep it the same " +
-    "from picture to picture. Draw the user from the profile's description of them; if it says nothing about their " +
+    "from picture to picture.\n" +
+    "- With a scene worked out, draw exactly the people it lists: usually the companion alone (solo). Draw the " +
+    "user only when the scene lists them, from the profile's description of them; if it says nothing about their " +
     "looks, keep them plain, or show them from behind or only in part.\n" +
     "- Picture the chosen moment, not the whole chat. The scene and the chat decide the place, the time of day, " +
     "the weather and what it has done (wet hair, soaked clothes), the light, each person's clothes and their " +
-    "state, and the mood; the memory fills in what they leave out, and the chat wins where they differ.\n" +
+    "state, and the mood; the memory fills in what they leave out, and the chat wins where they differ. Turn " +
+    "each person's expression into tags (blush, anger vein, tears, pout, clenched hand) and the atmosphere into " +
+    "colour and lighting tags (warm colors, red theme, blue hour, soft lighting).\n" +
     "- State all of it in tags. The image model invents whatever the prompt leaves unsaid, so leave nothing to it: " +
     "where nothing says, choose something plain that fits the scene, and still state it.\n" +
     '- negativePrompt: start with "bad quality, worst quality, worst detail, sketch, censor", then add what this ' +
@@ -107,6 +111,15 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "when neither fits.\n" +
     "- caption: one short plain sentence saying what the picture shows, for the gallery.\n\n" +
     "If the user adds a note, follow it.",
+  tone:
+    "You direct how a companion character's reply is read aloud by a text-to-speech voice. You are given the " +
+    "companion's profile, the chat just before the reply, and the reply itself as numbered lines.\n\n" +
+    "- For every numbered line, give the feeling it is said with and how strongly (1 slight, 2 clear, 3 strong). " +
+    "The voice turns these into loudness, pitch and speed: angry is louder and higher, whispering softer and " +
+    "slower, sad slower and lower.\n" +
+    "- Judge each line in context: who is speaking, what came just before, and whether it is a joke, a tease, " +
+    "sarcasm or meant. Most lines are said plainly or with a slight feeling; keep strong for lines that truly are.\n" +
+    "- An action line (in asterisks) is narration, unless it is itself whispered or shouted.",
 };
 
 /** Said to the memory model before each step of a rebuild, after the memory-keeping instructions. */
@@ -175,11 +188,15 @@ export const PROMPT_LABELS: Readonly<Record<PromptKey, { label: string; hint: st
   },
   scene: {
     label: "Scene reading instructions",
-    hint: "What Claude is told when it works out a moment before a picture of it, or before a reply is read aloud: the place, who is there and how, and how each line is said.",
+    hint: "What the scene model is told when it works out a moment before a picture of it: the place, the character and how they look, the atmosphere.",
   },
   picture: {
     label: "Picture instructions",
-    hint: "What Claude is told when it writes the prompt for a picture: the image model's style, and how to fill in what the chat leaves vague.",
+    hint: "What the model is told when it writes the prompt for a picture: the image model's style, and how to fill in what the chat leaves vague.",
+  },
+  tone: {
+    label: "Tone instructions",
+    hint: "What the tone model is told the first time a reply is read aloud with feeling: how each line is said.",
   },
   rejection: {
     label: "Rejection note",

@@ -1,4 +1,4 @@
-// Pictures of a companion: a profile picture from its page, a chat picture from a message. Claude
+// Pictures of a companion: a profile picture from its page, a chat picture from a message. A model
 // writes the prompt, you look it over, and CivitAI makes the picture in the background.
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
@@ -51,7 +51,7 @@ export function pictureRoutes(s: Services): Router {
     const from = kind === "chat" ? sceneOf(req, companion, body) : null;
     const scene: Scene = from ? { kind: "chat", path: from.path } : { kind: "profile" };
     // With scenes, a chat picture is drawn from the moment worked out: read once, kept, and yours to
-    // correct. Without (no memory, or Grok), from the message itself and the profile.
+    // correct. Without memory, from the message itself and the profile.
     const scenes = hasScenes(companion);
     const read = from && scenes ? await s.scenes.of(from.messageId, s.moment(companion, from.path)) : null;
     const request = scenes

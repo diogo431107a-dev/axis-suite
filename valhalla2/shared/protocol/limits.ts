@@ -21,6 +21,9 @@ export const LIMITS = {
   /** The reply length you can ask for. Replies stream, so a long ceiling costs nothing. */
   minTokens: 256,
   maxTokens: 64_000,
+  /** How much of the chat before a reply the tone model may read, in tokens. */
+  minToneTokens: 500,
+  maxToneTokens: 20_000,
   /** A picture's prompt, and its negative prompt. */
   picturePrompt: 4_000,
   /** What you add when asking for a picture: "at sunset", "from behind". */
