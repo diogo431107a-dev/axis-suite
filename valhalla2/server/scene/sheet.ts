@@ -39,8 +39,17 @@ export const SCENE_SCHEMA = {
       type: "array",
       items: {
         type: "object",
-        properties: { name: str, appearance: str, clothes: str, action: str, mood: str, expression: str },
-        required: ["name", "appearance", "clothes", "action", "mood", "expression"],
+        properties: {
+          name: str,
+          appearance: str,
+          clothes: str,
+          action: str,
+          pose: str,
+          view: str,
+          mood: str,
+          expression: str,
+        },
+        required: ["name", "appearance", "clothes", "action", "pose", "view", "mood", "expression"],
         additionalProperties: false,
       },
     },
@@ -87,7 +96,7 @@ export function momentRequest(
   };
 }
 
-const PERSON_FIELDS = ["name", "appearance", "clothes", "action", "mood", "expression"] as const;
+const PERSON_FIELDS = ["name", "appearance", "clothes", "action", "pose", "view", "mood", "expression"] as const;
 const SHEET_FIELDS = ["place", "time", "weather", "light", "atmosphere"] as const;
 
 /** The model's answer as a sheet. Whatever is missing or unknown is left empty; nothing is refused. */
@@ -126,6 +135,8 @@ export function correctedSheet(body: unknown): SceneSheet {
         appearance: field(person.appearance, "A look"),
         clothes: field(person.clothes, "The clothes"),
         action: field(person.action, "What someone is doing"),
+        pose: field(person.pose, "A pose"),
+        view: field(person.view, "How someone is seen"),
         mood: field(person.mood, "A mood"),
         expression: field(person.expression, "An expression"),
       };
@@ -145,7 +156,8 @@ interface Row {
   edited_at: string | null;
 }
 
-// A sheet kept before atmosphere and expression existed (one you corrected then) reads as empty there.
+// A sheet kept before atmosphere, expression, pose or view existed (one you corrected then) reads as
+// empty there.
 const viewOf = (row: Row): SceneView => ({
   messageId: row.message_id,
   sheet: sheetOf(JSON.parse(row.sheet)),

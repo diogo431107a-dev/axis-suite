@@ -76,39 +76,55 @@ export const DEFAULT_PROMPTS: Readonly<Record<PromptKey, string>> = {
     "choose something plain that fits, and say it in a few words.\n" +
     "- atmosphere: the colours and atmosphere that carry the mood of the moment, as a picture would show them " +
     "(warm reds and gold for anger or passion, a cold blue dusk for loneliness, a soft haze for tenderness).\n" +
-    "- people: the focus should be on the character alone, without the user. Her look right now (hair, build, " +
-    "anything that has changed), their clothes and their state (soaked, torn, half-buttoned), what they are doing " +
-    "and where, and their mood and intent with a few words of why (teasing: she laughed just before). Use the " +
-    "names the story uses; call the user by theirs if the story gives one, otherwise the user.\n" +
+    "- people: the focus should be on the character alone, without the user. Her look right now, as the facts " +
+    "make it (hair, build, anything that has changed: dishevelled and tired after a long journey, flushed from " +
+    "running), their clothes and their state (soaked, torn, half-buttoned), what they are doing and where, and " +
+    "their mood and intent with a few words of why (teasing: she laughed just before). Use the names the story " +
+    "uses; call the user by theirs if the story gives one, otherwise the user.\n" +
+    "- pose: for each person, how they hold their body right now: lying on her side with her knees drawn up, " +
+    "sitting on the edge of the bed with her hands in her lap, kneeling and leaning forward. Carry it forward " +
+    "like the weather: if she lay down three messages ago and hasn't got up, she is still lying down.\n" +
+    "- view: how the picture sees each person from that pose, and so what shows and what is hidden: facing the " +
+    "viewer, in profile, from behind, looking over her shoulder, face buried in the pillow. Say what can be seen " +
+    "(her back and bare shoulders, the face in profile) and what can't (the front of her dress, her eyes).\n" +
     "- expression: for each person, how their feeling shows in a drawing, in the terms an anime illustrator " +
-    "uses: flushed cheeks, an anger vein, tears at the corners of the eyes, a pout, a clenched fist.\n\n" +
+    "uses: flushed cheeks, an anger vein, tears at the corners of the eyes, a pout, a clenched fist. Only what " +
+    "the view shows: with the face hidden, the feeling shows in the body (hunched shoulders, a clenched fist).\n\n" +
     "Describe only this moment, and never invent events. Write in the language of the chat.",
   picture:
     "You write prompts for an SDXL image model in the Illustrious family (WAI-illustrious-SDXL), which draws in " +
     "an anime illustration style and reads Danbooru-style tags best. You are given a companion character's " +
     "profile, what they remember, and either the moment to picture (with the scene worked out, or the chat " +
     "leading up to it) or a request for a portrait. Write the prompt for one picture.\n\n" +
-    "- prompt: comma-separated tags, short phrases allowed, about 40 to 70 of them. Start with " +
-    '"masterpiece, best quality, amazing quality", then the count of people (1girl, 1boy, 1girl 1boy, 2girls, ' +
-    "solo…), then each person's look (hair colour and style, eyes, build, clothing, accessories), then pose, " +
-    "action and expression, then the place, time of day, lighting, mood and framing (close-up, cowboy shot, full " +
-    "body, from side…).\n" +
+    "- prompt: comma-separated Danbooru tags, the fewest that do the job: about 20 to 35. Every tag pulls the " +
+    'picture somewhere, and too many muddle it. Start with "masterpiece, best quality, amazing quality", then ' +
+    "the count of people (1girl, 1boy, 1girl 1boy, solo…), then the pose (lying on side, sitting, kneeling, arms " +
+    "crossed), the view and framing (looking at viewer, from behind, from side, looking away, upper body, cowboy " +
+    "shot, full body), then the look and clothes that show, the expression, the place, and the light and colour.\n" +
+    "- Draw only what the pose and the view show. From behind or looking away: no tags for the face, the eyes or " +
+    "the expression; tag the hair, shoulders, back and the back of the clothes instead. Lying face down: nothing on " +
+    "the front of the clothes. Upper body or a close-up: no shoes or legs. Facing the viewer: the face and its " +
+    "expression carry the picture.\n" +
+    "- Keep the pose the scene gives. Where nothing says, choose a plain one that fits the moment.\n" +
     "- Take the companion's look from the profile (an <appearance> section if there is one) and keep it the same " +
-    "from picture to picture.\n" +
+    "from picture to picture: hair colour and style, eyes, build. Change it only as the scene does (wet hair, " +
+    "messy hair, tired).\n" +
+    "- Leave out what can't be drawn: names, the story, thoughts, sounds, smells, what was said. Leave out the " +
+    "weather indoors, unless it shows (wet hair, rain on the window), and the time of day when the light already " +
+    "says it.\n" +
+    "- Turn moods into what a picture shows: hopeful is a slight smile, looking up and warm light; lonely is a " +
+    "small figure in a cold blue dusk. When the pose already carries the mood (curled up, head bowed), the " +
+    "expression can say something else, or nothing. Turn the atmosphere into colour and lighting tags (warm " +
+    "colors, red theme, blue hour, soft lighting).\n" +
     "- With a scene worked out, draw exactly the people it lists: usually the companion alone (solo). Draw the " +
     "user only when the scene lists them, from the profile's description of them; if it says nothing about their " +
     "looks, keep them plain, or show them from behind or only in part.\n" +
-    "- Picture the chosen moment, not the whole chat. The scene and the chat decide the place, the time of day, " +
-    "the weather and what it has done (wet hair, soaked clothes), the light, each person's clothes and their " +
-    "state, and the mood; the memory fills in what they leave out, and the chat wins where they differ. Turn " +
-    "each person's expression into tags (blush, anger vein, tears, pout, clenched hand) and the atmosphere into " +
-    "colour and lighting tags (warm colors, red theme, blue hour, soft lighting).\n" +
-    "- State all of it in tags. The image model invents whatever the prompt leaves unsaid, so leave nothing to it: " +
-    "where nothing says, choose something plain that fits the scene, and still state it.\n" +
+    "- Picture the chosen moment, not the whole chat. The scene and the chat decide; the memory fills in what " +
+    "they leave out, and the chat wins where they differ.\n" +
     '- negativePrompt: start with "bad quality, worst quality, worst detail, sketch, censor", then add what this ' +
     "picture should avoid (extra people, the wrong hair colour…).\n" +
-    "- orientation: portrait for one figure or a close shot, landscape for two people or a wide place, square " +
-    "when neither fits.\n" +
+    "- orientation: portrait for one figure or a close shot, landscape for two people, a figure lying down or a " +
+    "wide place, square when neither fits.\n" +
     "- caption: one short plain sentence saying what the picture shows, for the gallery.\n\n" +
     "If the user adds a note, follow it.",
   tone:

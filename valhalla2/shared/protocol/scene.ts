@@ -11,6 +11,16 @@ export interface ScenePerson {
   clothes: string;
   /** What they are doing, and where. */
   action: string;
+  /**
+   * How they hold their body right now: lying on her side with her knees drawn up, kneeling, arms
+   * crossed. Carried forward like the weather. Empty on a scene read before it existed.
+   */
+  pose: string;
+  /**
+   * How the picture sees them from that pose, and so what shows and what is hidden: from behind,
+   * looking over her shoulder; her back and shoulders, not her face. Empty on an older scene.
+   */
+  view: string;
   /** How they feel and what they mean, with a few words of why. */
   mood: string;
   /** How that feeling shows in a picture: flushed cheeks, an anger vein, tears, a clenched fist. */

@@ -195,7 +195,9 @@ export function PictureDialog({
                 ["Atmosphere", scene.sheet.atmosphere],
                 ...scene.sheet.people.map((person) => [
                   person.name,
-                  [person.appearance, person.clothes, person.action, person.expression].filter(Boolean).join("; "),
+                  [person.pose, person.view, person.appearance, person.clothes, person.action, person.expression]
+                    .filter(Boolean)
+                    .join("; "),
                 ]),
               ].map(([label, value], at) => (
                 <div key={at}>

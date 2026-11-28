@@ -19,6 +19,8 @@ const ANSWER = {
       appearance: "Gold hair, wet",
       clothes: "Soaked dress",
       action: "By the fire",
+      pose: "Sitting on a bench, leaning forward",
+      view: "Facing the viewer",
       mood: "Teasing",
       expression: "A sly smile, one eyebrow raised",
     },
@@ -141,11 +143,11 @@ describe("the scene model's answer", () => {
     expect(sheet.place).toBe("");
     expect(sheet.atmosphere).toBe("");
     expect(sheet.people).toEqual([
-      { name: "Freya", appearance: "", clothes: "", action: "", mood: "", expression: "" },
+      { name: "Freya", appearance: "", clothes: "", action: "", pose: "", view: "", mood: "", expression: "" },
     ]);
   });
 
-  it("reads a sheet kept before atmosphere and expression, and drops its lines", () => {
+  it("reads a sheet kept before atmosphere, expression, pose and view, and drops its lines", () => {
     const sheet = sheetOf({ place: "Hall", people: [{ name: "Freya", mood: "Calm" }], lines: [{ text: "Hi" }] });
     expect(sheet).toEqual({
       place: "Hall",
@@ -153,7 +155,9 @@ describe("the scene model's answer", () => {
       weather: "",
       light: "",
       atmosphere: "",
-      people: [{ name: "Freya", appearance: "", clothes: "", action: "", mood: "Calm", expression: "" }],
+      people: [
+        { name: "Freya", appearance: "", clothes: "", action: "", pose: "", view: "", mood: "Calm", expression: "" },
+      ],
     });
   });
 });

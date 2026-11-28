@@ -21,6 +21,17 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
   **memory paused**. **Resume** asks whether memory should keep what happened meanwhile, or leave it
   out for good. The companion isn't told, and nothing it is sent changes. For companions with
   memory, Claude and Grok alike.
+- **Pictures keep the character's pose, and draw only what shows.** The scene now says how the
+  character holds their body (lying on her side, kneeling), carried forward from the chat like the
+  weather, and how the picture sees them (from behind, looking away), with what that shows and
+  hides. The picture prompt is shorter (about 20 to 35 tags instead of 40 to 70), starts from the
+  pose and the view, leaves out what the pose hides (no face from behind) and what can't be drawn
+  (the weather indoors, names, thoughts), and turns moods into what a picture shows. You can
+  correct the pose and the view in the scene dialog. Scenes already read are read again the next
+  time you make a picture of them, unless you had corrected them.
+- **By hand:** only if you rewrote a companion's **Scene reading instructions** or **Picture
+  instructions**: they keep your words, so the pose, the view and the shorter prompts reach that
+  companion only after **Back to the default** (or after you copy the new rules in).
 
 ## 0.0.48 — 2026-11-28
 

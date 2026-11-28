@@ -10,7 +10,16 @@ import { Button, Dialog, Field, inputStyle, Notice } from "../../ui/bits.tsx";
 import { useSave } from "../../ui/useSave.ts";
 import { money } from "../memory/format.ts";
 
-const NOBODY: ScenePerson = { name: "", appearance: "", clothes: "", action: "", mood: "", expression: "" };
+const NOBODY: ScenePerson = {
+  name: "",
+  appearance: "",
+  clothes: "",
+  action: "",
+  pose: "",
+  view: "",
+  mood: "",
+  expression: "",
+};
 
 export function SceneDialog({
   chatId,
@@ -120,6 +129,8 @@ export function SceneDialog({
                 <div className="grid gap-2 sm:grid-cols-2">
                   {text("Looks", person.appearance, (appearance) => setPerson(at, { appearance }))}
                   {text("Wears", person.clothes, (clothes) => setPerson(at, { clothes }))}
+                  {text("Pose", person.pose, (pose) => setPerson(at, { pose }))}
+                  {text("Seen", person.view, (view) => setPerson(at, { view }))}
                   {text("Doing", person.action, (action) => setPerson(at, { action }))}
                   {text("Mood", person.mood, (mood) => setPerson(at, { mood }))}
                 </div>
