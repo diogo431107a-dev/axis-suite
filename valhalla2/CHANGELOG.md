@@ -4,6 +4,21 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Companions on GPT.** A new companion can now answer on OpenAI's GPT models, alongside Claude
+  and Grok. The picker offers GPT-6 Luna first, then GPT-6.1 Terra, GPT-6.2 Sol and GPT-6.2 Astra,
+  for chat and for memory (any other `gpt-` model can be typed in by hand). As with Grok, it is chosen when the
+  companion is created and everything it asks stays on OpenAI: its replies, its memory (kept by a
+  GPT model, its chat model to start with), its scenes, the tags its replies are read aloud with,
+  and its picture prompts. It works like a Grok companion: about 60K tokens of chat with memory,
+  memory can be turned on later for one made without it, stop sequences are cut by Valhalla 2, the
+  cache is OpenAI's own (half an hour), and there is no temperature and no fallback model. Unlike
+  Grok, the context line under the composer counts the chat before it is sent. Luna costs about
+  what Haiku does, Sol what Sonnet does, Astra what Fable does. Claude and Grok companions work
+  exactly as before. Without an OpenAI key, the GPT models are shown greyed out.
+  **By hand:** before installing, put the OpenAI key in `/etc/axis-suite/valhalla2-openai.key` (the
+  `install` line in the README). An empty file will do if you don't want GPT yet; without the file
+  the service won't start.
+
 ## 0.0.58 — 2026-11-28
 
 - **Grok Imagine makes pictures too.** Under **Pictures** on a companion's page, **Made by** chooses

@@ -11,7 +11,8 @@ import { prepare } from "./chat/turn.ts";
 import { createCompanions, needMemory, needScenes } from "./companions.ts";
 import { openDatabase } from "./db.ts";
 import { StoreError } from "./errors.ts";
-import { grokDraftOf, pictureRequestFor } from "./grok/pictures.ts";
+import { GROK } from "./grok/client.ts";
+import { draftFrom, pictureRequestFor } from "./responses/pictures.ts";
 import { tokensOf, windowWithout } from "./memory/history.ts";
 import { runStep } from "./memory/run.ts";
 import { createScheduler } from "./memory/scheduler.ts";
@@ -142,6 +143,61 @@ describe("Claude or Grok, with or without memory", () => {
     expect(() => needMemory(without)).toThrow("This companion has no memory");
     const withMemory = companions.save("comp-0002", { name: "Hrothgar" });
     expect(needMemory(withMemory)).toBe(withMemory);
+  });
+});
+
+describe("GPT companions", () => {
+  const gpt = { ...DEFAULT_SETTINGS, model: "gpt-6-luna" };
+
+  it("are kept as GPT's, read back as GPT's, with every helper model their own", () => {
+    const { companions } = setup();
+    expect(companions.save("comp-0001", { name: "Beowulf", settings: gpt })).toMatchObject({
+      provider: "openai",
+      memory: true,
+      settings: {
+        model: "gpt-6-luna",
+        memoryModel: "gpt-6-luna",
+        toneModel: "gpt-6-luna",
+        sceneModel: "gpt-6-luna",
+        temperature: null,
+      },
+    });
+    expect(companions.get("comp-0001").provider).toBe("openai");
+    expect(companions.list().map((companion) => companion.provider)).toEqual(["openai"]);
+  });
+
+  it("stay on GPT, and take no temperature", () => {
+    const { companions } = setup();
+    companions.save("comp-0001", { name: "Beowulf", settings: gpt });
+    expect(() => companions.save("comp-0001", { name: "Beowulf", settings: { model: "grok-4.7" } })).toThrow(
+      /talks to GPT/,
+    );
+    expect(() => companions.save("comp-0001", { name: "Beowulf", settings: { model: "claude-opus-5-5" } })).toThrow(
+      /talks to GPT/,
+    );
+    expect(() => companions.save("comp-0001", { name: "Beowulf", settings: { ...gpt, temperature: 0.4 } })).toThrow(
+      /GPT's models don't take a temperature/,
+    );
+    // A Claude companion can't move to GPT either.
+    companions.save("comp-0002", { name: "Hrothgar" });
+    expect(() => companions.save("comp-0002", { name: "Hrothgar", settings: gpt })).toThrow(/talks to Claude/);
+  });
+
+  it("get the larger window with memory, as on Grok", async () => {
+    const { companions } = setup();
+    const gptWith = companions.save("comp-0001", { name: "Beowulf", settings: gpt, memory: true });
+    expect(await chatWindow(gptWith)).toEqual({ tokens: config.openaiWindowTokens, chunk: config.windowChunk });
+    const gptWithout = companions.save("comp-0002", { name: "Beowulf", settings: gpt, memory: false });
+    expect(await chatWindow(gptWithout)).toEqual({
+      ...windowWithout(1_050_000, gpt.maxTokens),
+      chunk: config.windowChunk,
+    });
+  });
+
+  it("have scenes with memory, read on GPT", () => {
+    const { companions } = setup();
+    const gptWith = companions.save("comp-0001", { name: "Beowulf", settings: gpt, memory: true });
+    expect(needScenes(gptWith)).toBe(gptWith);
   });
 });
 
@@ -505,9 +561,10 @@ describe("a picture without memory", () => {
       ],
       usage: { input_tokens: 100, input_tokens_details: { cached_tokens: 0 }, output_tokens: 50 },
     } as unknown as Response;
-    expect(grokDraftOf(response, "grok-4.7")).toMatchObject({ prompt: "a giant", orientation: "landscape" });
+    expect(draftFrom(GROK, response, "grok-4.7")).toMatchObject({ prompt: "a giant", orientation: "landscape" });
     expect(() =>
-      grokDraftOf(
+      draftFrom(
+        GROK,
         { ...response, status: "incomplete", incomplete_details: { reason: "content_filter" } } as Response,
         "grok-4.7",
       ),

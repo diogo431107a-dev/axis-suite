@@ -48,7 +48,7 @@ export async function runStep(deps: RunDeps, spec: RunSpec): Promise<StepResult>
   const { db, memory, limits } = deps;
   // The one place the memory model runs. Only a companion with memory ever gets here, and only
   // with a memory model of its own API; this holds that even if a caller forgot, so nothing of a
-  // Grok companion's can reach Claude, or the reverse.
+  // companion's can reach another API.
   if (!spec.companion.memory) {
     throw new Error(`${spec.companion.name} has no memory, so the memory model was not run`);
   }

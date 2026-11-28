@@ -1,18 +1,21 @@
 // What Valhalla 2 sends besides the profile.
 //
 // A Claude companion has no temperature here, and that is not an omission: the current Claude
-// models reject `temperature`, `top_p` and `top_k` outright. Effort is the dial they left. A Grok
-// companion has a temperature, and some settings work differently for it; the hints say how.
+// models reject `temperature`, `top_p` and `top_k` outright. Effort is the dial they left. GPT's
+// models take none either. A Grok companion has a temperature, and some settings work differently
+// on Grok and GPT; the hints say how.
 import { useState } from "react";
 import {
   CACHE_TTLS,
   EFFORTS,
-  grokReadingDefaults,
   hasFallback,
   LIMITS,
   MODELS,
+  ownReadingDefaults,
+  PROVIDER_NAMES,
   providerOf,
   type Effort,
+  type Health,
   type Provider,
   type Settings,
 } from "../../shared/protocol.ts";
@@ -21,6 +24,27 @@ import { Field, inputStyle } from "../ui/bits.tsx";
 
 type Model = (typeof MODELS)[number];
 
+/** Which APIs the server has a key for. Claude's models are always offered. */
+const keysOf = (health: Health): Readonly<Record<Provider, boolean>> => ({
+  anthropic: true,
+  xai: health.grok,
+  openai: health.openai,
+});
+
+/** Who runs each API, for the line under a model the server has no key for. */
+const VENDORS: Readonly<Record<Provider, string>> = { anthropic: "Anthropic", xai: "xAI", openai: "OpenAI" };
+
+/** How each API's model ids start, in the order the picker shows them. */
+const PREFIXES: Readonly<Record<Provider, string>> = { anthropic: "claude-", xai: "grok-", openai: "gpt-" };
+
+/** "a, b or c". */
+const either = (items: readonly string[]): string =>
+  items.length < 2 ? (items[0] ?? "") : `${items.slice(0, -1).join(", ")} or ${items[items.length - 1]}`;
+
+/** The effort hint, which on Grok says that max is sent as xhigh. */
+const effortHint = (provider: Provider, what: string, usual: string): string =>
+  provider === "xai" ? `How much thinking goes into ${what}. Grok has no max: max is sent as xhigh.` : usual;
+
 /** A model from the picker, or any other id typed in by hand. */
 function ModelField({
   label,
@@ -28,7 +52,7 @@ function ModelField({
   value,
   onChange,
   models,
-  grok,
+  keys,
   note,
 }: {
   label: string;
@@ -37,14 +61,15 @@ function ModelField({
   onChange: (model: string) => void;
   /** The models this field offers. */
   models: readonly Model[];
-  /** Whether the server has an xAI key, so a Grok model can answer. */
-  grok: boolean;
+  /** Which APIs the server has a key for: a model of one it hasn't can't be chosen. */
+  keys: Readonly<Record<Provider, boolean>>;
   /** A line under a model from the picker, given its cache-read price. */
   note?: (cacheRead: number) => string;
 }) {
   const chosen = models.find((entry) => entry.id === value);
-  const offersGrok = models.some((entry) => entry.provider === "xai");
-  const offersClaude = models.some((entry) => entry.provider === "anthropic");
+  const offered = (Object.keys(PREFIXES) as Provider[]).filter((provider) =>
+    models.some((entry) => entry.provider === provider),
+  );
   return (
     <Field label={label} hint={hint}>
       <select
@@ -53,9 +78,9 @@ function ModelField({
         onChange={(e) => onChange(e.target.value === "other" ? "" : e.target.value)}
       >
         {models.map((entry) => (
-          <option key={entry.id} value={entry.id} disabled={entry.provider === "xai" && !grok}>
+          <option key={entry.id} value={entry.id} disabled={!keys[entry.provider]}>
             {entry.label} — ${entry.input} in / ${entry.output} out per Mtok
-            {entry.provider === "xai" && !grok ? " (no xAI key on the server)" : ""}
+            {keys[entry.provider] ? "" : ` (no ${VENDORS[entry.provider]} key on the server)`}
           </option>
         ))}
         <option value="other">Another model, by name</option>
@@ -65,7 +90,7 @@ function ModelField({
           className={`${inputStyle} mt-2 font-mono`}
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder={offersGrok && offersClaude ? "claude-… or grok-…" : offersGrok ? "grok-…" : "claude-…"}
+          placeholder={either(offered.map((provider) => `${PREFIXES[provider]}…`))}
           aria-label={`${label} id`}
         />
       )}
@@ -76,7 +101,7 @@ function ModelField({
       ) : (
         <span className="mt-1 block text-xs text-faint">
           Any model id the API accepts. Valhalla 2 sends it as you typed it
-          {offersGrok && offersClaude ? ": an id starting grok- goes to xAI, any other to Claude." : "."}
+          {offered.length > 1 ? ": an id starting grok- goes to xAI, gpt- to OpenAI, any other to Claude." : "."}
         </span>
       )}
     </Field>
@@ -117,7 +142,7 @@ function EffortField({
  */
 export function ToneSettings({ settings, onChange }: { settings: Settings; onChange: (settings: Settings) => void }) {
   const { health } = usePage();
-  const onGrok = providerOf(settings.model) === "xai";
+  const api = providerOf(settings.model);
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       <ModelField
@@ -126,13 +151,11 @@ export function ToneSettings({ settings, onChange }: { settings: Settings; onCha
         value={settings.toneModel}
         onChange={(toneModel) => onChange({ ...settings, toneModel })}
         models={sameApi(settings)}
-        grok={onGrok && health.grok}
+        keys={keysOf(health)}
       />
       <EffortField
         label="Tone effort"
-        hint={
-          onGrok ? "Grok has no max: max is sent as xhigh." : "How much thinking goes into it, and so what it costs."
-        }
+        hint={effortHint(api, "it", "How much thinking goes into it, and so what it costs.")}
         value={settings.toneEffort}
         onChange={(toneEffort) => onChange({ ...settings, toneEffort })}
       />
@@ -172,26 +195,31 @@ export function SettingsForm({
   const set = <K extends keyof Settings>(key: K, value: Settings[K]) => onChange({ ...settings, [key]: value });
   const [stops, setStops] = useState(settings.stopSequences.join("\n"));
   const { health } = usePage();
-  const onGrok = providerOf(settings.model) === "xai";
+  const keys = keysOf(health);
+  const api = providerOf(settings.model);
+  const onGrok = api === "xai";
+  /** Grok and GPT: no cache lifetime, stop sequences applied by Valhalla 2, no fallback. */
+  const responses = api !== "anthropic";
 
   /**
-   * A new chat model. Moving a new companion to Grok makes its memory, tone and scene models the
-   * Grok model too; moving it back to Claude gives it the server's again. A temperature is Grok's
-   * only. Moving between Claude and Grok resets effort to what is economical there: Grok's high is
-   * slow and dear for dialogue, so it starts low; Claude starts on the server's default (high, on
-   * Haiku).
+   * A new chat model. Moving a new companion to Grok or GPT makes its memory, tone and scene models
+   * that model too; moving it back to Claude gives it the server's again. A temperature is Grok's
+   * only. Moving between APIs resets effort to what is economical there: Grok's high is slow and
+   * dear for dialogue, so it starts low; Claude and GPT start on the server's default (high, on
+   * Haiku, which costs what Luna does).
    */
   const chooseModel = (model: string) => {
-    const grok = providerOf(model) === "xai";
-    const moved = grok !== onGrok;
+    const to = providerOf(model);
+    const moved = to !== api;
+    const own = to !== "anthropic";
     const { toneModel, toneEffort, sceneModel, sceneEffort } = health.defaults;
     onChange({
       ...settings,
       model,
-      memoryModel: moved ? (grok ? model : health.defaults.memoryModel) : settings.memoryModel,
-      effort: moved ? (grok ? "low" : health.defaults.effort) : settings.effort,
-      temperature: grok ? settings.temperature : null,
-      ...(moved ? (grok ? grokReadingDefaults(model) : { toneModel, toneEffort, sceneModel, sceneEffort }) : {}),
+      memoryModel: moved ? (own ? model : health.defaults.memoryModel) : settings.memoryModel,
+      effort: moved ? (to === "xai" ? "low" : health.defaults.effort) : settings.effort,
+      temperature: to === "xai" ? settings.temperature : null,
+      ...(moved ? (own ? ownReadingDefaults(model) : { toneModel, toneEffort, sceneModel, sceneEffort }) : {}),
     });
   };
 
@@ -204,13 +232,13 @@ export function SettingsForm({
           label="Model"
           hint={
             provider === null
-              ? "Answers in character. Claude or Grok is chosen now: a companion can't move between them later."
+              ? "Answers in character. Claude, Grok or GPT is chosen now: a companion can't move between them later."
               : "Answers in character."
           }
           value={settings.model}
           onChange={chooseModel}
           models={provider === null ? MODELS : MODELS.filter((entry) => entry.provider === provider)}
-          grok={health.grok}
+          keys={keys}
           note={(cacheRead) => `Cache reads $${cacheRead} per Mtok — what the chat so far costs to re-send.`}
         />
         {memory ? (
@@ -220,17 +248,17 @@ export function SettingsForm({
             value={settings.memoryModel}
             onChange={(model) => set("memoryModel", model)}
             models={sameApi(settings)}
-            grok={onGrok && health.grok}
+            keys={keys}
           />
         ) : null}
 
         <Field
           label="Effort"
-          hint={
-            onGrok
-              ? "How much thinking goes into a reply. Grok has no max: max is sent as xhigh."
-              : "How much thinking goes into a reply, and so what it costs. Haiku does well on high; a dearer model often needs less."
-          }
+          hint={effortHint(
+            api,
+            "a reply",
+            "How much thinking goes into a reply, and so what it costs. Haiku does well on high; a dearer model often needs less.",
+          )}
         >
           <select
             className={inputStyle}
@@ -286,7 +314,7 @@ export function SettingsForm({
               </span>
             )}
           </Field>
-        ) : (
+        ) : responses ? null : (
           <Field label="Keep the cache for" hint="How long the profile and the chat so far stay cheap to re-send.">
             <select
               className={inputStyle}
@@ -311,15 +339,11 @@ export function SettingsForm({
             value={settings.sceneModel}
             onChange={(model) => set("sceneModel", model)}
             models={sameApi(settings)}
-            grok={onGrok && health.grok}
+            keys={keys}
           />
           <EffortField
             label="Scene effort"
-            hint={
-              onGrok
-                ? "How much thinking goes into a scene. Grok has no max: max is sent as xhigh."
-                : "How much thinking goes into a scene, and so what it costs."
-            }
+            hint={effortHint(api, "a scene", "How much thinking goes into a scene, and so what it costs.")}
             value={settings.sceneEffort}
             onChange={(effort) => set("sceneEffort", effort)}
           />
@@ -330,13 +354,17 @@ export function SettingsForm({
         <p className="text-xs text-faint">
           Grok caches the chat by itself, for as long as it decides: there is no cache lifetime to choose.
         </p>
+      ) : responses ? (
+        <p className="text-xs text-faint">
+          OpenAI caches the chat by itself, for half an hour after each turn: there is no cache lifetime to choose.
+        </p>
       ) : null}
 
       <Field
         label="Stop at"
         hint={
-          onGrok
-            ? "One per line. A reply ends the moment it writes any of these. Grok can't take them, so Valhalla 2 cuts the reply itself, and its cost is then not known."
+          responses
+            ? `One per line. A reply ends the moment it writes any of these. ${PROVIDER_NAMES[api]} can't take them, so Valhalla 2 cuts the reply itself, and its cost is then not known.`
             : "One per line. A reply ends the moment it writes any of these — useful to stop the model writing your lines."
         }
       >
@@ -353,7 +381,7 @@ export function SettingsForm({
         />
       </Field>
 
-      {onGrok ? null : (
+      {responses ? null : (
         <label className={`flex items-start gap-2 text-sm ${hasFallback(settings.model) ? "" : "opacity-60"}`}>
           <input
             type="checkbox"

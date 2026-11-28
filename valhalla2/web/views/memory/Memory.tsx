@@ -71,7 +71,7 @@ export function Memory({ companion }: { companion: Companion }) {
           every chat, after the profile.
         </p>
       )}
-      {page && !companion.memory && companion.provider === "xai" ? (
+      {page && !companion.memory && companion.provider !== "anthropic" ? (
         <TurnOn base={base} page={page} companion={companion} onPage={setPage} onError={setError} />
       ) : null}
       <p className={companion.memory ? "text-sm text-faint" : "hidden"}>

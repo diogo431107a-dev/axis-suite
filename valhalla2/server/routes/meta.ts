@@ -3,6 +3,7 @@ import { Router } from "express";
 import type { Health } from "../../shared/protocol.ts";
 import { hasApiKey } from "../claude/client.ts";
 import { hasGrokKey } from "../grok/client.ts";
+import { hasOpenAiKey } from "../openai/client.ts";
 import { config } from "../config.ts";
 import type { Services } from "../services.ts";
 
@@ -15,6 +16,7 @@ export function metaRoutes(s: Services): Router {
     res.json({
       apiKey: hasApiKey(),
       grok: hasGrokKey(),
+      openai: hasOpenAiKey(),
       pictures: s.painter !== null,
       pictureEngines: s.painter?.available ?? [],
       speech: s.speech !== null,

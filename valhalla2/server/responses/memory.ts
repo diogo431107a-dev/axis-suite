@@ -1,14 +1,16 @@
-// A run of the memory model for a Grok companion: Grok, with the memory tool, until it is done.
+// A run of the memory model on a Responses API (a Grok or GPT companion's): its memory model, with
+// the memory tool, until it is done.
 //
-// Claude's runs use Anthropic's memory tool (../claude/memory.ts). xAI has no such tool, so here it
-// is an ordinary function, `memory`, with the same six commands and the same arguments. Each call
+// Claude's runs use Anthropic's memory tool (../claude/memory.ts). xAI and OpenAI have no such
+// tool, so here it is an ordinary function, `memory`, with the same six commands and the same
+// arguments. Each call
 // is carried out by the very handlers a Claude run uses (../memory/tool.ts): the same limits, the
 // same one-shot lock, the same answers, the same memory_ops log. Only the loop around them differs:
 //
 // - Not streamed, and no stop sequences, as for Claude: nobody watches it, and a memory file may
 //   well contain one.
-// - `store: false`, so the whole run goes out with every step. Grok's reasoning comes back
-//   encrypted and is sent back with the step after it, so the model keeps its train of thought.
+// - `store: false`, so the whole run goes out with every step. The reasoning comes back encrypted
+//   and is sent back with the step after it, so the model keeps its train of thought.
 // - Caching is automatic; `prompt_cache_key` keeps one run's steps on the same cache, so each step
 //   reads the ones before it at the cached rate.
 // - A refused command goes back as its error text, the way Claude's tool runner sends `is_error`,
@@ -22,10 +24,10 @@ import type {
 import { ToolError } from "@anthropic-ai/sdk/lib/tools/ToolError";
 import { blockText, type Attempt } from "../../shared/protocol.ts";
 import type { MemoryRunRequest, MemoryRunResult } from "../claude/memory.ts";
-import { grokClient, grokError } from "./client.ts";
+import { apiErrorOf, type ResponsesApi } from "./api.ts";
 import { replyOf } from "./reply.ts";
 
-/** The memory tool, described as a function: Grok has no built-in memory tool to lean on. */
+/** The memory tool, described as a function: these APIs have no built-in memory tool to lean on. */
 export const MEMORY_FUNCTION: FunctionTool = {
   type: "function",
   name: "memory",
@@ -68,12 +70,15 @@ export const MEMORY_FUNCTION: FunctionTool = {
   },
 };
 
-/** What the run does with one request: the server's sends it to xAI, the tests' answer from a script. */
+/** What the run does with one request: the server's sends it to the API, the tests' answer from a script. */
 export type ResponsesCall = (body: ResponseCreateParamsNonStreaming) => Promise<Response>;
 
-const toXai: ResponsesCall = (body) => grokClient().responses.create(body);
+const toApi =
+  (api: ResponsesApi): ResponsesCall =>
+  (body) =>
+    api.client().responses.create(body);
 
-/** One request of a run, as it goes to xAI. */
+/** One request of a run, as it goes to the API. */
 export function memoryRequestFor(
   request: MemoryRunRequest,
   input: ResponseInputItem[],
@@ -119,12 +124,13 @@ async function carryOut(request: MemoryRunRequest, args: string): Promise<string
 }
 
 /**
- * Runs the memory model on Grok until it stops calling the memory function (or has used up its
- * steps). Same shape as Claude's run, so ../memory/run.ts treats both alike.
+ * Runs the memory model on the API until it stops calling the memory function (or has used up its
+ * steps). Same shape as Claude's run, so ../memory/run.ts treats them all alike.
  */
-export async function runGrokMemoryModel(
+export async function runResponsesMemory(
+  api: ResponsesApi,
   request: MemoryRunRequest,
-  call: ResponsesCall = toXai,
+  call: ResponsesCall = toApi(api),
 ): Promise<MemoryRunResult> {
   const model = request.settings.memoryModel;
   const input: ResponseInputItem[] = [
@@ -137,7 +143,7 @@ export async function runGrokMemoryModel(
     try {
       response = await call(memoryRequestFor(request, input));
     } catch (err) {
-      throw grokError(err) ?? err;
+      throw apiErrorOf(api.vendor, err) ?? err;
     }
     const { details, content } = replyOf(response, model);
     if (details.usage) attempts.push({ ...details.usage, model: details.model });

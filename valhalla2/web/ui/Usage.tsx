@@ -18,7 +18,8 @@ function priceOf(turn: ReplyDetails): string | null {
 export function Usage({ last, tokens }: { last: ReplyDetails | null; tokens: TokenView | null }) {
   const usage = last?.usage ?? null;
   const price = last ? priceOf(last) : null;
-  // Without a count beforehand (Grok), the last reply's own input is the nearest there is.
+  // Without a count beforehand (Grok, or GPT when counting failed), the last reply's own input is the
+  // nearest there is.
   const sentLast = usage
     ? usage.input_tokens + (usage.cache_read_input_tokens ?? 0) + (usage.cache_creation_input_tokens ?? 0)
     : null;

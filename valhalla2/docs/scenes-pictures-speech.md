@@ -40,7 +40,7 @@ was sent and what it cost are under it. How the scene is read is one of the comp
 under Settings.
 
 The scene needs memory. A companion without memory draws its pictures from the message itself.
-A Claude companion's scene is read by Claude, a Grok companion's by Grok (see
+A Claude companion's scene is read by Claude, a Grok companion's by Grok, a GPT one's by GPT (see
 [providers](providers.md)).
 
 ## Pictures
@@ -48,8 +48,8 @@ A Claude companion's scene is read by Claude, a Grok companion's by Grok (see
 A picture of the moment, or of the companion, made by **CivitAI** or by **Grok Imagine** (xAI's image
 model), whichever the companion chose (see [Two engines](#two-engines) below). Under any message, the
 picture button works out the scene (above), or uses the one kept, and asks for a prompt for the
-image model from it (on Claude, `PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok, the companion's own
-model). For CivitAI it is the fewest Danbooru
+image model from it (on Claude, `PICTURE_PROMPT_MODEL`, Sonnet 5.5; on Grok or GPT, the
+companion's own model). For CivitAI it is the fewest Danbooru
 tags that do the job, about 20 to 35, since every tag pulls the picture somewhere: the people the
 scene lists, their pose and how they are seen, the look and clothes that show, the expression, the
 place, the light and the colours. It draws only what the pose and view show: from behind, no face
@@ -208,7 +208,7 @@ hear it**, or **Read it again**; which model read them, at what effort, what was
 cost are under them. A correction stays until the reply's own words change. Tags are not read again
 when only the chat before the reply changes, since that would mean reading the reply aloud again.
 
-The tags work for every companion, with memory or without, on Claude or Grok; each is read on the
+The tags work for every companion, with memory or without, on Claude, Grok or GPT; each is read on the
 companion's own API. The model, its effort and how much of the chat it reads are under **Read with
 feeling**, with the voice. How it judges a line is one of the companion's own texts, **Tone
 instructions**.

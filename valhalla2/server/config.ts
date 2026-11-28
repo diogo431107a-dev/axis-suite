@@ -34,6 +34,8 @@ export const config = {
   windowTokens: count("VALHALLA_WINDOW_TOKENS", 20_000, 1_000),
   /** The same, for a Grok companion with memory: more of the chat word for word, at Grok's cache rate. */
   grokWindowTokens: count("VALHALLA_GROK_WINDOW_TOKENS", 60_000, 1_000),
+  /** The same, for a GPT companion with memory, as for Grok. */
+  openaiWindowTokens: count("VALHALLA_OPENAI_WINDOW_TOKENS", 60_000, 1_000),
   /** How many exchanges slide out at once, so the cached prefix changes rarely. */
   windowChunk: count("VALHALLA_WINDOW_CHUNK", 10),
   /** Minutes without activity before a chat's new messages are folded into memory. */

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { loadXaiKey } from "./key.ts";
+import { loadXaiKey } from "../grok/key.ts";
 
 const made: string[] = [];
 afterEach(() => {

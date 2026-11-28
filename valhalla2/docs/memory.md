@@ -5,9 +5,9 @@ history without the old chats being sent again. This page explains all of it: wh
 who writes it and when, what a chat sees of it, how canon and one-shot chats differ, how to pause it,
 and how it is kept tidy, corrected and rebuilt.
 
-Only a companion **with memory** has one, Claude or Grok. A Grok companion's memory is kept by a
-Grok model and works the same way; what differs is in
-[Claude or Grok: Memory on Grok](providers.md#memory-on-grok). A companion without memory works
+Only a companion **with memory** has one, on Claude, Grok or GPT. A Grok companion's memory is kept
+by a Grok model, a GPT one's by a GPT model, and both work the same way; what differs is in
+[Memory on Grok and GPT](providers.md#memory-on-grok-and-gpt). A companion without memory works
 differently: see the same page.
 
 ## The whole thing at a glance
@@ -344,7 +344,7 @@ its next fresh look, like everything else.
 ## The window: long chats slide
 
 Only about the last 20,000 tokens of the selected path are sent (`VALHALLA_WINDOW_TOKENS`; about
-60,000 on Grok, `VALHALLA_GROK_WINDOW_TOKENS`). When a
+60,000 on Grok and GPT, `VALHALLA_GROK_WINDOW_TOKENS` and `VALHALLA_OPENAI_WINDOW_TOKENS`). When a
 chat outgrows that, its oldest ten exchanges slide out at once (`VALHALLA_WINDOW_CHUNK`), not one
 per turn: every slide changes the start of what is sent, and so costs the cache, and sliding one at
 a time would cost it every turn. The window always starts at one of your messages, the newest two
@@ -426,7 +426,7 @@ How it tidies is one of the companion's texts, **Tidy-up instructions**.
 **Rebuild from every chat** on the Memory page starts the files over from their seeds and replays
 every chat's selected path through the memory model, in the order the chats were opened, about
 20,000 tokens at a time. It is for when memory went wrong, a better memory model is out, or you
-rewrote its instructions. It is also how a Grok companion without memory gets it
+rewrote its instructions. It is also how a Grok or GPT companion without memory gets it
 ([Turning memory on](providers.md#turning-memory-on)): then memory is on once it has worked.
 
 - Each chat is replayed **under its current mode**, so one-shots stay out of the story.
@@ -443,19 +443,20 @@ rewrote its instructions. It is also how a Grok companion without memory gets it
 All of these have defaults. They are set in `dev.env` and `deploy/valhalla2.service` (see
 [Settings](../README.md#settings)).
 
-| Setting                       | Default    | What it does                                                                                                    |
-| ----------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
-| `MEMORY_MODEL`                | Sonnet 5.5 | the memory model a new Claude companion starts with (each can change it); a Grok one starts with its chat model |
-| `VALHALLA_IDLE_MINUTES`       | 30         | how long a chat is quiet before it is folded into memory                                                        |
-| `VALHALLA_WINDOW_TOKENS`      | 20000      | about how much of a chat is sent each turn                                                                      |
-| `VALHALLA_GROK_WINDOW_TOKENS` | 60000      | the same, for a Grok companion with memory                                                                      |
-| `VALHALLA_WINDOW_CHUNK`       | 10         | how many exchanges slide out at once                                                                            |
-| `VALHALLA_MEMORY_FILE_KB`     | 8          | the largest a memory file may be                                                                                |
-| `VALHALLA_MEMORY_STORY_KB`    | 16         | the largest `story/recent.md` and `story/arcs.md` may be                                                        |
-| `VALHALLA_MEMORY_FILES`       | 20         | how many files a companion's memory may have                                                                    |
-| `VALHALLA_MEMORY_ITERATIONS`  | 16         | the most requests one run may make                                                                              |
-| `VALHALLA_CLEANUP_EVERY`      | 10         | runs from chats between two tidy-ups                                                                            |
-| `VALHALLA_CLEANUP_DAYS`       | 7          | …or days, if memory changed at all                                                                              |
+| Setting                         | Default    | What it does                                                                                                    |
+| ------------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------- |
+| `MEMORY_MODEL`                  | Sonnet 5.5 | the memory model a new Claude companion starts with (each can change it); a Grok one starts with its chat model |
+| `VALHALLA_IDLE_MINUTES`         | 30         | how long a chat is quiet before it is folded into memory                                                        |
+| `VALHALLA_WINDOW_TOKENS`        | 20000      | about how much of a chat is sent each turn                                                                      |
+| `VALHALLA_GROK_WINDOW_TOKENS`   | 60000      | the same, for a Grok companion with memory                                                                      |
+| `VALHALLA_OPENAI_WINDOW_TOKENS` | 60000      | the same, for a GPT companion with memory                                                                       |
+| `VALHALLA_WINDOW_CHUNK`         | 10         | how many exchanges slide out at once                                                                            |
+| `VALHALLA_MEMORY_FILE_KB`       | 8          | the largest a memory file may be                                                                                |
+| `VALHALLA_MEMORY_STORY_KB`      | 16         | the largest `story/recent.md` and `story/arcs.md` may be                                                        |
+| `VALHALLA_MEMORY_FILES`         | 20         | how many files a companion's memory may have                                                                    |
+| `VALHALLA_MEMORY_ITERATIONS`    | 16         | the most requests one run may make                                                                              |
+| `VALHALLA_CLEANUP_EVERY`        | 10         | runs from chats between two tidy-ups                                                                            |
+| `VALHALLA_CLEANUP_DAYS`         | 7          | …or days, if memory changed at all                                                                              |
 
 **Cost.** A run makes several requests in a row, and each re-reads the one before it from the cache,
 so only what is new in a step costs full price: a few cents a run on Sonnet or Grok. Memory in a chat is a

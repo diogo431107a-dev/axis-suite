@@ -144,15 +144,15 @@ export function createScheduler(deps: SchedulerDeps) {
     },
 
     /**
-     * Turns memory on for a Grok companion without it, by building its memory from every chat
+     * Turns memory on for a Grok or GPT companion without it, by building its memory from every chat
      * (rebuild.ts), or joins the run already doing it. Memory is never turned off again.
      */
     enableMemory(companionId: string): Promise<RunOutcome> {
       const companion = companionById(companionId);
       if (!companion) return Promise.resolve({ kind: "nothing", reason: "No such companion" });
       if (companion.memory) return Promise.resolve({ kind: "nothing", reason: "This companion already has memory" });
-      if (companion.provider !== "xai") {
-        return Promise.resolve({ kind: "nothing", reason: "Only a Grok companion can have memory turned on later" });
+      if (companion.provider === "anthropic") {
+        return Promise.resolve({ kind: "nothing", reason: "A Claude companion can't have memory turned on later" });
       }
       return once(`rebuild:${companionId}`, () =>
         rebuild({ ...deps, partTokens: deps.partTokens }, companion, { enable: true }),

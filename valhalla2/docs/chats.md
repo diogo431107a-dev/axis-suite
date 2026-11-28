@@ -196,7 +196,8 @@ differences:
   that reply, and no memory carries it into later chats. With memory, it reaches `feedback.md` as
   on Claude.
 - **The policy is xAI's**, not Anthropic's, so what one declines the other may not. A companion
-  can't move between the two (see [Claude or Grok](providers.md)).
+  can't move between them (see [Claude, Grok or GPT](providers.md)). The same goes for a GPT
+  companion, on OpenAI's policy: a reply OpenAI filters is kept as a refusal, as on Grok.
 
 ## Things the current API decides, not Valhalla 2
 

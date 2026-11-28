@@ -10,6 +10,7 @@ import {
   ORIENTATIONS,
   PICTURE_ENGINE_LABELS,
   pictureEngineOf,
+  PROVIDER_NAMES,
   type Companion,
   type Orientation,
   type Picture,
@@ -124,7 +125,7 @@ export function PictureDialog({
   const change = (fields: Partial<PictureDraft>) => setDraft((at) => (at ? { ...at, ...fields } : at));
   const title = target.kind === "profile" ? `A profile picture of ${companion.name}` : "Picture this moment";
   /** Who writes the prompt: the companion's own API. */
-  const writer = companion.provider === "xai" ? "Grok" : "Claude";
+  const writer = PROVIDER_NAMES[companion.provider];
 
   return (
     <Dialog open onClose={onClose} title={title}>

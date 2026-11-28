@@ -1,6 +1,6 @@
 // A reading: one structured request that reads part of a chat and answers in a fixed shape. The
 // tags a reply is read aloud with (tone/) and the scene a picture is drawn from (scene/) are each
-// one. It goes to the companion's own API: claude/reading.ts or grok/reading.ts.
+// one. It goes to the companion's own API: claude/reading.ts or responses/reading.ts.
 import type { Effort, Provider } from "../shared/protocol.ts";
 
 export interface ReadingAsk {

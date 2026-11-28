@@ -6,6 +6,7 @@ import { DEFAULT_SETTINGS, hasFallback, providerOf } from "../../shared/protocol
 import { settings as checkSettings } from "../check.ts";
 import { StoreError } from "../errors.ts";
 import type { SystemBlock } from "../prompt.ts";
+import { GROK } from "../grok/client.ts";
 import { cutReply, eventOf, replyOf, requestFor, stopWatch } from "./reply.ts";
 
 const grokSettings = { ...DEFAULT_SETTINGS, model: "grok-4.7" };
@@ -91,7 +92,7 @@ describe("which API a model is on", () => {
 
 describe("the request that goes to Grok", () => {
   it("sends the system blocks, then each message as text only", () => {
-    const request = requestFor(system, messages, grokSettings, "chat-1");
+    const request = requestFor(GROK, system, messages, grokSettings, "chat-1");
     expect(request.model).toBe("grok-4.7");
     expect(request.input).toEqual([
       { role: "system", content: "<personality>Proud.</personality>" },
@@ -105,8 +106,8 @@ describe("the request that goes to Grok", () => {
   });
 
   it("always sends effort, sends max as xhigh, and keeps nothing on xAI", () => {
-    expect(requestFor(system, messages, { ...grokSettings, effort: "low" }).reasoning).toEqual({ effort: "low" });
-    const request = requestFor(system, messages, { ...grokSettings, effort: "max", maxTokens: 2048 }, "chat-1");
+    expect(requestFor(GROK, system, messages, { ...grokSettings, effort: "low" }).reasoning).toEqual({ effort: "low" });
+    const request = requestFor(GROK, system, messages, { ...grokSettings, effort: "max", maxTokens: 2048 }, "chat-1");
     expect(request.reasoning).toEqual({ effort: "xhigh" });
     expect(request.max_output_tokens).toBe(2048);
     expect(request.store).toBe(false);
@@ -115,10 +116,10 @@ describe("the request that goes to Grok", () => {
   });
 
   it("never sends stop sequences, cache breakpoints or temperature", () => {
-    const request = requestFor(system, messages, { ...grokSettings, stopSequences: ["Eadric:"] }) as unknown as Record<
-      string,
-      unknown
-    >;
+    const request = requestFor(GROK, system, messages, {
+      ...grokSettings,
+      stopSequences: ["Eadric:"],
+    }) as unknown as Record<string, unknown>;
     expect(request.stop).toBeUndefined();
     expect(request.cache_control).toBeUndefined();
     expect(request.temperature).toBeUndefined();
@@ -126,9 +127,9 @@ describe("the request that goes to Grok", () => {
   });
 
   it("sends a temperature only when the companion has one", () => {
-    expect(requestFor(system, messages, { ...grokSettings, temperature: null }).temperature).toBeUndefined();
-    expect(requestFor(system, messages, { ...grokSettings, temperature: 0 }).temperature).toBe(0);
-    expect(requestFor(system, messages, { ...grokSettings, temperature: 0.65 }).temperature).toBe(0.65);
+    expect(requestFor(GROK, system, messages, { ...grokSettings, temperature: null }).temperature).toBeUndefined();
+    expect(requestFor(GROK, system, messages, { ...grokSettings, temperature: 0 }).temperature).toBe(0);
+    expect(requestFor(GROK, system, messages, { ...grokSettings, temperature: 0.65 }).temperature).toBe(0.65);
   });
 });
 

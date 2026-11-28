@@ -7,6 +7,8 @@ export interface Health {
   apiKey: boolean;
   /** Whether the server has an xAI key, so a companion can answer on Grok. */
   grok: boolean;
+  /** Whether the server has an OpenAI key, so a companion can answer on GPT. */
+  openai: boolean;
   /** Whether the server can make pictures: it has a CivitAI key, an xAI key, or both. */
   pictures: boolean;
   /** The picture engines it has a key for: CivitAI's, Grok Imagine (on the xAI key). */
