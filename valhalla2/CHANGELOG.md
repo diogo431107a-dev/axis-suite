@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.48 — 2026-11-28
+
 - **Reading aloud with feeling and the scene are now two separate things.** How each line of a
   reply is said (its tags for Azure) is worked out on its own, the first time a reply is read aloud
   with feeling, from the profile and the last few exchanges only, so it is cheap and quick. After

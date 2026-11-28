@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.231 — 2026-11-28
+
+Valhalla 2 0.0.48: reading aloud with feeling and the scene are now separate, each with its own model and effort per companion. The tags a reply is read aloud with get their own window, and work without memory and on Grok; the scene is for pictures only, of the character alone unless you add someone. By hand: only if you rewrote a companion's Scene reading instructions, since the lines' feelings now have their own Tone instructions.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.33  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.48  |
+
 ## 0.0.229 — 2026-11-27
 
 Valhalla 2 0.0.46: Grok companions can have memory, kept by Grok. A new one can be made with it, and an existing one can have it turned on from its Pins page. Nothing to do by hand.
