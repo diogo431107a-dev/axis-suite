@@ -8,9 +8,9 @@ export interface Health {
   grok: boolean;
   /** Whether the server has a CivitAI key, so pictures can be made. */
   pictures: boolean;
-  /** Whether the server has an Azure Speech key, so replies can be read aloud. */
+  /** Whether the server has an Azure Speech key or an xAI key, so replies can be read aloud. */
   speech: boolean;
-  /** The voice a companion that names none of its own is read in; null without Azure Speech. */
+  /** The voice a companion that names none of its own is read in; null when nothing reads aloud. */
   voice: string | null;
   /** What a new companion starts from. */
   defaults: Settings;

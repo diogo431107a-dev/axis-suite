@@ -1,9 +1,18 @@
-// The voice a companion's replies are read aloud in: any of the voices Azure offers, found by
-// name or language, and heard before it is chosen; its speed, pitch and speaking style; and
-// whether replies are read with the feeling of each line, as the tone model works it out.
+// The voice a companion's replies are read aloud in: any of the voices Grok and Azure offer, found
+// by name or language, and heard before it is chosen; its speed, pitch and speaking style (Grok's
+// voices take only the speed); and whether replies are read with the feeling of each line, as the
+// tone model works it out.
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { LoaderCircle, RotateCcw, Volume2 } from "lucide-react";
-import { FEELINGS, LIMITS, type Feeling, type Voice, type VoiceList, type VoiceTuning } from "../../shared/protocol.ts";
+import {
+  engineOfVoice,
+  FEELINGS,
+  LIMITS,
+  type Feeling,
+  type Voice,
+  type VoiceList,
+  type VoiceTuning,
+} from "../../shared/protocol.ts";
 import { api, apiBlob, describeError } from "../api.ts";
 import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 
@@ -14,7 +23,7 @@ const describe = (voice: Voice): string =>
   [
     voice.name,
     voice.gender,
-    voice.multilingual ? "multilingual" : "",
+    voice.multilingual && voice.engine !== "grok" ? "multilingual" : "",
     voice.styles.length > 0 ? `${voice.styles.length} styles` : "",
   ]
     .filter(Boolean)
@@ -117,6 +126,10 @@ export function VoicePicker({
   const serverVoice = list ? byId(list.default) : undefined;
   const chosen = value ? byId(value) : serverVoice;
   const styles = chosen?.styles ?? [];
+  /** Grok's voices take only a speed, within their own range. */
+  const onGrok = engineOfVoice(value ?? list?.default ?? "") === "grok";
+  const rateMin = onGrok ? LIMITS.grokRateMin : LIMITS.voiceRateMin;
+  const rateMax = onGrok ? LIMITS.grokRateMax : LIMITS.voiceRateMax;
 
   /** Another voice; a speaking style it hasn't is let go. */
   const choose = (next: string | null) => {
@@ -162,8 +175,8 @@ export function VoicePicker({
     <div className="space-y-4">
       <div>
         <p className="text-xs text-faint">
-          The voice its replies are read aloud in, from every voice Azure offers, and how it speaks. A reply already
-          read is read again in the new voice, speed, pitch or style the next time you play it.
+          The voice its replies are read aloud in, from every voice Grok and Azure offer on this server, and how it
+          speaks. A reply already read is read again in the new voice, speed, pitch or style the next time you play it.
         </p>
       </div>
 
@@ -174,7 +187,7 @@ export function VoicePicker({
               className={inputStyle}
               value={find}
               onChange={(e) => setFind(e.target.value)}
-              placeholder="portuguese female, Francisca, multilingual…"
+              placeholder="grok, portuguese female, Francisca, multilingual…"
             />
           </Field>
           <Field label="Read aloud in">
@@ -187,7 +200,7 @@ export function VoicePicker({
                 The server's voice
                 {serverVoice ? ` — ${serverVoice.name}, ${serverVoice.language}` : ` — ${list.default}`}
               </option>
-              {value && !byId(value) ? <option value={value}>{value} (not in Azure's list)</option> : null}
+              {value && !byId(value) ? <option value={value}>{value} (not in the list of voices)</option> : null}
               {groups.map(([language, group]) => (
                 <optgroup key={language} label={language}>
                   {group.map((voice) => (
@@ -202,22 +215,33 @@ export function VoicePicker({
           <div className="grid gap-4 sm:grid-cols-2">
             <Tuner
               label="Speed"
-              hint="From half to twice the voice's usual speed."
-              value={tuning.rate}
-              min={LIMITS.voiceRateMin}
-              max={LIMITS.voiceRateMax}
+              hint={
+                onGrok
+                  ? "From 30% slower to half again as fast: what Grok's voices take."
+                  : "From half to twice the voice's usual speed."
+              }
+              value={Math.min(rateMax, Math.max(rateMin, tuning.rate))}
+              min={rateMin}
+              max={rateMax}
               step={5}
               onChange={(rate) => onTuning({ ...tuning, rate })}
             />
-            <Tuner
-              label="Pitch"
-              hint="Lower or higher than the voice's usual, by up to half."
-              value={tuning.pitch}
-              min={LIMITS.voicePitchMin}
-              max={LIMITS.voicePitchMax}
-              step={1}
-              onChange={(pitch) => onTuning({ ...tuning, pitch })}
-            />
+            {onGrok ? (
+              <p className="self-center text-xs text-faint">
+                Grok's voices have no pitch setting. Feelings are read with Grok's own tags (whispered, soft, loud,
+                slower, higher…), and the tone model can add a sigh, a laugh or a pause.
+              </p>
+            ) : (
+              <Tuner
+                label="Pitch"
+                hint="Lower or higher than the voice's usual, by up to half."
+                value={tuning.pitch}
+                min={LIMITS.voicePitchMin}
+                max={LIMITS.voicePitchMax}
+                step={1}
+                onChange={(pitch) => onTuning({ ...tuning, pitch })}
+              />
+            )}
           </div>
           {styles.length > 0 ? (
             <Field
@@ -249,16 +273,18 @@ export function VoicePicker({
                 The first time a reply is read, the tone model works out how each line is said (teasing, whispered,
                 angry) from the profile and the chat just before it. A fraction of a cent a reply on a cheap model, and
                 a moment's wait the first time; the button with sound waves under the reply shows it then.{" "}
-                {chosen && chosen.styles.length > 0
-                  ? `${chosen.name} has styles of its own (${chosen.styles.join(", ")}), which sound the most natural; other feelings are read with speed, pitch and volume, on top of the speed and pitch above.`
-                  : "This voice has no styles of its own, so feelings are read with speed, pitch and volume, on top of the speed and pitch above. Type “styles” above to find voices that have them."}
+                {onGrok
+                  ? "On a Grok voice each feeling becomes Grok's own tags, on top of the speed above, and the tone model may add a sound (a sigh, a chuckle, a breath) before a line where the character would really make one; the tags dialog lets you change it."
+                  : chosen && chosen.styles.length > 0
+                    ? `${chosen.name} has styles of its own (${chosen.styles.join(", ")}), which sound the most natural; other feelings are read with speed, pitch and volume, on top of the speed and pitch above.`
+                    : "This voice has no styles of its own, so feelings are read with speed, pitch and volume, on top of the speed and pitch above. Type “styles” above to find voices that have them."}
               </span>
             </span>
           </label>
           {feeling ? children : null}
           <Field
             label="Try it"
-            hint="Read by Azure like a reply, so it counts toward this month's characters; hearing the same words again is free."
+            hint={`Read by ${onGrok ? "Grok" : "Azure"} like a reply, so it counts toward this month's characters; hearing the same words again is free.`}
           >
             <div className="flex items-start gap-2">
               <textarea
@@ -287,7 +313,7 @@ export function VoicePicker({
           </Field>
         </>
       ) : error ? null : (
-        <p className="text-sm text-faint">Asking Azure for its voices…</p>
+        <p className="text-sm text-faint">Asking for the voices…</p>
       )}
       <Notice>{error}</Notice>
     </div>

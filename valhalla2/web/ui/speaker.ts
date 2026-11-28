@@ -1,7 +1,7 @@
 // Replies read aloud: one player for the chat, so starting one reply stops the other, and the
 // switch that says whether new replies are read as they arrive.
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { SpeechReply } from "../../shared/protocol.ts";
+import type { SpeechEngine, SpeechReply } from "../../shared/protocol.ts";
 import { api, describeError } from "../api.ts";
 
 /** What the player is doing, and for which message. */
@@ -16,7 +16,8 @@ export function useSpeaker(chatId: string, onError: (message: string) => void, o
   // Each play gets a number; whatever an older one finishes after a newer one started is ignored.
   const turn = useRef(0);
   const [playing, setPlaying] = useState<Playing>(null);
-  const [monthChars, setMonthChars] = useState<number | null>(null);
+  // What the engine that read the last reply has read this month, for everyone.
+  const [monthChars, setMonthChars] = useState<{ engine: SpeechEngine; chars: number } | null>(null);
   const report = useRef(onError);
   report.current = onError;
   const read = useRef(onRead);
@@ -41,7 +42,7 @@ export function useSpeaker(chatId: string, onError: (message: string) => void, o
         const reply = await api<SpeechReply>(`/api/chats/${chatId}/messages/${messageId}/speech`, {
           method: "POST",
         });
-        setMonthChars(reply.monthChars);
+        setMonthChars({ engine: reply.engine, chars: reply.monthChars });
         read.current?.(messageId);
         if (mine !== turn.current) return;
         const player = (audio.current ??= new Audio());

@@ -1,6 +1,12 @@
 // The foot of the chat: what went wrong, the box you write in, and what the chat costs.
 import { Send } from "lucide-react";
-import { LIMITS, type Message, type TokenView } from "../../../shared/protocol.ts";
+import {
+  LIMITS,
+  SPEECH_ENGINE_NAMES,
+  type Message,
+  type SpeechEngine,
+  type TokenView,
+} from "../../../shared/protocol.ts";
 import { Button, inputStyle, Notice } from "../../ui/bits.tsx";
 import { Usage } from "../../ui/Usage.tsx";
 
@@ -29,7 +35,8 @@ export function Composer({
   /** The last reply on the path. */
   last: Message | null;
   tokens: TokenView | null;
-  monthChars: number | null;
+  /** What the engine that read the last reply has read this month. */
+  monthChars: { engine: SpeechEngine; chars: number } | null;
 }) {
   return (
     <footer className="border-t border-rule px-4 py-3">
@@ -59,9 +66,10 @@ export function Composer({
           {monthChars !== null ? (
             <span
               className="font-mono text-xs text-faint"
-              title="Characters Azure has read aloud for this Valhalla 2 this month, everyone's included. Azure's free tier (F0) includes 500,000 a month; a reply played again costs nothing."
+              title={`Characters ${SPEECH_ENGINE_NAMES[monthChars.engine]} has read aloud for this Valhalla 2 this month, everyone's included.${monthChars.engine === "azure" ? " Azure's free tier (F0) includes 500,000 a month;" : ""} A reply played again costs nothing.`}
             >
-              read aloud {monthChars.toLocaleString("en-US")} chars this month
+              {SPEECH_ENGINE_NAMES[monthChars.engine]} read aloud {monthChars.chars.toLocaleString("en-US")} chars this
+              month
             </span>
           ) : null}
           <span className="text-xs text-faint">Enter sends · Shift+Enter for a new line</span>

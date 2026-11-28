@@ -57,7 +57,10 @@ export const config = {
   speech: {
     /** The Azure region of the Speech resource the key belongs to. */
     region: modelFrom("SPEECH_REGION", "brazilsouth"),
-    /** The voice that reads every reply. Multilingual, so it reads Portuguese too. */
+    /**
+     * The voice that reads the replies of a companion that names none. Multilingual, so it reads
+     * Portuguese too. A Grok voice is `grok:` and its name, such as `grok:eve`.
+     */
     voice: modelFrom("SPEECH_VOICE", "en-US-AvaMultilingualNeural"),
   },
 };

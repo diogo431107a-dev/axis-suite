@@ -369,6 +369,21 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE speech ADD COLUMN engine TEXT NOT NULL DEFAULT 'azure';
     `);
   },
+  // v15: what each engine was asked to read each month, apart, since Grok's voices now read too.
+  // Everything counted so far was Azure's.
+  (db) => {
+    db.exec(`
+      CREATE TABLE speech_usage_by_engine (
+        month  TEXT NOT NULL,                         -- YYYY-MM, UTC
+        engine TEXT NOT NULL,                         -- azure, grok
+        chars  INTEGER NOT NULL,
+        PRIMARY KEY (month, engine)
+      );
+      INSERT INTO speech_usage_by_engine (month, engine, chars) SELECT month, 'azure', chars FROM speech_usage;
+      DROP TABLE speech_usage;
+      ALTER TABLE speech_usage_by_engine RENAME TO speech_usage;
+    `);
+  },
 ];
 
 /**

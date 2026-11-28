@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Brain, Images } from "lucide-react";
 import {
   DEFAULT_TUNING,
+  GROK_VOICE,
   LIMITS,
   MODELS,
   PROMPT_KEYS,
@@ -71,13 +72,15 @@ const ownPrompts = (texts: Record<PromptKey, string>): Prompts =>
 /** A model's name from the picker, or its id when it was typed in by hand. */
 const modelLabel = (id: string): string => MODELS.find((entry) => entry.id === id)?.label ?? id;
 
-/** An Azure voice's own name from its id: en-US-AvaMultilingualNeural reads Ava. */
+/** A voice's own name from its id: en-US-AvaMultilingualNeural reads Ava, grok:eve reads Eve (Grok). */
 const voiceLabel = (id: string): string =>
-  id
-    .split("-")
-    .slice(2)
-    .join("-")
-    .replace(/(Multilingual)?Neural$/, "") || id;
+  id.startsWith(GROK_VOICE)
+    ? `${id.charAt(GROK_VOICE.length).toUpperCase()}${id.slice(GROK_VOICE.length + 1)} (Grok)`
+    : id
+        .split("-")
+        .slice(2)
+        .join("-")
+        .replace(/(Multilingual)?Neural$/, "") || id;
 
 /** The profile's box: as tall as its text, and never less than most of the window. */
 function ProfileBox({ value, onChange }: { value: string; onChange: (value: string) => void }) {

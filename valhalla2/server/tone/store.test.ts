@@ -6,7 +6,7 @@ import { createCompanions } from "../companions.ts";
 import { openDatabase } from "../db.ts";
 import type { Reader, ReadingAsk } from "../reading.ts";
 import { linesOf } from "../scene/lines.ts";
-import { toneRequest } from "./request.ts";
+import { SOUND_NOTE, toneRequest } from "./request.ts";
 import { createTones, tonesOf } from "./store.ts";
 
 const ANSWER = {
@@ -155,6 +155,60 @@ describe("the tone model's answer", () => {
       ["narration", 2],
       ["neutral", 2],
       ["neutral", 2],
+    ]);
+  });
+});
+
+describe("sounds, for a Grok voice", () => {
+  const WITH_SOUNDS = {
+    lines: [
+      { line: 1, feeling: "narration", strength: 1, sound: "sigh" },
+      { line: 2, feeling: "teasing", strength: 3, sound: "chuckle" },
+    ],
+  };
+
+  it("asks for them only for a Grok voice, with the note after the instructions", async () => {
+    const { reply, asks, tones, companions, tree } = setup(WITH_SOUNDS);
+    const request = toneRequest(companions.get("comp-0001"), tree.pathTo(reply.id), true);
+    const tone = await tones.of(reply.id, request);
+    expect(asks[0]!.system).toBe(`${DEFAULT_PROMPTS.tone}\n\n${SOUND_NOTE}`);
+    expect(asks[0]!.cacheKey).toBe("tone:comp-0001:sounds");
+    expect(JSON.stringify(asks[0]!.schema)).toContain('"sound"');
+    expect(tone.sounds).toBe(true);
+    expect(tone.lines.map((line) => line.sound)).toEqual(["sigh", "chuckle"]);
+  });
+
+  it("keeps none from an answer that wasn't asked for them, and reads the tags again for a Grok voice", async () => {
+    const { reply, asks, tones, request, companions, tree } = setup(WITH_SOUNDS);
+    const azure = await tones.of(reply.id, request());
+    expect(JSON.stringify(asks[0]!.schema)).not.toContain('"sound"');
+    expect(azure.sounds).toBe(false);
+    expect(azure.lines.map((line) => line.sound)).toEqual([null, null]);
+    await tones.of(reply.id, toneRequest(companions.get("comp-0001"), tree.pathTo(reply.id), true));
+    expect(asks).toHaveLength(2);
+  });
+
+  it("takes a corrected sound, refuses an unknown one, and reads old lines without one as none", async () => {
+    const { db, reply, tones, companions, tree } = setup(WITH_SOUNDS);
+    const request = toneRequest(companions.get("comp-0001"), tree.pathTo(reply.id), true);
+    const tone = await tones.of(reply.id, request);
+    const changed = tone.lines.map((line, at) => ({ ...line, sound: at === 0 ? null : "laugh" }));
+    expect(tones.save(reply.id, request, { lines: changed }).lines.map((line) => line.sound)).toEqual([null, "laugh"]);
+    const unknown = tone.lines.map((line) => ({ ...line, sound: "burp" }));
+    expect(() => tones.save(reply.id, request, { lines: unknown })).toThrow(/sound isn't valid/);
+
+    const old = tone.lines.map(({ sound: _sound, ...line }) => line);
+    db.prepare("UPDATE tones SET lines = ? WHERE message_id = ?").run(JSON.stringify(old), reply.id);
+    expect(tones.peek(reply.id, request)?.lines.map((line) => line.sound)).toEqual([null, null]);
+  });
+
+  it("finds sounds only when they were asked for", () => {
+    const lines = linesOf("*Smiles.* Hi.");
+    expect(tonesOf(WITH_SOUNDS, lines, true).map((line) => line.sound)).toEqual(["sigh", "chuckle"]);
+    expect(tonesOf(WITH_SOUNDS, lines).map((line) => line.sound)).toEqual([null, null]);
+    expect(tonesOf({ lines: [{ line: 1, sound: "burp" }] }, lines, true).map((line) => line.sound)).toEqual([
+      null,
+      null,
     ]);
   });
 });

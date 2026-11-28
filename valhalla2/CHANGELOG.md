@@ -4,6 +4,16 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Grok's voices for reading aloud.** Under **Voice** on a companion's page, Grok's voices (Eve,
+  Ara, Rex, Leo, Sal and the rest) are listed first, beside Azure's, for any companion, Claude or
+  Grok. They read on the xAI key the server already has, and read any language. A Grok voice reads
+  feelings with Grok's own tags (whispered, soft, loud, slower, higher, sing-song…) and takes only
+  **Speed**, so the page hides Pitch and the speaking style for it. With **Read with feeling** on,
+  the tone model may also give a line a sound just before it: a sigh, a laugh, a chuckle, a breath,
+  a pause. You can change it in the tags dialog, which now has a sound for each line on a Grok voice.
+  Companions on Azure voices read exactly as before, and keep the audio they have. The count under
+  the composer now names the engine that read the reply (Azure or Grok), and each is counted apart.
+
 ## 0.0.54 — 2026-11-28
 
 - **Picture settings for each companion.** Under **Pictures** on a companion's page: steps, CFG,

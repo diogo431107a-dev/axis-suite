@@ -1,4 +1,4 @@
-// How each line of a reply is said, for reading it aloud: the tags Azure reads it with. Worked out
+// How each line of a reply is said, for reading it aloud: the tags a voice reads it with. Worked out
 // the first time a reply is read aloud with feeling, kept, and yours to correct. Apart from the
 // scene (scene.ts), which is for pictures.
 import type { Effort } from "./models.ts";
@@ -32,6 +32,28 @@ export type Feeling = (typeof FEELINGS)[number];
 export const STRENGTHS = [1, 2, 3] as const;
 export type Strength = (typeof STRENGTHS)[number];
 
+/**
+ * A sound said before a line that isn't a word: a sigh, a laugh, a breath, a pause. Only Grok's
+ * voices make them (as `[sigh]`); Azure's read the line without it.
+ */
+export const SOUNDS = [
+  "pause",
+  "long-pause",
+  "hum-tune",
+  "laugh",
+  "chuckle",
+  "giggle",
+  "cry",
+  "tsk",
+  "tongue-click",
+  "lip-smack",
+  "breath",
+  "inhale",
+  "exhale",
+  "sigh",
+] as const;
+export type Sound = (typeof SOUNDS)[number];
+
 /** One line of a reply, as Valhalla 2 cut it, and how it is said. */
 export interface ToneLine {
   /** The words, exactly as in the reply, without the asterisks. */
@@ -42,12 +64,16 @@ export interface ToneLine {
   paragraph: boolean;
   feeling: Feeling;
   strength: Strength;
+  /** A sound just before it, for Grok's voices; null or left out for none (tags read before sounds). */
+  sound?: Sound | null;
 }
 
 /** A kept reading of how a reply is said, with what it cost and the request that made it. */
 export interface ToneView {
   messageId: number;
   lines: ToneLine[];
+  /** Whether it was read for a Grok voice, which also makes sounds, so they can be chosen. */
+  sounds: boolean;
   /** You corrected it: it stays as you left it until the reply's own words change. */
   edited: boolean;
   model: string;
