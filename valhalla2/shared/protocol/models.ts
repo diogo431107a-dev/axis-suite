@@ -40,8 +40,12 @@ export const MODELS = [
   { id: "claude-haiku-5-5", label: "Haiku 5.5", input: 0.1, output: 0.5, cacheRead: 0.01, provider: "anthropic" },
   // Grok has two rates too: these, and twice as much for a prompt of 200K tokens or more.
   { id: "grok-4.7", label: "Grok 4.7", input: 2.0, output: 6.0, cacheRead: 0.5, provider: "xai" },
-  // GPT has two rates as well: these, and dearer ones for a prompt over 272K tokens.
+  // GPT has two rates as well: these, and dearer ones for a prompt over 272K tokens. Luna, the
+  // cheapest, first: it is the one most GPT companions use.
   { id: "gpt-6-luna", label: "GPT-6 Luna", input: 0.1, output: 0.5, cacheRead: 0.01, provider: "openai" },
+  { id: "gpt-6.1-terra", label: "GPT-6.1 Terra", input: 1.0, output: 5.0, cacheRead: 0.05, provider: "openai" },
+  { id: "gpt-6.2-sol", label: "GPT-6.2 Sol", input: 2.0, output: 10.0, cacheRead: 0.1, provider: "openai" },
+  { id: "gpt-6.2-astra", label: "GPT-6.2 Astra", input: 8.0, output: 40.0, cacheRead: 0.4, provider: "openai" },
 ] as const satisfies readonly {
   id: string;
   label: string;
@@ -89,6 +93,24 @@ export const PRICES: Readonly<Record<string, Price>> = {
     output: 0.5,
     cacheRead: 0.01,
     long: { over: 272_000, input: 0.2, output: 0.75, cacheRead: 0.02 },
+  },
+  "gpt-6.1-terra": {
+    input: 1.0,
+    output: 5.0,
+    cacheRead: 0.05,
+    long: { over: 272_000, input: 2.0, output: 7.5, cacheRead: 0.1 },
+  },
+  "gpt-6.2-sol": {
+    input: 2.0,
+    output: 10.0,
+    cacheRead: 0.1,
+    long: { over: 272_000, input: 4.0, output: 15.0, cacheRead: 0.2 },
+  },
+  "gpt-6.2-astra": {
+    input: 8.0,
+    output: 40.0,
+    cacheRead: 0.4,
+    long: { over: 272_000, input: 16.0, output: 60.0, cacheRead: 0.8 },
   },
   "claude-opus-5": { input: 5.0, output: 25.0, cacheRead: 0.5 },
   "claude-opus-4-8": { input: 5.0, output: 25.0, cacheRead: 0.5 },

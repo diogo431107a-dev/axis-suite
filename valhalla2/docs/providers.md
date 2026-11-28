@@ -113,6 +113,16 @@ differs is forced by xAI's API:
 
 ## What differs on GPT
 
+The picker offers four GPT models, for chat and for memory, per million tokens (prices of
+2026-11-28):
+
+| Model         | Input | Cached read | Output | Much like      |
+| ------------- | ----- | ----------- | ------ | -------------- |
+| GPT-6 Luna    | $0.10 | $0.01       | $0.50  | Haiku's prices |
+| GPT-6.1 Terra | $1    | $0.05       | $5     |                |
+| GPT-6.2 Sol   | $2    | $0.10       | $10    | Sonnet's       |
+| GPT-6.2 Astra | $8    | $0.40       | $40    | Fable's        |
+
 A GPT companion's requests are built by the same code as a Grok one's, through OpenAI's own API.
 Most of [What differs on Grok](#what-differs-on-grok) holds for it too: stop sequences applied by
 Valhalla 2, only text kept, no fallback model, a filtered reply stored as a refusal, and
@@ -123,12 +133,11 @@ Valhalla 2, only text kept, no fallback model, a filtered reply stored as a refu
   always sent; memory runs use `medium`.
 - **Caching is automatic, for half an hour** after each turn. There is no lifetime to choose. Unlike
   Grok, OpenAI bills what it writes to the cache: 1.25 times the input rate, as Claude's 5-minute
-  cache does, and the cost under a reply counts it. On GPT-6 Luna, input is $0.10 per million, a
-  cached read $0.01, and output $0.50. A prompt over 272K tokens is billed at a dearer rate, all of
-  it ($0.20, $0.02 and $0.75).
+  cache does, and the cost under a reply counts it. A prompt over 272K tokens is billed at a dearer
+  rate, all of it: input and cached reads at twice the rate, output at one and a half times.
 - **A chat is counted before it is sent**, through OpenAI's counting endpoint, so the context line
   under the composer shows the chat as it stands, as on Claude. If counting fails, it shows what the
   last reply sent instead, as on Grok.
-- **Context windows are written down**, since OpenAI's API doesn't say them: GPT-6 Luna's is
-  1,050,000 tokens. A `gpt-` model typed in by hand that isn't on the list shows no window, and a
+- **Context windows are written down**, since OpenAI's API doesn't say them: every model in the
+  picker has 1,050,000 tokens. A `gpt-` model typed in by hand that isn't on the list shows no window, and a
   chat on it without memory keeps to the usual 200K limit.

@@ -5,7 +5,7 @@ import { join } from "node:path";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Response } from "openai/resources/responses/responses";
 import { dollarsFor, dollarsOf } from "../../shared/price.ts";
-import { DEFAULT_SETTINGS, hasFallback, providerOf } from "../../shared/protocol.ts";
+import { DEFAULT_SETTINGS, hasFallback, MODELS, providerOf } from "../../shared/protocol.ts";
 import { readOnItsApi } from "../chat/write.ts";
 import { settings as checkSettings } from "../check.ts";
 import { openDatabase } from "../db.ts";
@@ -190,6 +190,20 @@ describe("what is stored from a GPT reply", () => {
       (272_000 * 0.1 + 1_000 * 0.5) / 1_000_000,
       12,
     );
+  });
+
+  it("prices every GPT model in the picker, each with its long rate", () => {
+    const usage = {
+      input_tokens: 1_000_000,
+      output_tokens: 0,
+      cache_read_input_tokens: 0,
+      cache_creation_input_tokens: 0,
+      cache_creation_1h_input_tokens: null,
+    };
+    const gpts = MODELS.filter((entry) => entry.provider === "openai").map((entry) => entry.id);
+    expect(gpts).toEqual(["gpt-6-luna", "gpt-6.1-terra", "gpt-6.2-sol", "gpt-6.2-astra"]);
+    // A million tokens is over 272K, so each is billed at its long input rate: twice the usual.
+    expect(gpts.map((id) => dollarsFor(id, usage))).toEqual([0.2, 2, 4, 16]);
   });
 
   it("keeps a filtered reply as a refusal", () => {
