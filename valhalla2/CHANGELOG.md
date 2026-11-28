@@ -4,6 +4,14 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Picture settings for each companion.** Under **Pictures** on a companion's page: steps, CFG,
+  sampler and clip skip. A new companion, and every one you have, starts at 20 steps (pictures were
+  made at 30 before, so they are a little quicker and cheaper now), CFG 7, Euler a and clip skip 2.
+- **The seed carries on.** The picture dialog shows the seed the picture is made with, with a dice
+  for a new one. Whatever seed a picture is made with becomes the companion's, so the next picture
+  starts from it and pictures stay alike. Each picture shows its steps, CFG, sampler, clip skip and
+  seed.
+
 ## 0.0.48 — 2026-11-28
 
 - **Reading aloud with feeling and the scene are now two separate things.** How each line of a

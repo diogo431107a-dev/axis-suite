@@ -53,13 +53,26 @@ can then be written again from the correction.
 
 The prompt opens in a dialog for you to change, with a note for Claude ("at sunset", "from behind")
 if you want it written again. **Make the picture** sends it to CivitAI, which makes it on the
-WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) at 30 steps and CFG 7, at a size SDXL was trained
-on for the shape Claude chose. It takes a few seconds to a minute; the picture appears under its
-message when it is done, only on that branch of the chat.
+WAI-illustrious SDXL checkpoint (`PICTURE_MODEL`) with the companion's picture settings, at a size
+SDXL was trained on for the shape Claude chose. It takes a few seconds to a minute; the picture
+appears under its message when it is done, only on that branch of the chat.
+
+**Picture settings** are under **Pictures** on the companion's page: **Steps** (10–60, 20 to
+start; more is finer, slower and dearer), **CFG** (1–15 in halves, 7 to start; higher follows the
+prompt more literally), **Sampler** (Euler a to start; the DPM++ ones cost a little more Buzz) and
+**Clip skip** (1–3, 2 to start, which suits anime checkpoints).
+
+**The seed carries on.** The picture dialog shows the seed the picture will be made with: the
+companion's, or a new one if it has none yet. The dice rolls another. Whatever seed a picture is
+made with becomes the companion's, so the next picture starts from it too, and pictures of the same
+moment stay alike. The companion's seed can also be typed, or cleared, under **Pictures**; an empty
+one is rolled at the next picture. A seed Valhalla 2 rolls has ten digits.
 
 Each companion's **Pictures** page, from its own page, has two shelves: **Profile pictures**, made
 there from the profile alone, and **Chat pictures**, each naming the chat it came from. Any picture
-can be opened full size, made again from the same prompt with a new seed, or deleted. How Claude
+can be opened full size, made again from the same prompt (the dialog shows the seed, and the dice
+rolls a new one), or deleted. Under each picture are the steps, CFG, sampler, clip skip and seed it
+was made with. How Claude
 writes the prompts is one of the companion's own texts, **Picture instructions**, which you can
 rewrite like the others.
 

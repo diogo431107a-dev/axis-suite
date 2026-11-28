@@ -1,7 +1,7 @@
 // A picture as the chat and the gallery show it: small, or full size with how it was made.
 import { useState } from "react";
 import { Copy, ImagePlus, Maximize2, Trash2 } from "lucide-react";
-import type { Picture } from "../../shared/protocol.ts";
+import { samplerLabel, type Picture } from "../../shared/protocol.ts";
 import { Button, Dialog } from "./bits.tsx";
 import { fileOf } from "./watch.ts";
 
@@ -76,7 +76,10 @@ export function PictureView({
         <p className="text-xs text-faint">
           {new Date(picture.createdAt).toLocaleString()}
           {picture.chatTitle ? ` · from "${picture.chatTitle}"` : picture.kind === "chat" ? " · its chat is gone" : ""}
-          {` · ${picture.params.width}×${picture.params.height} · seed ${picture.params.seed}`}
+          {` · ${picture.params.width}×${picture.params.height} · ${picture.params.steps} steps · CFG ${picture.params.cfgScale}`}
+          {picture.params.sampler ? ` · ${samplerLabel(picture.params.sampler)}` : ""}
+          {picture.params.clipSkip ? ` · clip skip ${picture.params.clipSkip}` : ""}
+          {` · seed ${picture.params.seed}`}
         </p>
         <details className="text-sm">
           <summary className="cursor-pointer text-faint hover:text-ink">The prompt</summary>

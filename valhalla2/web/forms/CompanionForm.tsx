@@ -15,6 +15,7 @@ import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
 import { usePage } from "../page.ts";
 import { SettingsForm, ToneSettings } from "./SettingsForm.tsx";
+import { PictureSettings } from "./PictureSettings.tsx";
 import { VoicePicker } from "./VoicePicker.tsx";
 import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 import { useSave } from "../ui/useSave.ts";
@@ -184,6 +185,13 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
         memory={memory}
         note="Every chat with this companion uses these."
       />
+
+      {health.pictures ? (
+        <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
+          <h2 className="font-display text-lg">Pictures</h2>
+          <PictureSettings settings={settings} onChange={setSettings} />
+        </section>
+      ) : null}
 
       {health.speech ? (
         <VoicePicker

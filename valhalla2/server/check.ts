@@ -7,6 +7,8 @@ import {
   LIMITS,
   PROMPT_KEYS,
   providerOf,
+  SAMPLER_IDS,
+  type Sampler,
   type CacheTtl,
   type Provider,
   type Effort,
@@ -171,7 +173,35 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
     ),
     sceneModel: helper(body.sceneModel, defaults.sceneModel, "scene model"),
     sceneEffort: effort(body.sceneEffort, defaults.sceneEffort, "The scene effort"),
+    pictureSteps: whole(
+      body.pictureSteps ?? defaults.pictureSteps,
+      LIMITS.pictureStepsMin,
+      LIMITS.pictureStepsMax,
+      "The picture steps",
+    ),
+    pictureCfg: halves(body.pictureCfg ?? defaults.pictureCfg, LIMITS.pictureCfgMin, LIMITS.pictureCfgMax, "The CFG"),
+    pictureSampler: oneOf<Sampler>(body.pictureSampler ?? defaults.pictureSampler, SAMPLER_IDS, "The sampler"),
+    pictureClipSkip: whole(
+      body.pictureClipSkip ?? defaults.pictureClipSkip,
+      LIMITS.pictureClipSkipMin,
+      LIMITS.pictureClipSkipMax,
+      "The clip skip",
+    ),
+    pictureSeed: body.pictureSeed === undefined ? defaults.pictureSeed : seed(body.pictureSeed),
   };
+}
+
+/** A number from `min` to `max` in steps of a half, such as a CFG of 6.5. */
+export function halves(value: unknown, min: number, max: number, what: string): number {
+  if (typeof value !== "number" || !Number.isInteger(value * 2)) invalid(`${what} has to be a whole or half number`);
+  if (value < min || value > max) invalid(`${what} has to be between ${min} and ${max}`);
+  return value;
+}
+
+/** A picture's seed: a whole number of up to ten digits, or null for one rolled at the next picture. */
+export function seed(value: unknown): number | null {
+  if (value === null) return null;
+  return whole(value, 0, LIMITS.pictureSeedMax, "The seed");
 }
 
 /** A companion's own prompt texts. An empty one is left out, so the default is used. */

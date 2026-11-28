@@ -1,5 +1,14 @@
 import { describe, expect, it } from "vitest";
-import { CivitaiError, createCivitai, imagesOf, sniffImage, type PictureJob } from "./civitai.ts";
+import {
+  CivitaiError,
+  createCivitai,
+  imagesOf,
+  randomSeed,
+  SEED_MAX,
+  SEED_MIN,
+  sniffImage,
+  type PictureJob,
+} from "./civitai.ts";
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0, 0, 0, 0, 0]);
 
@@ -9,9 +18,11 @@ const job: PictureJob = {
   negativePrompt: "bad quality",
   width: 832,
   height: 1216,
-  steps: 30,
+  steps: 20,
   cfgScale: 7,
-  seed: 42,
+  sampleMethod: "euler_a",
+  clipSkip: 2,
+  seed: 4_294_967_295,
 };
 
 /** A fake CivitAI: answers each request with the next of `answers`, and remembers what it was asked. */
@@ -30,6 +41,16 @@ function fake(...answers: (Response | Error)[]) {
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status });
 
 describe("CivitAI", () => {
+  it("rolls ten-digit seeds that fit in 32 bits", () => {
+    for (let i = 0; i < 1000; i++) {
+      const seed = randomSeed();
+      expect(Number.isInteger(seed)).toBe(true);
+      expect(seed).toBeGreaterThanOrEqual(SEED_MIN);
+      expect(seed).toBeLessThanOrEqual(SEED_MAX);
+      expect(String(seed)).toHaveLength(10);
+    }
+  });
+
   it("asks for one picture with the job's settings and the key", async () => {
     const { civitai, asked } = fake(json({ id: "wf-1", status: "processing" }));
     const workflow = await civitai.submit(job);

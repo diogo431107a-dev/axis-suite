@@ -2,6 +2,7 @@
 // picture; this then asks CivitAI for it, waits, downloads it, and marks it done or failed. The
 // page looks at the picture every few seconds until then.
 import type { DatabaseSync } from "node:sqlite";
+import { DEFAULT_SETTINGS } from "../../shared/protocol.ts";
 import { CivitaiError, type Civitai, type Workflow } from "./civitai.ts";
 import type { FileStore } from "../files.ts";
 import { jobOf, markDone, markFailed, setWorkflow, unfinished } from "./store.ts";
@@ -22,7 +23,15 @@ export function createPainter({ db, civitai, files }: PainterOptions) {
       } else {
         const job = jobOf(db, id);
         if (!job) return;
-        workflow = await civitai.submit({ prompt: job.prompt, negativePrompt: job.negativePrompt, ...job.params });
+        const { sampler, clipSkip, ...params } = job.params;
+        // A picture asked for before these could be chosen gets what a new companion starts with.
+        workflow = await civitai.submit({
+          prompt: job.prompt,
+          negativePrompt: job.negativePrompt,
+          ...params,
+          sampleMethod: sampler ?? DEFAULT_SETTINGS.pictureSampler,
+          clipSkip: clipSkip ?? DEFAULT_SETTINGS.pictureClipSkip,
+        });
         setWorkflow(db, id, workflow.id);
       }
       const url = await civitai.finish(workflow);
