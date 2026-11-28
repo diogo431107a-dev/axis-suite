@@ -14,8 +14,8 @@ decide what to send.
 - **Valhalla 2's own words are few, and yours to rewrite.** A chat needs a little text you didn't
   write: the memory policy that comes with the companion's memory, the instruction that has it open
   the chat, the note that passes on why you rejected a reply, the instructions the memory model
-  works by, the ones Claude reads a scene and writes a picture's prompt by, and the notes above your
-  pins and the topics to leave alone. Each companion has its own copy of every one of them, which
+  works by, the ones a scene, a picture's prompt and the tags a reply is read aloud with are made by,
+  and the notes above your pins and the topics to leave alone. Each companion has its own copy of every one of them, which
   you can rewrite or leave on the default. A default that improves reaches every companion that
   never changed it.
 - **Inspect shows everything.** The **Inspect** panel in a chat shows the exact request that goes

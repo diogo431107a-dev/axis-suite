@@ -4,9 +4,11 @@
 //
 // Rows belong to a Heimdall username (`companions.owner`); everything else hangs off a companion,
 // so deleting one person's companions takes all of theirs with them.
+import { createHash } from "node:crypto";
 import { DatabaseSync } from "node:sqlite";
 import { mkdirSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { DEFAULT_PROMPTS } from "../shared/prompts.ts";
 
 /** Where everything is kept: /var/lib/valhalla2 on a server, ./data in development. */
 export const STATE_DIR = process.env.STATE_DIRECTORY ?? "data";
@@ -297,6 +299,57 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE companions ADD COLUMN voice_pitch INTEGER NOT NULL DEFAULT 0;
       ALTER TABLE companions ADD COLUMN voice_style TEXT;
     `);
+  },
+  // v12: how each line of a reply is said aloud (tone/store.ts), apart from the scene, which is now
+  // for pictures only. The lines every kept scene had are moved here, as read under the default
+  // tone instructions, so a reply already read aloud keeps its feelings, and its audio.
+  (db) => {
+    db.exec(`
+      CREATE TABLE tones (
+        message_id  INTEGER PRIMARY KEY REFERENCES messages(id) ON DELETE CASCADE,
+        prompt_hash TEXT NOT NULL,                    -- sha256 of the tone instructions
+        text_hash   TEXT NOT NULL,                    -- sha256 of the reply's own words
+        lines       TEXT NOT NULL,                    -- JSON: ToneLine[]
+        model       TEXT NOT NULL,
+        effort      TEXT NOT NULL,
+        cost        REAL,                             -- dollars; NULL when a price is unknown
+        request     TEXT NOT NULL,                    -- JSON: exactly what was sent
+        created_at  TEXT NOT NULL,
+        edited_at   TEXT                              -- you corrected it
+      );
+    `);
+    const promptHash = createHash("sha256").update(DEFAULT_PROMPTS.tone).digest("hex");
+    const insert = db.prepare(
+      `INSERT INTO tones (message_id, prompt_hash, text_hash, lines, model, effort, cost, request, created_at, edited_at)
+       VALUES (?, ?, ?, ?, ?, 'low', ?, ?, ?, ?)`,
+    );
+    const scenes = db
+      .prepare("SELECT message_id, text_hash, sheet, model, cost, request, created_at, edited_at FROM scenes")
+      .all() as {
+      message_id: number;
+      text_hash: string;
+      sheet: string;
+      model: string;
+      cost: number | null;
+      request: string;
+      created_at: string;
+      edited_at: string | null;
+    }[];
+    for (const scene of scenes) {
+      const { lines } = JSON.parse(scene.sheet) as { lines?: unknown[] };
+      if (!Array.isArray(lines) || lines.length === 0) continue;
+      insert.run(
+        scene.message_id,
+        promptHash,
+        scene.text_hash,
+        JSON.stringify(lines),
+        scene.model,
+        scene.cost,
+        scene.request,
+        scene.created_at,
+        scene.edited_at,
+      );
+    }
   },
 ];
 

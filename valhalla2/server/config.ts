@@ -16,11 +16,16 @@ function count(name: string, fallback: number, min = 1): number {
 const modelFrom = (name: string, fallback: string): string => process.env[name]?.trim() || fallback;
 
 export const config = {
-  /** What a new companion starts from: CHAT_MODEL answers in character, MEMORY_MODEL keeps memory. */
+  /**
+   * What a new Claude companion starts from: CHAT_MODEL answers in character, MEMORY_MODEL keeps
+   * memory, TONE_MODEL works out how a reply is said aloud, SCENE_MODEL a moment for a picture.
+   */
   defaults: {
     ...DEFAULT_SETTINGS,
     model: modelFrom("CHAT_MODEL", DEFAULT_SETTINGS.model),
     memoryModel: modelFrom("MEMORY_MODEL", DEFAULT_SETTINGS.memoryModel),
+    toneModel: modelFrom("TONE_MODEL", DEFAULT_SETTINGS.toneModel),
+    sceneModel: modelFrom("SCENE_MODEL", DEFAULT_SETTINGS.sceneModel),
   } satisfies Settings,
   /** After this many swipes on one reply, ask why the replies aren't working. */
   swipeAsk: count("VALHALLA_SWIPE_ASK", 5),
@@ -46,10 +51,8 @@ export const config = {
     promptModel: modelFrom("PICTURE_PROMPT_MODEL", "claude-sonnet-5-5"),
   },
   scene: {
-    /** About how many tokens of the chat, up to the moment, Claude reads to understand it. */
+    /** About how many tokens of the chat, up to the moment, the scene model reads to understand it. */
     tokens: count("VALHALLA_SCENE_TOKENS", 12_000, 500),
-    /** The Claude model that works out a moment: the scene, and how each line is said. */
-    model: modelFrom("SCENE_MODEL", "claude-haiku-5-5"),
   },
   speech: {
     /** The Azure region of the Speech resource the key belongs to. */

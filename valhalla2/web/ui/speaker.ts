@@ -10,7 +10,8 @@ export type Playing = { messageId: number; phase: "loading" | "playing" } | null
 /** Whether a reply has anything to read once its asterisks are gone. */
 export const hasSpeech = (text: string): boolean => text.replace(/\*+/g, "").trim() !== "";
 
-export function useSpeaker(chatId: string, onError: (message: string) => void) {
+/** `onRead` hears of each reply read, once its audio is ready: its tags may be new. */
+export function useSpeaker(chatId: string, onError: (message: string) => void, onRead?: (messageId: number) => void) {
   const audio = useRef<HTMLAudioElement | null>(null);
   // Each play gets a number; whatever an older one finishes after a newer one started is ignored.
   const turn = useRef(0);
@@ -18,6 +19,8 @@ export function useSpeaker(chatId: string, onError: (message: string) => void) {
   const [monthChars, setMonthChars] = useState<number | null>(null);
   const report = useRef(onError);
   report.current = onError;
+  const read = useRef(onRead);
+  read.current = onRead;
 
   const stop = useCallback(() => {
     turn.current++;
@@ -39,6 +42,7 @@ export function useSpeaker(chatId: string, onError: (message: string) => void) {
           method: "POST",
         });
         setMonthChars(reply.monthChars);
+        read.current?.(messageId);
         if (mine !== turn.current) return;
         const player = (audio.current ??= new Audio());
         player.onended = () => {

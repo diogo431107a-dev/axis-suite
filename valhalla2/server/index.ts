@@ -12,6 +12,7 @@ import { messageRoutes } from "./routes/messages.ts";
 import { metaRoutes } from "./routes/meta.ts";
 import { pictureRoutes } from "./routes/pictures.ts";
 import { sceneRoutes } from "./routes/scene.ts";
+import { toneRoutes } from "./routes/tone.ts";
 import { speechRoutes } from "./routes/speech.ts";
 import { createServices } from "./services.ts";
 
@@ -48,6 +49,7 @@ for (const routes of [
   messageRoutes,
   memoryRoutes,
   sceneRoutes,
+  toneRoutes,
   pictureRoutes,
   speechRoutes,
 ]) {

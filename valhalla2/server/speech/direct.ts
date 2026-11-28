@@ -1,17 +1,11 @@
-// A reply read with feeling: each line in the way the scene says it is said (scene/sheet.ts).
+// A reply read with feeling: each line in the way its tags say it is said (tone/store.ts).
 //
 // Azure has two ways to direct a voice. A few voices have speaking styles of their own (cheerful,
 // whispering, sad…), which sound the most natural; a line whose feeling matches one of the voice's
 // styles is read in it. Every voice follows speed, pitch and volume, so every other line is read
 // with those, set for its feeling, in the companion's own speaking style if it has one. The
 // companion's speed and pitch are under all of it. The words are always the reply's own.
-import {
-  DEFAULT_TUNING,
-  type Feeling,
-  type SceneLine,
-  type Strength,
-  type VoiceTuning,
-} from "../../shared/protocol.ts";
+import { DEFAULT_TUNING, type Feeling, type ToneLine, type Strength, type VoiceTuning } from "../../shared/protocol.ts";
 import { combinePitch, combineRate, deliver, escapeXml, speak } from "./text.ts";
 
 /** The voice's own styles that fit a feeling, the closest first. */
@@ -76,7 +70,7 @@ export function styleFor(feeling: Feeling, styles: readonly string[]): string | 
  * pitch and volume. The companion's speed and pitch are under everything; a feeling read with
  * speed and pitch is read on top of them.
  */
-function lineOf(line: SceneLine, styles: readonly string[], tuning: VoiceTuning): string {
+function lineOf(line: ToneLine, styles: readonly string[], tuning: VoiceTuning): string {
   const said = escapeXml(line.text);
   const style = styleFor(line.feeling, styles);
   if (style) {
@@ -100,7 +94,7 @@ function lineOf(line: SceneLine, styles: readonly string[], tuning: VoiceTuning)
  * The companion's style is used only if the voice has it, which is the caller's to check.
  */
 export function directedSsml(
-  lines: readonly SceneLine[],
+  lines: readonly ToneLine[],
   voice: string,
   styles: readonly string[],
   tuning: VoiceTuning = DEFAULT_TUNING,

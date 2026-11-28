@@ -34,8 +34,10 @@ export function Entry({
   onPin,
   onPicture,
   onScene,
+  onTone,
   memory,
   scenes,
+  toned,
   onView,
 }: {
   chatId: string;
@@ -60,10 +62,13 @@ export function Entry({
   onPin: (start: { messageId: number; speaker: string; text: string }) => void;
   onPicture: (messageId: number) => void;
   onScene: (messageId: number) => void;
+  onTone: (messageId: number) => void;
   /** Whether the companion has memory. */
   memory: boolean;
-  /** Whether the companion has scenes. */
+  /** Whether the companion has scenes, and pictures can be made. */
   scenes: boolean;
+  /** Whether this reply's tags (how it is read aloud) can be looked at. */
+  toned: boolean;
   onView: (pictureId: string) => void;
 }) {
   const { message, siblings } = entry;
@@ -137,8 +142,10 @@ export function Entry({
         onEdit={() => setEditing({ id: message.id, text })}
         onPicture={() => onPicture(message.id)}
         onScene={() => onScene(message.id)}
+        onTone={() => onTone(message.id)}
         memory={memory}
         scenes={scenes}
+        toned={toned}
         onDeleting={(asking) => setDeleting(asking ? message.id : null)}
       />
 

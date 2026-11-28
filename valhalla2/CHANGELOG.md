@@ -4,6 +4,26 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Reading aloud with feeling and the scene are now two separate things.** How each line of a
+  reply is said (its tags for Azure) is worked out on its own, the first time a reply is read aloud
+  with feeling, from the profile and the last few exchanges only, so it is cheap and quick. After
+  that, a new button with sound waves under the reply opens its tags, to check or correct them,
+  and hear it again.
+- **The scene is now for pictures only**, and focuses on the character and the place: you are in
+  the picture only if you add yourself in the scene dialog. It also notes the colours and
+  atmosphere of the moment and how each feeling shows in a drawing (a blush, an anger vein,
+  tears), which the picture prompt turns into tags.
+- **You choose who reads each, and how hard.** Under Settings, **Scene model** and **Scene
+  effort**; under **Read with feeling**, **Tone model**, **Tone effort** and how much of the chat
+  it reads. Both start on Haiku at low effort, as before, so you can try Sonnet or another effort
+  and compare.
+- **Grok companions get both**, read by Grok (their own chat model to start with): pictures from
+  the scene when they have memory, and replies read with feeling.
+- **Read with feeling works without memory too**, for Claude and Grok companions.
+- Replies already read aloud keep their feelings and their audio.
+- **By hand:** only if you rewrote a companion's **Scene reading instructions**: they now apply to
+  pictures only, and the lines' feelings have their own **Tone instructions** box.
+
 ## 0.0.46 — 2026-11-27
 
 - **Grok companions can now have memory.** A new Grok companion can be made with memory, as a

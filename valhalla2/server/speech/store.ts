@@ -2,7 +2,7 @@
 // as a file (in its own folder, see files.ts), so playing it again
 // is instant and costs nothing. An edited reply, or another voice, is read again, and the old
 // audio is deleted. Each companion may have its own voice; one that names none is read in the
-// server's. A reply is read with the feeling of each line when the scene has worked it out
+// server's. A reply is read with the feeling of each line when its tags have been worked out
 // (direct.ts), and is read again when that changes, or when its companion's speed, pitch or
 // speaking style does.
 import { createHash } from "node:crypto";
@@ -14,7 +14,7 @@ import {
   isDefaultTuning,
   type Feeling,
   type Message,
-  type SceneLine,
+  type ToneLine,
   type Voice,
   type VoiceTuning,
 } from "../../shared/protocol.ts";
@@ -96,7 +96,7 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
    */
   async function ssmlFor(
     voice: string,
-    lines: readonly SceneLine[] | null,
+    lines: readonly ToneLine[] | null,
     text: string,
     tuning: VoiceTuning,
   ): Promise<string> {
@@ -140,14 +140,14 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
 
     /**
      * The kept audio of a reply, read now in `voice` if it isn't kept yet: with `lines`, each said
-     * the way the scene says (direct.ts), otherwise plainly, at the tuning's speed, pitch and style.
+     * the way its tags say (direct.ts), otherwise plainly, at the tuning's speed, pitch and style.
      * Another way of saying it is another reading. Whose message it is, and that it is still there,
      * is the caller's to check.
      */
     async of(
       message: Message,
       voice: string = serverVoice,
-      lines: readonly SceneLine[] | null = null,
+      lines: readonly ToneLine[] | null = null,
       tuning: VoiceTuning = DEFAULT_TUNING,
     ): Promise<Spoken> {
       if (message.role !== "assistant") invalid("Only a companion's replies are read aloud");

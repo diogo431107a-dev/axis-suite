@@ -13,6 +13,7 @@ import {
 import { asStoreError } from "../claude/client.ts";
 import { runMemoryModel, type MemoryRunner } from "../claude/memory.ts";
 import { writePicturePrompt } from "../claude/pictures.ts";
+import { readWithClaude } from "../claude/reading.ts";
 import { streamReply, type Writer } from "../claude/reply.ts";
 import { contextWindow, countTokens } from "../claude/tokens.ts";
 import { config } from "../config.ts";
@@ -21,9 +22,11 @@ import { windowWithout } from "../memory/history.ts";
 import { grokError } from "../grok/client.ts";
 import { runGrokMemoryModel } from "../grok/memory.ts";
 import { writeGrokPicturePrompt } from "../grok/pictures.ts";
+import { readWithGrok } from "../grok/reading.ts";
 import { streamGrokReply } from "../grok/reply.ts";
 import { grokContextWindow } from "../grok/tokens.ts";
 import type { SystemBlock } from "../prompt.ts";
+import type { Reader } from "../reading.ts";
 import type { WindowSize } from "./turn.ts";
 
 /** The companion's API, checked against the model about to be asked. */
@@ -59,6 +62,10 @@ export function writePictureFor(
   }
   return writePicturePrompt(request, config.pictures.promptModel);
 }
+
+/** A reading (the tags a reply is read aloud with, a scene) on the companion's own API. */
+export const readOnItsApi: Reader = async (ask) =>
+  providerFor(ask.model, ask.provider) === "xai" ? readWithGrok(ask) : readWithClaude(ask);
 
 /**
  * How much of a chat goes out each turn. With memory, the configured window (a larger one on Grok):

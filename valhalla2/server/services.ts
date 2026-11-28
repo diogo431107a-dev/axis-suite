@@ -10,7 +10,7 @@ import type { DatabaseSync } from "node:sqlite";
 import { startDailyBackups } from "./backup.ts";
 import { createBusy } from "./busy.ts";
 import { createChats } from "./chat/chats.ts";
-import { runMemoryFor } from "./chat/write.ts";
+import { readOnItsApi, runMemoryFor } from "./chat/write.ts";
 import { id as checkId } from "./check.ts";
 import { createCompanions } from "./companions.ts";
 import { config } from "./config.ts";
@@ -23,10 +23,10 @@ import { startPictures } from "./pictures/feature.ts";
 import { createPictures } from "./pictures/store.ts";
 import { createPins, pinsOf } from "./pins.ts";
 import { createQuiet } from "./quiet.ts";
-import { readScene } from "./claude/scene.ts";
 import type { Remembered } from "./scene/context.ts";
 import { createScenes, momentRequest } from "./scene/sheet.ts";
 import { startSpeech } from "./speech/feature.ts";
+import { createTones } from "./tone/store.ts";
 import type { Companion, Message } from "../shared/protocol.ts";
 import { closeCutShortRuns, removeGoneUsers } from "./startup.ts";
 import { needScenes } from "./companions.ts";
@@ -80,7 +80,7 @@ export function createServices(db: DatabaseSync) {
     pins: pinsOf(db, companionId),
   });
 
-  /** What is asked about the moment at the end of `path`. Only a Claude companion with memory has a scene. */
+  /** What is asked about the moment at the end of `path`. Only a companion with memory has a scene. */
   const moment = (companion: Companion, path: readonly Message[]) =>
     momentRequest(needScenes(companion), remembered(companion.id), path, config.scene.tokens);
 
@@ -100,8 +100,10 @@ export function createServices(db: DatabaseSync) {
     painter: pictures.painter,
     speechFiles: speech.files,
     speech: speech.speech,
-    /** Moments worked out, kept. */
-    scenes: createScenes({ db, read: readScene, model: config.scene.model }),
+    /** Moments worked out for pictures, kept. */
+    scenes: createScenes({ db, read: readOnItsApi }),
+    /** How each line of a reply is said aloud, kept. */
+    tones: createTones({ db, read: readOnItsApi }),
     remembered,
     moment,
     ownedBy,

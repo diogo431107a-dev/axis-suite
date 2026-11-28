@@ -15,8 +15,8 @@ export type CacheTtl = (typeof CACHE_TTLS)[number];
 /**
  * Which API answers a model: Anthropic's for Claude, xAI's for Grok. Told by the id alone, so a
  * model typed in by hand needs nothing more. A companion is one or the other, and everything it
- * asks goes to its own API: chat replies, its memory model and picture prompts. Scene reading is
- * Claude's only, so a Grok companion has none.
+ * asks goes to its own API: chat replies, its memory model, picture prompts, its scenes and the
+ * tags its replies are read aloud with.
  */
 export type Provider = "anthropic" | "xai";
 export const providerOf = (model: string): Provider => (model.startsWith("grok-") ? "xai" : "anthropic");
@@ -97,7 +97,22 @@ export const DEFAULT_SETTINGS: Settings = {
   cacheTtl: "1h",
   fallbacks: true,
   temperature: null,
+  toneModel: "claude-haiku-5-5",
+  toneEffort: "low",
+  toneTokens: 4_000,
+  sceneModel: "claude-haiku-5-5",
+  sceneEffort: "low",
 };
+
+/** The tag and scene settings a Grok companion starts with: its own chat model, at low effort. */
+export const grokReadingDefaults = (
+  model: string,
+): Pick<Settings, "toneModel" | "toneEffort" | "sceneModel" | "sceneEffort"> => ({
+  toneModel: model,
+  toneEffort: "low",
+  sceneModel: model,
+  sceneEffort: "low",
+});
 
 /** What Valhalla 2 sends with a request, besides the profile. One set per companion. */
 export interface Settings {
@@ -121,4 +136,15 @@ export interface Settings {
    * default. Claude's models reject a temperature, so a Claude companion's is always null.
    */
   temperature: number | null;
+  /**
+   * The model that works out how each line of a reply is said when it is read aloud with feeling,
+   * and its effort. On the companion's own API.
+   */
+  toneModel: string;
+  toneEffort: Effort;
+  /** About how many tokens of the chat before a reply the tone model reads. */
+  toneTokens: number;
+  /** The model that works out a moment for a picture of it (with memory only), and its effort. */
+  sceneModel: string;
+  sceneEffort: Effort;
 }

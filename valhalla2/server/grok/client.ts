@@ -1,7 +1,7 @@
 // The one place Valhalla 2 talks to the xAI API is this folder; this file holds the client.
 //
-// Everything a Grok companion asks goes here and nowhere else: its chat replies, its memory runs
-// and its pictures' prompts. It has no scene, so nothing else is asked. xAI speaks OpenAI's
+// Everything a Grok companion asks goes here and nowhere else: its chat replies, its memory runs,
+// its pictures' prompts, its scenes and the tags its replies are read aloud with. xAI speaks OpenAI's
 // Responses API, so the client is the `openai` SDK pointed at api.x.ai.
 //
 //   key.ts       the key, from the systemd credential or XAI_API_KEY
@@ -9,6 +9,7 @@
 //   reply.ts     a chat reply, streamed
 //   memory.ts    a run of the memory model, with the memory tool as a function
 //   pictures.ts  a picture's prompt
+//   reading.ts   a structured reading: a scene, or how a reply is said aloud
 //   tokens.ts    each model's context window
 import OpenAI from "openai";
 import { StoreError } from "../errors.ts";

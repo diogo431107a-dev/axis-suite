@@ -7,10 +7,12 @@ import { useState } from "react";
 import {
   CACHE_TTLS,
   EFFORTS,
+  grokReadingDefaults,
   hasFallback,
   LIMITS,
   MODELS,
   providerOf,
+  type Effort,
   type Provider,
   type Settings,
 } from "../../shared/protocol.ts";
@@ -81,6 +83,77 @@ function ModelField({
   );
 }
 
+/** The models a helper of the chat model (memory, tone, scene) may be: those of the same API. */
+const sameApi = (settings: Settings): readonly Model[] =>
+  MODELS.filter((entry) => entry.provider === providerOf(settings.model));
+
+function EffortField({
+  label,
+  hint,
+  value,
+  onChange,
+}: {
+  label: string;
+  hint: string;
+  value: Effort;
+  onChange: (effort: Effort) => void;
+}) {
+  return (
+    <Field label={label} hint={hint}>
+      <select className={inputStyle} value={value} onChange={(e) => onChange(e.target.value as Effort)}>
+        {EFFORTS.map((effort) => (
+          <option key={effort} value={effort}>
+            {effort}
+          </option>
+        ))}
+      </select>
+    </Field>
+  );
+}
+
+/**
+ * Who works out how each line of a reply is said when it is read aloud with feeling, at what
+ * effort, and from how much of the chat. Shown with the voice.
+ */
+export function ToneSettings({ settings, onChange }: { settings: Settings; onChange: (settings: Settings) => void }) {
+  const { health } = usePage();
+  const onGrok = providerOf(settings.model) === "xai";
+  return (
+    <div className="grid gap-4 sm:grid-cols-2">
+      <ModelField
+        label="Tone model"
+        hint="Works out the feeling of each line, the first time a reply is read aloud. A cheap model does well."
+        value={settings.toneModel}
+        onChange={(toneModel) => onChange({ ...settings, toneModel })}
+        models={sameApi(settings)}
+        grok={onGrok && health.grok}
+      />
+      <EffortField
+        label="Tone effort"
+        hint={
+          onGrok ? "Grok has no max: max is sent as xhigh." : "How much thinking goes into it, and so what it costs."
+        }
+        value={settings.toneEffort}
+        onChange={(toneEffort) => onChange({ ...settings, toneEffort })}
+      />
+      <Field
+        label="How much of the chat it reads"
+        hint="In tokens, before the reply, with the profile. No memory: a few exchanges are usually enough."
+      >
+        <input
+          className={inputStyle}
+          type="number"
+          min={LIMITS.minToneTokens}
+          max={LIMITS.maxToneTokens}
+          step={500}
+          value={settings.toneTokens}
+          onChange={(e) => onChange({ ...settings, toneTokens: Number(e.target.value) })}
+        />
+      </Field>
+    </div>
+  );
+}
+
 export function SettingsForm({
   settings,
   onChange,
@@ -102,20 +175,23 @@ export function SettingsForm({
   const onGrok = providerOf(settings.model) === "xai";
 
   /**
-   * A new chat model. Moving a new companion to Grok makes its memory model the Grok model too;
-   * moving it back to Claude gives it the server's memory model again. A temperature is Grok's only.
-   * Moving between Claude and Grok resets effort to what is economical there: Grok's high is slow
-   * and dear for dialogue, so it starts low; Claude starts on the server's default (high, on Haiku).
+   * A new chat model. Moving a new companion to Grok makes its memory, tone and scene models the
+   * Grok model too; moving it back to Claude gives it the server's again. A temperature is Grok's
+   * only. Moving between Claude and Grok resets effort to what is economical there: Grok's high is
+   * slow and dear for dialogue, so it starts low; Claude starts on the server's default (high, on
+   * Haiku).
    */
   const chooseModel = (model: string) => {
     const grok = providerOf(model) === "xai";
     const moved = grok !== onGrok;
+    const { toneModel, toneEffort, sceneModel, sceneEffort } = health.defaults;
     onChange({
       ...settings,
       model,
       memoryModel: moved ? (grok ? model : health.defaults.memoryModel) : settings.memoryModel,
       effort: moved ? (grok ? "low" : health.defaults.effort) : settings.effort,
       temperature: grok ? settings.temperature : null,
+      ...(moved ? (grok ? grokReadingDefaults(model) : { toneModel, toneEffort, sceneModel, sceneEffort }) : {}),
     });
   };
 
@@ -146,7 +222,7 @@ export function SettingsForm({
             hint="Keeps the companion's memory up to date after a chat."
             value={settings.memoryModel}
             onChange={(model) => set("memoryModel", model)}
-            models={MODELS.filter((entry) => entry.provider === (onGrok ? "xai" : "anthropic"))}
+            models={sameApi(settings)}
             grok={onGrok && health.grok}
           />
         ) : null}
@@ -229,6 +305,29 @@ export function SettingsForm({
           </Field>
         )}
       </div>
+
+      {memory && health.pictures ? (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ModelField
+            label="Scene model"
+            hint="Works out a moment before a picture of it: the place, the character and how they look, the atmosphere."
+            value={settings.sceneModel}
+            onChange={(model) => set("sceneModel", model)}
+            models={sameApi(settings)}
+            grok={onGrok && health.grok}
+          />
+          <EffortField
+            label="Scene effort"
+            hint={
+              onGrok
+                ? "How much thinking goes into a scene. Grok has no max: max is sent as xhigh."
+                : "How much thinking goes into a scene, and so what it costs."
+            }
+            value={settings.sceneEffort}
+            onChange={(effort) => set("sceneEffort", effort)}
+          />
+        </div>
+      ) : null}
 
       {onGrok ? (
         <p className="text-xs text-faint">

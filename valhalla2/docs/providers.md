@@ -11,16 +11,16 @@ Two things are chosen when a companion is created:
   without memory can have it turned on later (see [Turning memory on](#turning-memory-on)), but
   never off.
 
-|                       | Claude with memory                                         | Grok with memory                            | Without memory (Claude or Grok)               |
-| --------------------- | ---------------------------------------------------------- | ------------------------------------------- | --------------------------------------------- |
-| What a chat sends     | profile, memory, pins, topics to leave alone; about 20K    | the same; about 60K                         | profile and pins; the chat, up to 160K tokens |
-| Memory model          | a Claude model (Sonnet 5.5 by default)                     | a Grok model (its chat model by default)    | none                                          |
-| A picture of a moment | drawn from the scene, worked out from memory and the chat  | drawn from that one message and the profile | drawn from that one message and the profile   |
-| Reading aloud         | with the feeling of each line, from the scene (or plainly) | plainly, as written                         | plainly, as written                           |
-| Leave alone           | yes                                                        | yes                                         | no                                            |
-| Scene                 | yes                                                        | not yet                                     | no                                            |
-| A like's comment      | read by the memory model                                   | read by the memory model                    | no comment: a like is only a mark for you     |
-| Canon or one-shot     | decides what memory keeps                                  | decides what memory keeps                   | makes no difference                           |
+|                       | Claude with memory                                        | Grok with memory                         | Without memory (Claude or Grok)               |
+| --------------------- | --------------------------------------------------------- | ---------------------------------------- | --------------------------------------------- |
+| What a chat sends     | profile, memory, pins, topics to leave alone; about 20K   | the same; about 60K                      | profile and pins; the chat, up to 160K tokens |
+| Memory model          | a Claude model (Sonnet 5.5 by default)                    | a Grok model (its chat model by default) | none                                          |
+| A picture of a moment | drawn from the scene, worked out from memory and the chat | the same, by Grok                        | drawn from that one message and the profile   |
+| Reading aloud         | with the feeling of each line, from its tags (or plainly) | the same, by Grok                        | the same, on the companion's own API          |
+| Leave alone           | yes                                                       | yes                                      | no                                            |
+| Scene                 | yes                                                       | yes                                      | no                                            |
+| A like's comment      | read by the memory model                                  | read by the memory model                 | no comment: a like is only a mark for you     |
+| Canon or one-shot     | decides what memory keeps                                 | decides what memory keeps                | makes no difference                           |
 
 How a companion with memory remembers is in [How memory works](memory.md). It is the same on both
 APIs: the same files, the same runs, the same rules. Only the model that keeps it differs.
@@ -44,8 +44,9 @@ its chat model. Claude never sees any of it.
 - **Cost.** A run is a few requests in a row, each re-reading the earlier ones at the cached rate
   ($0.50 per million on Grok 4.7): a few cents a run. Each turn of a chat sends about 60K tokens,
   most of it from the cache, about a cent.
-- **No scene yet.** The scene is worked out by Claude, so a Grok companion's pictures are drawn from
-  the message and the profile, and its replies are read aloud as written, with memory or without.
+- **Scenes and tags are Grok's too.** A Grok companion's scenes (with memory) and the tags its
+  replies are read aloud with are read by a Grok model, its **Scene model** and **Tone model**
+  (its chat model to start with), at their own effort, sent as `reasoning.effort` as for a reply.
 
 ### Turning memory on
 

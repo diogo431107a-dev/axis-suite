@@ -16,6 +16,7 @@ export const PROMPT_KEYS = [
   "cleanup",
   "scene",
   "picture",
+  "tone",
 ] as const;
 export type PromptKey = (typeof PROMPT_KEYS)[number];
 export type Prompts = Partial<Record<PromptKey, string>>;
@@ -38,15 +39,14 @@ export interface Companion {
   /**
    * Whether it has memory, chosen when it is created (a Grok companion without can have it turned
    * on later, never off). With memory: the memory model, the sliding window, topics to leave alone,
-   * and for a Claude companion the scene and reading with feeling (see hasScenes). Without: the
-   * whole chat is sent, and pictures and reading aloud work from the message itself. Pins work
-   * either way.
+   * and the scene pictures are drawn from (see hasScenes). Without: the whole chat is sent, and
+   * pictures work from the message itself. Pins, and reading aloud with feeling, work either way.
    */
   memory: boolean;
   prompts: Prompts;
   /** The Azure voice its replies are read aloud in; null for the server's own. */
   voice: string | null;
-  /** Whether its replies are read with the feeling of each line (the scene), or plainly. */
+  /** Whether its replies are read with the feeling of each line (its tags, tone.ts), or plainly. */
   voiceFeeling: boolean;
   /** Its voice's speed, pitch and speaking style. */
   voiceTuning: VoiceTuning;
@@ -56,8 +56,7 @@ export interface Companion {
 
 /**
  * Whether the companion has scenes: a moment worked out from memory and the chat, which pictures
- * are drawn from and replies read aloud with. Claude reads them, so only a Claude companion with
- * memory has them; a Grok one's pictures and readings work from the message itself.
+ * are drawn from. Read on the companion's own API, so a Claude or a Grok companion with memory has
+ * them; one without draws its pictures from the message itself.
  */
-export const hasScenes = (companion: Pick<Companion, "memory" | "provider">): boolean =>
-  companion.memory && companion.provider === "anthropic";
+export const hasScenes = (companion: Pick<Companion, "memory">): boolean => companion.memory;

@@ -1,8 +1,15 @@
 // A chat: the selected path through it, the other versions of each message one click away, and
 // the composer.
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import { BookmarkCheck, Brain, Eye, Settings2, Volume2, VolumeX } from "lucide-react";
-import { hasScenes, type Message, type PathEntry, type Picture, type PictureDraft } from "../../../shared/protocol.ts";
+import {
+  hasScenes,
+  type Message,
+  type PathEntry,
+  type Picture,
+  type PictureDraft,
+  type ToneList,
+} from "../../../shared/protocol.ts";
 import { api, describeError } from "../../api.ts";
 import { usePage } from "../../page.ts";
 import { Button, Notice } from "../../ui/bits.tsx";
@@ -19,6 +26,7 @@ import { Live } from "./Live.tsx";
 import { textOf } from "./message.ts";
 import { PinDialog } from "./PinDialog.tsx";
 import { SceneDialog } from "./SceneDialog.tsx";
+import { ToneDialog } from "./ToneDialog.tsx";
 import { useChat } from "./useChat.ts";
 
 export function Chat({ id, greet }: { id: string; greet: boolean }) {
@@ -57,9 +65,13 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   /** The message something is being pinned from. */
   const [pinning, setPinning] = useState<{ messageId: number; speaker: string; text: string } | null>(null);
 
-  /** The message a picture is being asked for, and the prompt to start from when making one again. */
   /** The message whose scene is open. */
   const [scening, setScening] = useState<number | null>(null);
+  /** The reply whose tags (how each line is read aloud) are open. */
+  const [toning, setToning] = useState<number | null>(null);
+  /** The replies whose tags have been worked out, the first time each was read aloud with feeling. */
+  const [toned, setToned] = useState<number[]>([]);
+  /** The message a picture is being asked for, and the prompt to start from when making one again. */
   const [picturing, setPicturing] = useState<{ messageId: number; start?: PictureDraft } | null>(null);
   const [viewing, setViewing] = useState<string | null>(null);
 
@@ -67,7 +79,15 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   const [showPrompt, setShowPrompt] = useState(false);
   const bottom = useRef<HTMLDivElement>(null);
 
-  const speaker = useSpeaker(id, setError);
+  const loadToned = useCallback(() => {
+    if (!health.speech) return;
+    api<ToneList>(`/api/chats/${id}/tones`)
+      .then((list) => setToned(list.messageIds))
+      .catch(() => undefined);
+  }, [id, health.speech]);
+  useEffect(loadToned, [loadToned]);
+
+  const speaker = useSpeaker(id, setError, loadToned);
   const [readAloud, setReadAloud] = useReadAloud();
   onAnswered.current = (message) => {
     if (health.speech && readAloud && message.role === "assistant" && hasSpeech(textOf(message))) {
@@ -211,8 +231,10 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
                 onPin={setPinning}
                 onPicture={(messageId) => setPicturing({ messageId })}
                 onScene={setScening}
+                onTone={setToning}
                 memory={companion.memory}
-                scenes={hasScenes(companion)}
+                scenes={health.pictures && hasScenes(companion)}
+                toned={health.speech && companion.voiceFeeling && toned.includes(entry.message.id)}
                 onView={setViewing}
               />
             </Fragment>
@@ -297,7 +319,14 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           messageId={scening}
           companionName={companion.name}
           onClose={() => setScening(null)}
-          onHear={health.speech ? () => void speaker.play(scening) : undefined}
+        />
+      ) : null}
+      {toning !== null ? (
+        <ToneDialog
+          chatId={chat.id}
+          messageId={toning}
+          onClose={() => setToning(null)}
+          onHear={() => void speaker.play(toning)}
         />
       ) : null}
       {pinning ? (

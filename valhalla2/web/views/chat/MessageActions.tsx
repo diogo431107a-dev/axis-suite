@@ -1,5 +1,6 @@
 // The row of small buttons under a message.
 import {
+  AudioLines,
   Check,
   ChevronLeft,
   ChevronRight,
@@ -44,8 +45,10 @@ export function MessageActions({
   onEdit,
   onPicture,
   onScene,
+  onTone,
   memory,
   scenes,
+  toned,
   onDeleting,
 }: {
   chatId: string;
@@ -72,10 +75,13 @@ export function MessageActions({
   onEdit: () => void;
   onPicture: () => void;
   onScene: () => void;
+  onTone: () => void;
   /** Whether the companion has memory: without, a like carries no comment. */
   memory: boolean;
-  /** Whether the companion has scenes (a Claude companion with memory). */
+  /** Whether the companion has scenes (with memory) and pictures can be made. */
   scenes: boolean;
+  /** Whether this reply has been read aloud with feeling, so its tags can be looked at. */
+  toned: boolean;
   onDeleting: (asking: boolean) => void;
 }) {
   const { health } = usePage();
@@ -182,13 +188,22 @@ export function MessageActions({
           </IconButton>
         )
       ) : null}
+      {toned && !mine ? (
+        <IconButton label="How it is read aloud: the feeling of each line" onClick={onTone}>
+          <AudioLines size={14} />
+        </IconButton>
+      ) : null}
       {health.pictures && text ? (
         <IconButton label="Picture this moment" disabled={busy} onClick={onPicture}>
           <ImagePlus size={14} />
         </IconButton>
       ) : null}
       {scenes && text && !refused ? (
-        <IconButton label="The scene: where, who, and how it is said" disabled={busy} onClick={onScene}>
+        <IconButton
+          label="The scene a picture is drawn from: where, who, and how they look"
+          disabled={busy}
+          onClick={onScene}
+        >
           <Clapperboard size={14} />
         </IconButton>
       ) : null}

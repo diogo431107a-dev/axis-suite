@@ -14,7 +14,7 @@ import {
 import { DEFAULT_PROMPTS, PROMPT_LABELS } from "../../shared/prompts.ts";
 import { api } from "../api.ts";
 import { usePage } from "../page.ts";
-import { SettingsForm } from "./SettingsForm.tsx";
+import { SettingsForm, ToneSettings } from "./SettingsForm.tsx";
 import { VoicePicker } from "./VoicePicker.tsx";
 import { Button, Field, inputStyle, Notice } from "../ui/bits.tsx";
 import { useSave } from "../ui/useSave.ts";
@@ -136,9 +136,8 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
                 With memory
                 <span className="mt-0.5 block text-xs text-faint">
                   The memory model keeps what happens across chats; the oldest turns of a long chat slide out into it.
-                  {provider === "xai"
-                    ? " Topics to leave alone. On Grok, pictures are still drawn from the message you choose, and replies are read aloud as written. Nothing it says goes to Claude."
-                    : " Topics to leave alone, the scene, pictures that keep track of the story, and reading with feeling."}
+                  {" Topics to leave alone, and pictures drawn from the scene, which keeps track of the story."}
+                  {provider === "xai" ? " Nothing it says goes to Claude." : ""}
                 </span>
               </span>
             </label>
@@ -147,8 +146,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
               <span>
                 Without memory
                 <span className="mt-0.5 block text-xs text-faint">
-                  Every chat is sent whole each turn, with your pins. Pictures are drawn from the message you choose,
-                  and replies are read aloud as written.
+                  Every chat is sent whole each turn, with your pins. Pictures are drawn from the message you choose.
                   {provider === "xai" ? " Memory can be turned on later." : ""}
                 </span>
               </span>
@@ -195,8 +193,9 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
           onTuning={setVoiceTuning}
           feeling={voiceFeeling}
           onFeeling={setVoiceFeeling}
-          withFeeling={memory && provider === "anthropic"}
-        />
+        >
+          <ToneSettings settings={settings} onChange={setSettings} />
+        </VoicePicker>
       ) : null}
 
       <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">

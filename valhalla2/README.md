@@ -120,28 +120,29 @@ Grok, and so does its memory step, with Grok as the memory model.
 Set in `dev.env` for development and in `deploy/valhalla2.service` on a server. Every one has a
 default.
 
-| Variable                      | Default                                          | What it does                                                      |
-| ----------------------------- | ------------------------------------------------ | ----------------------------------------------------------------- |
-| `CHAT_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion answers with. Each can change it.       |
-| `MEMORY_MODEL`                | `claude-sonnet-5-5`                              | The model a new companion keeps its memory with. Each can change. |
-| `VALHALLA_SWIPE_ASK`          | `5`                                              | Swipes on one reply before asking why they aren't working.        |
-| `VALHALLA_WINDOW_TOKENS`      | `20000`                                          | About how many tokens of a chat are sent each turn.               |
-| `VALHALLA_GROK_WINDOW_TOKENS` | `60000`                                          | The same, for a Grok companion with memory.                       |
-| `VALHALLA_WINDOW_CHUNK`       | `10`                                             | How many exchanges slide out at once when a chat outgrows that.   |
-| `VALHALLA_IDLE_MINUTES`       | `30`                                             | How long a chat is quiet before it is folded into memory.         |
-| `VALHALLA_MEMORY_FILE_KB`     | `8`                                              | The largest a memory file may be.                                 |
-| `VALHALLA_MEMORY_STORY_KB`    | `16`                                             | The largest `story/recent.md` and `story/arcs.md` may be.         |
-| `VALHALLA_MEMORY_FILES`       | `20`                                             | How many memory files a companion may have.                       |
-| `VALHALLA_MEMORY_ITERATIONS`  | `16`                                             | The most requests one run of the memory model may make.           |
-| `VALHALLA_CLEANUP_EVERY`      | `10`                                             | Consolidations between two tidy-ups of a companion's memory.      |
-| `VALHALLA_CLEANUP_DAYS`       | `7`                                              | …or days, if memory changed at all in that time.                  |
-| `VALHALLA_BACKUPS_KEPT`       | `14`                                             | How many daily backups of the database are kept.                  |
-| `PICTURE_MODEL`               | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                 |
-| `PICTURE_PROMPT_MODEL`        | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                         |
-| `SCENE_MODEL`                 | `claude-haiku-5-5`                               | The model that works out a moment's scene and how lines are said. |
-| `VALHALLA_SCENE_TOKENS`       | `12000`                                          | About how much of the chat it reads, up to the moment.            |
-| `SPEECH_REGION`               | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.       |
-| `SPEECH_VOICE`                | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none of its own.           |
+| Variable                      | Default                                          | What it does                                                       |
+| ----------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
+| `CHAT_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion answers with. Each can change it.        |
+| `MEMORY_MODEL`                | `claude-sonnet-5-5`                              | The model a new companion keeps its memory with. Each can change.  |
+| `VALHALLA_SWIPE_ASK`          | `5`                                              | Swipes on one reply before asking why they aren't working.         |
+| `VALHALLA_WINDOW_TOKENS`      | `20000`                                          | About how many tokens of a chat are sent each turn.                |
+| `VALHALLA_GROK_WINDOW_TOKENS` | `60000`                                          | The same, for a Grok companion with memory.                        |
+| `VALHALLA_WINDOW_CHUNK`       | `10`                                             | How many exchanges slide out at once when a chat outgrows that.    |
+| `VALHALLA_IDLE_MINUTES`       | `30`                                             | How long a chat is quiet before it is folded into memory.          |
+| `VALHALLA_MEMORY_FILE_KB`     | `8`                                              | The largest a memory file may be.                                  |
+| `VALHALLA_MEMORY_STORY_KB`    | `16`                                             | The largest `story/recent.md` and `story/arcs.md` may be.          |
+| `VALHALLA_MEMORY_FILES`       | `20`                                             | How many memory files a companion may have.                        |
+| `VALHALLA_MEMORY_ITERATIONS`  | `16`                                             | The most requests one run of the memory model may make.            |
+| `VALHALLA_CLEANUP_EVERY`      | `10`                                             | Consolidations between two tidy-ups of a companion's memory.       |
+| `VALHALLA_CLEANUP_DAYS`       | `7`                                              | …or days, if memory changed at all in that time.                   |
+| `VALHALLA_BACKUPS_KEPT`       | `14`                                             | How many daily backups of the database are kept.                   |
+| `PICTURE_MODEL`               | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                  |
+| `PICTURE_PROMPT_MODEL`        | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                          |
+| `SCENE_MODEL`                 | `claude-haiku-5-5`                               | The model a new companion works out a picture's scene with.        |
+| `TONE_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion works out how lines are said aloud with. |
+| `VALHALLA_SCENE_TOKENS`       | `12000`                                          | About how much of the chat it reads, up to the moment.             |
+| `SPEECH_REGION`               | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.        |
+| `SPEECH_VOICE`                | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none of its own.            |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 

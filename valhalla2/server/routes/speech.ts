@@ -1,13 +1,12 @@
 // Replies read aloud. Asking (POST) reads the reply if it isn't kept yet and says where the audio
 // is; the page then plays that file (GET), which an <audio> element can fetch by itself. A reply is
 // read in its companion's voice, or the server's when it names none, and with the feeling of each
-// line as the scene worked it out, unless the companion reads plainly; at the companion's speed,
-// pitch and speaking style either way. The voices to choose from, and a short sample of one, are
-// here too.
+// line as its tags say (worked out the first time), unless the companion reads plainly; at the
+// companion's speed, pitch and speaking style either way. The voices to choose from, and a short
+// sample of one, are here too.
 import { Router, type Request, type Response } from "express";
 import {
   FEELINGS,
-  hasScenes,
   LIMITS,
   type ApiError,
   type Companion,
@@ -30,6 +29,7 @@ import { sendStored } from "../http/sendStored.ts";
 import type { Services } from "../services.ts";
 import { SpeechError } from "../speech/azure.ts";
 import { charsThisMonth, ownsSpeech } from "../speech/store.ts";
+import { toneRequest } from "../tone/request.ts";
 
 /** Azure's own failures as refusals the page shows, word for word. */
 async function asked<T>(work: () => Promise<T>): Promise<T> {
@@ -45,15 +45,16 @@ export function speechRoutes(s: Services): Router {
   const routes = Router();
 
   /**
-   * How each line of the reply at the end of `path` is said, from its scene. When the scene can't
-   * be read (Claude is unreachable, say), the reply is read plainly rather than not at all.
+   * How each line of the reply at the end of `path` is said: its tags, worked out the first time.
+   * When they can't be (the model is unreachable, say), the reply is read plainly rather than not
+   * at all.
    */
   async function feelingOf(companion: Companion, path: readonly Message[]) {
     const at = path.at(-1)!;
     try {
-      return (await s.scenes.of(at.id, s.moment(companion, path))).sheet.lines;
+      return (await s.tones.of(at.id, toneRequest(companion, path))).lines;
     } catch (err) {
-      console.warn(`Reading message ${at.id} plainly: its scene couldn't be read:`, (err as Error).message);
+      console.warn(`Reading message ${at.id} plainly: its tags couldn't be read:`, (err as Error).message);
       return null;
     }
   }
@@ -69,9 +70,7 @@ export function speechRoutes(s: Services): Router {
     const tree = my.chats.tree(id);
     const message = tree.get(messageId(req.params.messageId));
     const companion = my.companions.get(chat.companionId);
-    // Without a scene (no memory, or Grok) the reply is read as it is written.
-    const feeling = hasScenes(companion) && companion.voiceFeeling;
-    const lines = feeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
+    const lines = companion.voiceFeeling ? await feelingOf(companion, tree.pathTo(message.id)) : null;
     const { file } = await asked(() => read.of(message, companion.voice ?? undefined, lines, companion.voiceTuning));
     res.json({ url: `/api/speech/${file}`, monthChars: charsThisMonth(s.db) } satisfies SpeechReply);
   });

@@ -135,23 +135,42 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
   const body = object(value);
   const chatModel = model(body.model ?? defaults.model);
   const provider = providerOf(chatModel);
-  const asked = body.memoryModel === undefined ? undefined : model(body.memoryModel);
-  const memory =
-    provider === "xai"
-      ? asked !== undefined && providerOf(asked) === "xai"
-        ? asked
-        : chatModel
-      : (asked ?? model(defaults.memoryModel));
-  if (providerOf(memory) !== provider) invalid("The memory model has to be a Claude model");
+  /**
+   * A model besides the chat model (memory, tone, scene). On Grok, one left out or not Grok's is
+   * the chat model; on Claude, one left out is the server's default, and Grok's is refused.
+   */
+  const helper = (value: unknown, fallback: string, what: string): string => {
+    const asked = value === undefined ? undefined : model(value);
+    const chosen =
+      provider === "xai"
+        ? asked !== undefined && providerOf(asked) === "xai"
+          ? asked
+          : chatModel
+        : (asked ?? model(fallback));
+    if (providerOf(chosen) !== provider) invalid(`The ${what} has to be a Claude model`);
+    return chosen;
+  };
+  const effort = (value: unknown, fallback: Effort, what: string): Effort =>
+    oneOf<Effort>(value ?? fallback, EFFORTS, what);
   return {
     model: chatModel,
-    memoryModel: memory,
+    memoryModel: helper(body.memoryModel, defaults.memoryModel, "memory model"),
     maxTokens: whole(body.maxTokens ?? defaults.maxTokens, LIMITS.minTokens, LIMITS.maxTokens, "Reply length"),
-    effort: oneOf<Effort>(body.effort ?? defaults.effort, EFFORTS, "The effort"),
+    effort: effort(body.effort, defaults.effort, "The effort"),
     stopSequences: stopSequences(body.stopSequences),
     cacheTtl: oneOf<CacheTtl>(body.cacheTtl ?? defaults.cacheTtl, CACHE_TTLS, "The cache setting"),
     fallbacks: body.fallbacks === undefined ? defaults.fallbacks : body.fallbacks === true,
     temperature: temperature(body.temperature, provider),
+    toneModel: helper(body.toneModel, defaults.toneModel, "tone model"),
+    toneEffort: effort(body.toneEffort, defaults.toneEffort, "The tone effort"),
+    toneTokens: whole(
+      body.toneTokens ?? defaults.toneTokens,
+      LIMITS.minToneTokens,
+      LIMITS.maxToneTokens,
+      "How much of the chat the tone model reads",
+    ),
+    sceneModel: helper(body.sceneModel, defaults.sceneModel, "scene model"),
+    sceneEffort: effort(body.sceneEffort, defaults.sceneEffort, "The scene effort"),
   };
 }
 

@@ -6,6 +6,7 @@ export * from "./protocol/companions.ts";
 export * from "./protocol/chat.ts";
 export * from "./protocol/memory.ts";
 export * from "./protocol/scene.ts";
+export * from "./protocol/tone.ts";
 export * from "./protocol/pictures.ts";
 export * from "./protocol/speech.ts";
 export * from "./protocol/api.ts";

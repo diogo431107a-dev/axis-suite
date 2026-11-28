@@ -1,6 +1,6 @@
-// A moment worked out: the scene, and how each line of a reply is said. Looking (GET) never asks
-// Claude; reading (POST) uses the kept reading while it holds; reading again asks afresh; and you
-// can correct it (PUT).
+// A moment worked out for a picture of it: the scene. Looking (GET) never asks a model; reading
+// (POST) uses the kept reading while it holds; reading again asks afresh; and you can correct it
+// (PUT).
 import { Router, type Request, type Response } from "express";
 import { id as checkId, messageId } from "../check.ts";
 import { needScenes } from "../companions.ts";
@@ -13,8 +13,7 @@ export function sceneRoutes(s: Services): Router {
   function momentOf(req: Request) {
     const my = s.ownedBy(req);
     const chat = my.chats.get(checkId(req.params.id));
-    // The scene is read by Claude from the memory and much of the chat: only a Claude companion
-    // with memory has one.
+    // The scene is read from the memory and much of the chat: only a companion with memory has one.
     const companion = needScenes(my.companions.get(chat.companionId));
     const tree = my.chats.tree(chat.id);
     const at = messageId(req.params.messageId);

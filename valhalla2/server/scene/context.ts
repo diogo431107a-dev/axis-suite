@@ -1,7 +1,7 @@
-// What Claude reads to understand one moment of a chat: who the companion is, what it remembers,
-// and the chat up to that moment. It is read for a picture's prompt, and to work out the scene and
-// how a reply is said (sheet.ts); it is never sent in the chat itself. Only the words: no thinking
-// and no hidden instructions.
+// What a model reads to understand one moment of a chat: who the companion is, what it remembers,
+// and the chat up to that moment. It is read for a picture's prompt, to work out the scene
+// (sheet.ts), and, without the memory, to say how a reply is read aloud (../tone/); it is never
+// sent in the chat itself. Only the words: no thinking and no hidden instructions.
 import { blockText, type Companion, type Message, type Pin, type SceneSheet } from "../../shared/protocol.ts";
 import { promptOf } from "../../shared/prompts.ts";
 import { tokensOf } from "../memory/history.ts";
@@ -68,9 +68,12 @@ export function renderSheet(sheet: SceneSheet): string {
     `Time: ${sheet.time}`,
     `Weather: ${sheet.weather}`,
     `Light: ${sheet.light}`,
+    `Atmosphere: ${sheet.atmosphere}`,
+    sheet.people.length === 1 ? "In the picture, alone:" : "In the picture:",
     ...sheet.people.map(
       (person) =>
-        `${person.name}: looks ${person.appearance}; wears ${person.clothes}; ${person.action}; ${person.mood}`,
+        `${person.name}: looks ${person.appearance}; wears ${person.clothes}; ${person.action}; ${person.mood}; ` +
+        `shows it as ${person.expression}`,
     ),
   ];
   return `<scene>\n${lines.join("\n")}\n</scene>`;
@@ -122,7 +125,7 @@ export function sceneRequest(
     parts.push(renderSheet(sheet), chatUpTo(companion, scene.path, 0));
     parts.push(
       "Write the prompt for a picture of the moment marked <moment>. The scene above was worked out from the " +
-        "whole chat and the memory: draw the place, the people and their state as it says.",
+        "whole chat and the memory: draw the place, the atmosphere, and exactly the people it lists, as it says.",
     );
   } else {
     parts.push(chatUpTo(companion, scene.path, budget));
