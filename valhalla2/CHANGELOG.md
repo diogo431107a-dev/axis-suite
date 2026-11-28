@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.64 — 2026-11-28
+
 - **OpenAI makes pictures too.** Under **Pictures** on a companion's page, **Made by** now also
   offers OpenAI (its image model, `gpt-image-2.6-flare`), for any companion, Claude, Grok or GPT.
   It runs on the OpenAI key the server already has. Its prompts are plain sentences, written from
