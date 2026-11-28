@@ -11,7 +11,8 @@ import { prepare } from "./chat/turn.ts";
 import { createCompanions, needMemory, needScenes } from "./companions.ts";
 import { openDatabase } from "./db.ts";
 import { StoreError } from "./errors.ts";
-import { grokDraftOf, pictureRequestFor } from "./grok/pictures.ts";
+import { GROK } from "./grok/client.ts";
+import { draftFrom, pictureRequestFor } from "./responses/pictures.ts";
 import { tokensOf, windowWithout } from "./memory/history.ts";
 import { runStep } from "./memory/run.ts";
 import { createScheduler } from "./memory/scheduler.ts";
@@ -505,9 +506,10 @@ describe("a picture without memory", () => {
       ],
       usage: { input_tokens: 100, input_tokens_details: { cached_tokens: 0 }, output_tokens: 50 },
     } as unknown as Response;
-    expect(grokDraftOf(response, "grok-4.7")).toMatchObject({ prompt: "a giant", orientation: "landscape" });
+    expect(draftFrom(GROK, response, "grok-4.7")).toMatchObject({ prompt: "a giant", orientation: "landscape" });
     expect(() =>
-      grokDraftOf(
+      draftFrom(
+        GROK,
         { ...response, status: "incomplete", incomplete_details: { reason: "content_filter" } } as Response,
         "grok-4.7",
       ),

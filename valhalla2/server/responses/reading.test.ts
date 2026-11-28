@@ -5,7 +5,8 @@ import { claudeReadingRequest } from "../claude/reading.ts";
 import { StoreError } from "../errors.ts";
 import type { ReadingAsk } from "../reading.ts";
 import { TONE_SCHEMA } from "../tone/request.ts";
-import { grokReadingOf, grokReadingRequest } from "./reading.ts";
+import { GROK } from "../grok/client.ts";
+import { readingOf, readingRequest } from "./reading.ts";
 
 const ask: ReadingAsk = {
   provider: "xai",
@@ -32,7 +33,7 @@ const response = (over: Partial<Response>): Response =>
 
 describe("a reading on Grok", () => {
   it("sends effort as Grok takes it, the profile first, a cache key, and keeps nothing on xAI", () => {
-    const request = grokReadingRequest(ask);
+    const request = readingRequest(GROK, ask);
     expect(request.model).toBe("grok-4.7");
     expect(request.reasoning).toEqual({ effort: "xhigh" });
     expect(request.store).toBe(false);
@@ -56,7 +57,7 @@ describe("a reading on Grok", () => {
         },
       ] as unknown as Response["output"],
     });
-    expect(grokReadingOf(answered, ask).raw).toEqual({ lines: [] });
+    expect(readingOf(GROK, answered, ask).raw).toEqual({ lines: [] });
     const garbled = response({
       output: [
         {
@@ -68,7 +69,7 @@ describe("a reading on Grok", () => {
         },
       ] as unknown as Response["output"],
     });
-    expect(() => grokReadingOf(garbled, ask)).toThrow(StoreError);
+    expect(() => readingOf(GROK, garbled, ask)).toThrow(StoreError);
   });
 
   it("is never sent for a model of the other API", async () => {

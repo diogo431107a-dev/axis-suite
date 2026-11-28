@@ -1,5 +1,5 @@
 // A picture's prompt as a model writes it: the shape it answers in, and reading the answer. The same
-// for Claude (../claude/pictures.ts) and Grok (../grok/pictures.ts).
+// for Claude (../claude/pictures.ts) and the Responses APIs (../responses/pictures.ts).
 import { LIMITS, ORIENTATIONS, type Orientation, type PictureDraft } from "../../shared/protocol.ts";
 import { StoreError } from "../errors.ts";
 

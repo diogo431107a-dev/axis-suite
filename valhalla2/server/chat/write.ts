@@ -19,12 +19,12 @@ import { contextWindow, countTokens } from "../claude/tokens.ts";
 import { config } from "../config.ts";
 import { invalid, type StoreError } from "../errors.ts";
 import { windowWithout } from "../memory/history.ts";
-import { grokError } from "../grok/client.ts";
-import { runGrokMemoryModel } from "../grok/memory.ts";
-import { writeGrokPicturePrompt } from "../grok/pictures.ts";
-import { readWithGrok } from "../grok/reading.ts";
-import { streamGrokReply } from "../grok/reply.ts";
+import { GROK, grokError } from "../grok/client.ts";
 import { grokContextWindow } from "../grok/tokens.ts";
+import { runResponsesMemory } from "../responses/memory.ts";
+import { writePicturePromptOn } from "../responses/pictures.ts";
+import { readOn } from "../responses/reading.ts";
+import { streamResponsesReply } from "../responses/reply.ts";
 import type { SystemBlock } from "../prompt.ts";
 import type { Reader } from "../reading.ts";
 import type { WindowSize } from "./turn.ts";
@@ -40,12 +40,12 @@ export function providerFor(model: string, provider: Provider = providerOf(model
 /** Writes a reply on the companion's API. */
 export const writeReply: Writer = (system, messages, settings, onEvent, options) =>
   providerFor(settings.model, options?.provider) === "xai"
-    ? streamGrokReply(system, messages, settings, onEvent, options)
+    ? streamResponsesReply(GROK, system, messages, settings, onEvent, options)
     : streamReply(system, messages, settings, onEvent);
 
 /** Runs the memory model on its own API: Claude's for a Claude companion, Grok's for a Grok one. */
 export const runMemoryFor: MemoryRunner = (request) =>
-  providerFor(request.settings.memoryModel) === "xai" ? runGrokMemoryModel(request) : runMemoryModel(request);
+  providerFor(request.settings.memoryModel) === "xai" ? runResponsesMemory(GROK, request) : runMemoryModel(request);
 
 /**
  * Writes a picture's prompt on the companion's API: Claude's picture-prompt model for a Claude
@@ -58,14 +58,14 @@ export function writePictureFor(
   if (companion.provider === "xai") {
     const model = companion.settings.model;
     providerFor(model, "xai");
-    return writeGrokPicturePrompt(request, model);
+    return writePicturePromptOn(GROK, request, model);
   }
   return writePicturePrompt(request, config.pictures.promptModel);
 }
 
 /** A reading (the tags a reply is read aloud with, a scene) on the companion's own API. */
 export const readOnItsApi: Reader = async (ask) =>
-  providerFor(ask.model, ask.provider) === "xai" ? readWithGrok(ask) : readWithClaude(ask);
+  providerFor(ask.model, ask.provider) === "xai" ? readOn(GROK, ask) : readWithClaude(ask);
 
 /**
  * How much of a chat goes out each turn. With memory, the configured window (a larger one on Grok):

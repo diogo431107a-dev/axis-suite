@@ -8,7 +8,8 @@ import { DEFAULT_SETTINGS, type ChatMode } from "../../shared/protocol.ts";
 import { openDatabase } from "../db.ts";
 import { createMemory } from "../memory/store.ts";
 import { memoryTool } from "../memory/tool.ts";
-import { MEMORY_FUNCTION, memoryRequestFor, runGrokMemoryModel, type ResponsesCall } from "./memory.ts";
+import { GROK } from "../grok/client.ts";
+import { MEMORY_FUNCTION, memoryRequestFor, runResponsesMemory, type ResponsesCall } from "./memory.ts";
 
 const LIMITS = { fileBytes: 8192, storyBytes: 16384, files: 20, viewChars: 16_000 };
 const settings = { ...DEFAULT_SETTINGS, model: "grok-4.7", memoryModel: "grok-4.7" };
@@ -116,7 +117,7 @@ describe("a memory run on Grok", () => {
       ]),
       answer([]),
     );
-    const result = await runGrokMemoryModel(request, xai.call);
+    const result = await runResponsesMemory(GROK, request, xai.call);
     expect(result).toMatchObject({ stopReason: "end_turn", text: "Added her sister." });
     expect(memory.read("comp-0001", "user.md")?.content).toContain("- Has a sister, Hild.");
     expect(xai.asked).toHaveLength(2);
@@ -153,7 +154,7 @@ describe("a memory run on Grok", () => {
       ]),
       answer([]),
     );
-    const result = await runGrokMemoryModel(request, xai.call);
+    const result = await runResponsesMemory(GROK, request, xai.call);
     expect(result.stopReason).toBe("end_turn");
     // The one-shot lock holds on Grok exactly as on Claude.
     expect(memory.read("comp-0001", "world.md")?.content).toBe(before);
@@ -171,7 +172,7 @@ describe("a memory run on Grok", () => {
     const { request } = setup("canon", 2);
     const view = { command: "view", path: "/memories" };
     const xai = scripted(answer([view]), answer([view]), answer([]));
-    const result = await runGrokMemoryModel(request, xai.call);
+    const result = await runResponsesMemory(GROK, request, xai.call);
     expect(result.stopReason).toBe("tool_use");
     expect(xai.asked).toHaveLength(2);
     expect(result.attempts).toHaveLength(2);
@@ -182,7 +183,7 @@ describe("a memory run on Grok", () => {
     const xai = scripted(
       answer([], { status: "incomplete", incomplete_details: { reason: "content_filter" } }, "Can't help with that."),
     );
-    const result = await runGrokMemoryModel(request, xai.call);
+    const result = await runResponsesMemory(GROK, request, xai.call);
     expect(result.stopReason).toBe("refusal");
     expect(result.stopDetails?.category).toBe("content_filter");
   });
@@ -190,7 +191,7 @@ describe("a memory run on Grok", () => {
   it("counts every request, with the cached tokens kept apart", async () => {
     const { request } = setup();
     const xai = scripted(answer([{ command: "view", path: "/memories" }]), answer([]));
-    const result = await runGrokMemoryModel(request, xai.call);
+    const result = await runResponsesMemory(GROK, request, xai.call);
     expect(result.attempts).toEqual([
       expect.objectContaining({
         model: "grok-4.7",
