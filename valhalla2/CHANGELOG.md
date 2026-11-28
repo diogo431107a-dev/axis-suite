@@ -32,6 +32,9 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 - **By hand:** only if you rewrote a companion's **Scene reading instructions** or **Picture
   instructions**: they keep your words, so the pose, the view and the shorter prompts reach that
   companion only after **Back to the default** (or after you copy the new rules in).
+- Groundwork, with nothing to notice yet: pictures and reading aloud now go through an "engine",
+  CivitAI and Azure today, so Grok's and OpenAI's images and Grok's voice can be added later for any
+  companion. Each picture and each reading remembers which engine made it.
 
 ## 0.0.48 — 2026-11-28
 

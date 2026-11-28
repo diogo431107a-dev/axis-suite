@@ -1,5 +1,5 @@
-// Replies read aloud. A reply is read by Azure the first time it is asked for, and the MP3 is kept
-// as a file (in its own folder, see files.ts), so playing it again
+// Replies read aloud. A reply is read by the voice engine (engine.ts: Azure) the first time it is
+// asked for, and the audio is kept as a file (in its own folder, see files.ts), so playing it again
 // is instant and costs nothing. An edited reply, or another voice, is read again, and the old
 // audio is deleted. Each companion may have its own voice; one that names none is read in the
 // server's. A reply is read with the feeling of each line when its tags have been worked out
@@ -22,28 +22,28 @@ import { STATE_DIR, transaction } from "../db.ts";
 import { invalid, notFound } from "../errors.ts";
 import type { FileStore } from "../files.ts";
 import { linesOf } from "../scene/lines.ts";
-import type { AzureSpeech } from "./azure.ts";
-import { directedSsml } from "./direct.ts";
-import { spokenText, ssmlOf } from "./text.ts";
+import type { VoiceEngine } from "./engine.ts";
+import { spokenText } from "./text.ts";
 
 /** Next to the database, as an absolute path, which sendFile needs. */
 export const SPEECH_DIR = resolve(STATE_DIR, "speech");
 
-/** What a kept audio file is called: `<message id>-<16 hex>.mp3`. */
-export const SPEECH_FILE = /^[0-9]{1,15}-[0-9a-f]{16}\.mp3$/;
+/** What a kept audio file is called: `<message id>-<16 hex>.<the engine's ending>`. */
+export const SPEECH_FILE = /^[0-9]{1,15}-[0-9a-f]{16}\.(mp3|ogg|wav)$/;
 
 /** This month, as `speech_usage` keys it. */
 const monthOf = (when: Date): string => when.toISOString().slice(0, 7);
 
 export interface Spoken {
   file: string;
-  /** Characters Azure read for it; 0 when it was already kept. */
+  /** Characters the engine read for it; 0 when it was already kept. */
   read: number;
 }
 
 export interface SpeechOptions {
   db: DatabaseSync;
-  azure: AzureSpeech;
+  /** What reads the replies: Azure. */
+  engine: VoiceEngine;
   files: FileStore;
   /** The voice a reply is read in when its companion names none. */
   voice: string;
@@ -54,13 +54,13 @@ const VOICES_MS = 24 * 60 * 60_000;
 /** How many tried voices are kept in memory, so trying the same one again costs nothing. */
 const SAMPLES_KEPT = 20;
 
-export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOptions) {
+export function createSpeech({ db, engine, files, voice: serverVoice }: SpeechOptions) {
   /** Readings under way, so asking twice for the same one pays once. */
   const underway = new Map<string, Promise<Spoken>>();
   let voiceList: { at: number; voices: Promise<Voice[]> } | null = null;
   const samples = new Map<string, Promise<Uint8Array>>();
 
-  /** Adds what Azure was asked to read to this month's count. */
+  /** Adds what the engine was asked to read to this month's count. */
   const count = (chars: number) =>
     db
       .prepare(
@@ -69,7 +69,7 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       )
       .run(monthOf(new Date()), chars);
 
-  /** The voice's own styles, from Azure's list; none when the list can't be had. */
+  /** The voice's own styles, from the engine's list; none when the list can't be had. */
   async function stylesOf(voice: string): Promise<string[]> {
     try {
       return (await voices()).find((one) => one.id === voice)?.styles ?? [];
@@ -78,10 +78,10 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
     }
   }
 
-  /** Every voice Azure offers, asked once a day. A failed ask is tried again next time. */
+  /** Every voice the engine offers, asked once a day. A failed ask is tried again next time. */
   function voices(): Promise<Voice[]> {
     if (!voiceList || Date.now() - voiceList.at > VOICES_MS) {
-      const asked = azure.voices();
+      const asked = engine.voices();
       voiceList = { at: Date.now(), voices: asked };
       asked.catch(() => {
         if (voiceList?.voices === asked) voiceList = null;
@@ -91,27 +91,38 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
   }
 
   /**
-   * The SSML for `lines` in `voice`: each said its way, or the words plainly when no line has a way;
+   * The audio of `lines` in `voice`: each said its way, or the words plainly when no line has a way;
    * at the tuning's speed and pitch, and in its style if the voice has that style.
    */
-  async function ssmlFor(
+  async function audioFor(
     voice: string,
     lines: readonly ToneLine[] | null,
     text: string,
     tuning: VoiceTuning,
-  ): Promise<string> {
+  ): Promise<Uint8Array> {
     const styles = lines || tuning.style ? await stylesOf(voice) : [];
     const fit = tuning.style && !styles.includes(tuning.style) ? { ...tuning, style: null } : tuning;
-    return lines ? directedSsml(lines, voice, styles, fit) : ssmlOf(text, voice, fit);
+    return engine.read({ voice, text, lines, tuning: fit, styles });
   }
+
+  /**
+   * What the hash adds for the engine: nothing for Azure, which read everything kept before engines
+   * had names, so that audio stays.
+   */
+  const engineTag = engine.id === "azure" ? "" : `${engine.id}\n`;
 
   /** What the hash adds for a tuning; nothing for the voice as it comes, so audio kept before stays. */
   const tuned = (tuning: VoiceTuning): string =>
     isDefaultTuning(tuning) ? "" : `\n${JSON.stringify([tuning.rate, tuning.pitch, tuning.style])}`;
 
-  async function read(message: Message, voice: string, ssml: string, chars: number, hash: string): Promise<Spoken> {
-    const audio = await azure.synthesize(ssml);
-    const file = files.write(`${message.id}-${hash.slice(0, 16)}`, "mp3", audio);
+  async function read(
+    message: Message,
+    voice: string,
+    audio: Uint8Array,
+    chars: number,
+    hash: string,
+  ): Promise<Spoken> {
+    const file = files.write(`${message.id}-${hash.slice(0, 16)}`, engine.format.ext, audio);
     let replaced: string[];
     try {
       replaced = transaction(db, () => {
@@ -119,14 +130,14 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
           file: string;
         }[];
         db.prepare(
-          `INSERT INTO speech (message_id, voice, text_hash, file, bytes, chars, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?)`,
-        ).run(message.id, voice, hash, file, audio.length, chars, new Date().toISOString());
+          `INSERT INTO speech (message_id, voice, text_hash, file, bytes, chars, created_at, engine)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        ).run(message.id, voice, hash, file, audio.length, chars, new Date().toISOString(), engine.id);
         count(chars);
         return old.map((row) => row.file).filter((name) => name !== file);
       });
     } catch (err) {
-      // The message was deleted with its chat while Azure was reading it.
+      // The message was deleted with its chat while the engine was reading it.
       files.remove(file);
       if (String((err as Error).message).includes("FOREIGN KEY")) notFound("message");
       throw err;
@@ -137,6 +148,8 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
 
   return {
     voice: serverVoice,
+    /** What the engine's audio is, to serve a sample as. */
+    format: engine.format,
 
     /**
      * The kept audio of a reply, read now in `voice` if it isn't kept yet: with `lines`, each said
@@ -155,7 +168,7 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       if (!text) invalid("This reply has nothing to read aloud");
       const how = lines ? `\n${JSON.stringify(lines.map((line) => [line.text, line.feeling, line.strength]))}` : "";
       const hash = createHash("sha256")
-        .update(`${voice}\n${text}${how}${tuned(tuning)}`)
+        .update(`${engineTag}${voice}\n${text}${how}${tuned(tuning)}`)
         .digest("hex");
 
       const kept = db
@@ -167,8 +180,8 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       let reading = underway.get(key);
       if (!reading) {
         const chars = lines ? lines.reduce((sum, line) => sum + [...line.text].length, 0) : [...text].length;
-        reading = ssmlFor(voice, lines, text, tuning)
-          .then((ssml) => read(message, voice, ssml, chars, hash))
+        reading = audioFor(voice, lines, text, tuning)
+          .then((audio) => read(message, voice, audio, chars, hash))
           .finally(() => underway.delete(key));
         underway.set(key, reading);
       }
@@ -192,17 +205,15 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
       const spoken = spokenText(text);
       if (!spoken) invalid("Write something for the voice to read");
       const key = createHash("sha256")
-        .update(`${voice}\n${feeling ?? ""}\n${spoken}${tuned(tuning)}`)
+        .update(`${engineTag}${voice}\n${feeling ?? ""}\n${spoken}${tuned(tuning)}`)
         .digest("hex");
       let audio = samples.get(key);
       if (!audio) {
         const lines = feeling ? linesOf(text).map((line) => ({ ...line, feeling, strength: 2 as const })) : null;
-        audio = ssmlFor(voice, lines, spoken, tuning)
-          .then((ssml) => azure.synthesize(ssml))
-          .then((bytes) => {
-            count([...spoken].length);
-            return bytes;
-          });
+        audio = audioFor(voice, lines, spoken, tuning).then((bytes) => {
+          count([...spoken].length);
+          return bytes;
+        });
         audio.catch(() => samples.delete(key));
         samples.set(key, audio);
         while (samples.size > SAMPLES_KEPT) samples.delete(samples.keys().next().value!);
@@ -214,7 +225,7 @@ export function createSpeech({ db, azure, files, voice: serverVoice }: SpeechOpt
 
 export type Speech = ReturnType<typeof createSpeech>;
 
-/** How many characters Azure was asked to read this month, for everyone. */
+/** How many characters the engine was asked to read this month, for everyone. */
 export function charsThisMonth(db: DatabaseSync, now: Date = new Date()): number {
   const row = db.prepare("SELECT chars FROM speech_usage WHERE month = ?").get(monthOf(now)) as
     { chars: number } | undefined;

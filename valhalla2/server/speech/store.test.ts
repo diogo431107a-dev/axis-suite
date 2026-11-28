@@ -10,6 +10,7 @@ import { StoreError } from "../errors.ts";
 import { createFileStore } from "../files.ts";
 import { linesOf } from "../scene/lines.ts";
 import type { AzureSpeech } from "./azure.ts";
+import { azureVoice } from "./engine.ts";
 import {
   charsThisMonth,
   createSpeech,
@@ -61,7 +62,17 @@ function setup(voice = "en-US-AvaMultilingualNeural") {
       return [VOICE];
     },
   };
-  return { db, chats, tree, hello, mine, dir, files, read, speech: createSpeech({ db, azure, files, voice }) };
+  return {
+    db,
+    chats,
+    tree,
+    hello,
+    mine,
+    dir,
+    files,
+    read,
+    speech: createSpeech({ db, engine: azureVoice(azure), files, voice }),
+  };
 }
 
 describe("reading aloud", () => {
@@ -104,7 +115,7 @@ describe("reading aloud", () => {
     const kept = await first.speech.of(first.tree.get(first.hello.id));
     const other = createSpeech({
       db: first.db,
-      azure: { synthesize: async () => MP3, voices: async () => [] },
+      engine: azureVoice({ synthesize: async () => MP3, voices: async () => [] }),
       files: first.files,
       voice: "pt-BR-FranciscaNeural",
     });
@@ -181,11 +192,39 @@ describe("reading aloud", () => {
     await expect(speech.of(tree.get(hello.id))).rejects.toThrow(/nothing to read/);
   });
 
+  it("keeps another engine's audio apart, in its own format", async () => {
+    const { db, tree, hello, files, speech } = setup();
+    const azure = await speech.of(tree.get(hello.id));
+    const asked: unknown[] = [];
+    const other = createSpeech({
+      db,
+      engine: {
+        id: "other",
+        format: { ext: "ogg", type: "audio/ogg" },
+        voices: async () => [],
+        read: async (reading) => {
+          asked.push(reading);
+          return MP3;
+        },
+      },
+      files,
+      voice: "en-US-AvaMultilingualNeural",
+    });
+    const read = await other.of(tree.get(hello.id), "en-US-AvaMultilingualNeural");
+    expect(read.file).toMatch(/\.ogg$/);
+    expect(read.file).not.toBe(azure.file);
+    expect(asked).toEqual([
+      expect.objectContaining({ voice: "en-US-AvaMultilingualNeural", text: "Waves. Hello.", lines: null }),
+    ]);
+    expect(db.prepare("SELECT engine FROM speech WHERE file = ?").get(read.file)).toEqual({ engine: "other" });
+    expect(other.format.type).toBe("audio/ogg");
+  });
+
   it("keeps nothing when Azure fails", async () => {
     const { db, tree, hello, dir, files } = setup();
     const failing = createSpeech({
       db,
-      azure: { synthesize: () => Promise.reject(new Error("down")), voices: async () => [] },
+      engine: azureVoice({ synthesize: () => Promise.reject(new Error("down")), voices: async () => [] }),
       files,
       voice: "v",
     });

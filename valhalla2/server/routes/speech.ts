@@ -28,6 +28,7 @@ import { invalid, StoreError } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import type { Services } from "../services.ts";
 import { SpeechError } from "../speech/azure.ts";
+import { AUDIO_TYPES } from "../speech/engine.ts";
 import { charsThisMonth, ownsSpeech } from "../speech/store.ts";
 import { toneRequest } from "../tone/request.ts";
 
@@ -81,7 +82,7 @@ export function speechRoutes(s: Services): Router {
     if (!ownsSpeech(s.db, s.ownedBy(req).username, file)) {
       return void res.status(404).json({ error: "No such audio" } satisfies ApiError);
     }
-    sendStored(res, s.speechFiles.path(file), "No such audio", "audio/mpeg");
+    sendStored(res, s.speechFiles.path(file), "No such audio", AUDIO_TYPES[file.split(".").pop() ?? ""]);
   });
 
   /** The voices a companion can be read aloud in. */
@@ -92,7 +93,7 @@ export function speechRoutes(s: Services): Router {
 
   /**
    * `{ voice, text, feeling?, tuning? }` read aloud, to hear a voice (at a speed, pitch and style)
-   * before choosing it. Answers with the MP3.
+   * before choosing it. Answers with the audio.
    */
   routes.post("/voices/sample", async (req: Request, res: Response) => {
     const read = needSpeech();
@@ -105,7 +106,7 @@ export function speechRoutes(s: Services): Router {
         : oneOf<Feeling>(body.feeling, FEELINGS, "The feeling");
     const tuning = checkTuning(body.tuning);
     const audio = await asked(() => read.sample(voice, text, feeling, tuning));
-    res.type("audio/mpeg").send(Buffer.from(audio));
+    res.type(read.format.type).send(Buffer.from(audio));
   });
 
   return routes;

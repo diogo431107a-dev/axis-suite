@@ -5,6 +5,9 @@
 // are separate, so a picture the server was stopped in the middle of can be picked up again from
 // the workflow's id.
 
+import { DEFAULT_SETTINGS } from "../../shared/protocol.ts";
+import { EngineError, type PictureEngine, type PictureOrder } from "./engine.ts";
+
 const API = "https://orchestration.civitai.com/v2/consumer/workflows";
 
 /** One picture to make. */
@@ -29,7 +32,7 @@ export interface Workflow {
 }
 
 /** A picture that CivitAI refused, failed to make, or took too long over. */
-export class CivitaiError extends Error {}
+export class CivitaiError extends EngineError {}
 
 const FINISHED = new Set(["succeeded", "failed", "expired", "canceled"]);
 
@@ -151,3 +154,30 @@ export function createCivitai(options: CivitaiOptions) {
 }
 
 export type Civitai = ReturnType<typeof createCivitai>;
+
+/**
+ * The CivitAI job for a kept picture. One asked for before the sampler and clip skip could be
+ * chosen gets what a new companion starts with.
+ */
+export function jobFor({ prompt, negativePrompt, params }: PictureOrder): PictureJob {
+  const { sampler, clipSkip, ...rest } = params;
+  return {
+    prompt,
+    negativePrompt,
+    ...rest,
+    sampleMethod: sampler ?? DEFAULT_SETTINGS.pictureSampler,
+    clipSkip: clipSkip ?? DEFAULT_SETTINGS.pictureClipSkip,
+  };
+}
+
+/** CivitAI as a picture engine: SDXL checkpoints, which read Danbooru tags. */
+export function civitaiEngine(civitai: Civitai): PictureEngine {
+  return {
+    id: "civitai",
+    promptStyle: "tags",
+    submit: (order) => civitai.submit(jobFor(order)),
+    // A job it answered is a workflow; the painter only ever hands back what submit gave it.
+    finish: (job) => civitai.finish(typeof job === "string" ? job : (job as Workflow)),
+    download: (url) => civitai.download(url),
+  };
+}

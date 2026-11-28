@@ -360,6 +360,15 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       ALTER TABLE swipe_feedback ADD COLUMN off_record INTEGER NOT NULL DEFAULT 0; -- the same, for a reason you gave
     `);
   },
+  // v14: which engine made each picture and read each reply (pictures/engine.ts, speech/engine.ts),
+  // so another can be added later without taking one's work for the other's. Everything so far was
+  // CivitAI's and Azure's.
+  (db) => {
+    db.exec(`
+      ALTER TABLE pictures ADD COLUMN engine TEXT NOT NULL DEFAULT 'civitai';
+      ALTER TABLE speech ADD COLUMN engine TEXT NOT NULL DEFAULT 'azure';
+    `);
+  },
 ];
 
 /**
