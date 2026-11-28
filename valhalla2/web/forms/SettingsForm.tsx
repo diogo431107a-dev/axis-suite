@@ -196,11 +196,8 @@ export function SettingsForm({
   };
 
   return (
-    <section className="space-y-4 rounded border border-rule bg-sheet/50 p-4">
-      <div>
-        <h2 className="font-display text-lg">Settings</h2>
-        {note ? <p className="mt-1 text-xs text-faint">{note}</p> : null}
-      </div>
+    <div className="space-y-4">
+      {note ? <p className="text-xs text-faint">{note}</p> : null}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <ModelField
@@ -375,6 +372,6 @@ export function SettingsForm({
           </span>
         </label>
       )}
-    </section>
+    </div>
   );
 }

@@ -11,6 +11,11 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
   for a new one. Whatever seed a picture is made with becomes the companion's, so the next picture
   starts from it and pictures stay alike. Each picture shows its steps, CFG, sampler, clip skip and
   seed.
+- **The companion page is one page of folding sections**: Profile (open), Model and memory,
+  Pictures, Voice and Valhalla 2's own words, each with a one-line summary of what is inside. Each of
+  Valhalla 2's own texts folds on its own, marked when it is your own words. The text boxes grow with
+  what you write (the profile starts at most of the window), the page is wider, and Save stays at
+  the bottom of the window.
 
 ## 0.0.48 — 2026-11-28
 

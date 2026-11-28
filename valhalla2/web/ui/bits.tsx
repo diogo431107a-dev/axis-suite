@@ -1,5 +1,5 @@
-// The handful of shapes every view uses: a button, a field, a notice, a dialog, an icon button and
-// a speech bubble.
+// The handful of shapes every view uses: a button, a field, a notice, a dialog, an icon button, a
+// speech bubble and a fold.
 import { useEffect, useRef, type ReactNode } from "react";
 
 const base =
@@ -123,5 +123,35 @@ export function IconButton({
     >
       {children}
     </button>
+  );
+}
+
+/**
+ * A section that folds: its title and a one-line hint of what is inside, always shown; the rest
+ * when it is open. Opening one leaves the others as they are.
+ */
+export function Fold({
+  title,
+  hint,
+  open,
+  children,
+}: {
+  title: string;
+  hint?: ReactNode;
+  /** Open when first shown. */
+  open?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <details open={open} className="group rounded border border-rule bg-sheet/50">
+      <summary className="flex cursor-pointer flex-wrap items-baseline gap-x-3 gap-y-0.5 px-4 py-3 select-none">
+        <span className="font-display text-lg">
+          <span className="mr-2 inline-block text-faint transition-transform group-open:rotate-90">›</span>
+          {title}
+        </span>
+        {hint ? <span className="text-xs text-faint">{hint}</span> : null}
+      </summary>
+      <div className="space-y-4 px-4 pb-4">{children}</div>
+    </details>
   );
 }
