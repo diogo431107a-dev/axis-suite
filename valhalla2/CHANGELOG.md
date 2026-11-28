@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.58 — 2026-11-28
+
 - **Grok Imagine makes pictures too.** Under **Pictures** on a companion's page, **Made by** chooses
   CivitAI or Grok Imagine (xAI's image model) for any companion, Claude or Grok. It runs on the xAI
   key the server already has. Its prompts are plain sentences in an anime illustration style,

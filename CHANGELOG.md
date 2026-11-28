@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.241 — 2026-11-28
+
+Valhalla 2 0.0.58: Grok Imagine makes pictures too, beside CivitAI, for any companion, on the xAI key the server already has. Each companion chooses under Pictures (Made by); Grok Imagine's prompts are plain sentences in an anime style, from their own Picture instructions, with Quality and Size settings, no seed and no negative prompt, and each picture shows what it cost (about 4¢). Every companion stays on CivitAI until changed. Nothing by hand.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.33  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.58  |
+
 ## 0.0.239 — 2026-11-28
 
 Valhalla 2 0.0.56: Grok's voices for reading aloud, beside Azure's, for any companion, on the xAI key the server already has. A Grok voice reads feelings with Grok's own tags (whispered, soft, loud, slower, higher…) and takes only a speed, and the tone model may add a sound before a line (a sigh, a chuckle, a pause), correctable in the tags dialog. Companions on Azure voices read as before. The count under the composer names the engine, and each is counted apart. Nothing by hand.
