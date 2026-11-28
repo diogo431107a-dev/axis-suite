@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.54 — 2026-11-28
+
 - **Picture settings for each companion.** Under **Pictures** on a companion's page: steps, CFG,
   sampler and clip skip. A new companion, and every one you have, starts at 20 steps (pictures were
   made at 30 before, so they are a little quicker and cheaper now), CFG 7, Euler a and clip skip 2.
