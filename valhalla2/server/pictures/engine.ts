@@ -1,16 +1,16 @@
-// What makes a picture: CivitAI or Grok Imagine (xAI's image model).
+// What makes a picture: CivitAI, Grok Imagine (xAI's image model) or OpenAI's image model.
 //
 // The painter (painter.ts) asks for a picture and keeps it. An engine either answers with a job to
 // wait for (CivitAI: its id is kept so a picture the server stopped in the middle of can be picked
 // up again, then the painter waits and downloads it), or with the picture itself (Grok Imagine,
-// which makes it within the one request). What differs most between engines is the prompt, and
+// which makes it within the one request, as OpenAI's does). What differs most between engines is the prompt, and
 // each engine says which of the companion's picture instructions write it (shared/prompts.ts):
-// CivitAI's SDXL checkpoints read Danbooru tags ("picture"), Grok Imagine plain sentences
-// ("grokPicture").
+// CivitAI's SDXL checkpoints read Danbooru tags ("picture"), Grok Imagine and OpenAI plain
+// sentences ("grokPicture", "openaiPicture").
 import type { PictureEngineId, PictureParams, PromptKey } from "../../shared/protocol.ts";
 
 /** The companion's instructions an engine's prompts are written from. */
-export type PicturePrompt = Extract<PromptKey, "picture" | "grokPicture">;
+export type PicturePrompt = Extract<PromptKey, "picture" | "grokPicture" | "openaiPicture">;
 
 /** One picture to make, as it is kept: its prompt and what it is made with. */
 export interface PictureOrder {

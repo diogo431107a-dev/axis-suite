@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Copy, ImagePlus, Maximize2, Trash2 } from "lucide-react";
 import {
   isGrokParams,
+  isOpenAiParams,
   PICTURE_ENGINE_LABELS,
   samplerLabel,
   type Picture,
@@ -11,9 +12,13 @@ import {
 import { Button, Dialog } from "./bits.tsx";
 import { fileOf } from "./watch.ts";
 
-/** A picture's shape, as CSS takes it: 832 / 1216 for CivitAI, 2 / 3 for Grok Imagine. */
+/** A picture's shape, as CSS takes it: 832 / 1216 for CivitAI, 2 / 3 for Grok Imagine, 1024 / 1536 for OpenAI. */
 const shapeOf = (params: PictureParams): string =>
-  isGrokParams(params) ? params.aspectRatio.replace(":", " / ") : `${params.width} / ${params.height}`;
+  isGrokParams(params)
+    ? params.aspectRatio.replace(":", " / ")
+    : isOpenAiParams(params)
+      ? params.size.replace("x", " / ")
+      : `${params.width} / ${params.height}`;
 
 /** What a picture cost, as the page shows it: 4.0¢. */
 const cents = (dollars: number): string => `${(dollars * 100).toFixed(1)}¢`;
@@ -21,9 +26,12 @@ const cents = (dollars: number): string => `${(dollars * 100).toFixed(1)}¢`;
 /** How a picture was made, in one line after its date. */
 function madeWith(picture: Picture): string {
   const { params } = picture;
+  const cost = picture.cost === null ? "" : ` · ${cents(picture.cost)}`;
   if (isGrokParams(params)) {
-    const cost = picture.cost === null ? "" : ` · ${cents(picture.cost)}`;
     return ` · ${PICTURE_ENGINE_LABELS.grok} · ${params.aspectRatio} · ${params.resolution} · ${params.quality} quality${cost}`;
+  }
+  if (isOpenAiParams(params)) {
+    return ` · ${PICTURE_ENGINE_LABELS.openai} · ${params.size.replace("x", "×")} · ${params.quality} quality${cost}`;
   }
   return [
     ` · ${params.width}×${params.height} · ${params.steps} steps · CFG ${params.cfgScale}`,

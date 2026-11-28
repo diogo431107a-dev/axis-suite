@@ -53,6 +53,8 @@ export const config = {
     promptModel: modelFrom("PICTURE_PROMPT_MODEL", "claude-sonnet-5-5"),
     /** The xAI image model a companion on Grok Imagine makes its pictures with. */
     grokModel: modelFrom("GROK_PICTURE_MODEL", "grok-imagine-image-2.0"),
+    /** The OpenAI image model a companion on OpenAI makes its pictures with. */
+    openaiModel: modelFrom("OPENAI_PICTURE_MODEL", "gpt-image-2.6-flare"),
   },
   scene: {
     /** About how many tokens of the chat, up to the moment, the scene model reads to understand it. */

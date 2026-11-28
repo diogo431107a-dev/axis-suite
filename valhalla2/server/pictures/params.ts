@@ -2,6 +2,7 @@
 // companion's, for the shape asked for. Kept with the picture, so it can be made again as it was.
 import {
   GROK_ASPECT,
+  OPENAI_SIZES,
   PICTURE_SIZES,
   type Orientation,
   type PictureEngineId,
@@ -25,6 +26,13 @@ export function paramsFor(
         aspectRatio: GROK_ASPECT[orientation],
         resolution: settings.grokPictureResolution,
         quality: settings.grokPictureQuality,
+      };
+    case "openai":
+      return {
+        engine: "openai",
+        model: config.pictures.openaiModel,
+        size: OPENAI_SIZES[orientation],
+        quality: settings.openaiPictureQuality,
       };
     case "civitai":
       if (seed === null) throw new Error("A CivitAI picture needs a seed");

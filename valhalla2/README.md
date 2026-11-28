@@ -29,7 +29,8 @@ everything a GPT companion asks goes to `api.openai.com`, on the server's OpenAI
 else. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
 pays in Buzz, or, for a companion that chose Grok Imagine, by xAI's image model (`api.x.ai`) on the
-server's xAI key. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
+server's xAI key, or, for one that chose OpenAI, by OpenAI's image model (`api.openai.com`) on the
+server's OpenAI key. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
 the server's Azure key, or, for a companion that chose one of Grok's voices, by xAI's text to speech
 (`api.x.ai`) on the server's xAI key.
 
@@ -58,8 +59,8 @@ default. See [Chats](docs/chats.md#what-valhalla-2-adds-to-a-request).
   through OpenAI's on GPT, with or without memory; a Grok or GPT one can have memory turned on
   later. They never mix: a Grok companion's memory is kept by Grok, a GPT one's by GPT. See
   [providers](docs/providers.md).
-- **Pictures and reading aloud.** A picture of any moment, or of the companion, made by CivitAI or
-  Grok Imagine;
+- **Pictures and reading aloud.** A picture of any moment, or of the companion, made by CivitAI,
+  Grok Imagine or OpenAI;
   replies read aloud by Azure AI Speech or in one of Grok's voices, each line with its feeling. See
   [Scenes, pictures and reading aloud](docs/scenes-pictures-speech.md).
 - **When the API declines a turn**, the refusal is kept and shown, and another model can answer
@@ -153,6 +154,7 @@ default.
 | `PICTURE_MODEL`                 | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                  |
 | `PICTURE_PROMPT_MODEL`          | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                          |
 | `GROK_PICTURE_MODEL`            | `grok-imagine-image-2.0`                         | The xAI image model a companion on Grok Imagine makes pictures on. |
+| `OPENAI_PICTURE_MODEL`          | `gpt-image-2.6-flare`                            | The OpenAI image model a companion on OpenAI makes pictures on.    |
 | `SCENE_MODEL`                   | `claude-haiku-5-5`                               | The model a new companion works out a picture's scene with.        |
 | `TONE_MODEL`                    | `claude-haiku-5-5`                               | The model a new companion works out how lines are said aloud with. |
 | `VALHALLA_SCENE_TOKENS`         | `12000`                                          | About how much of the chat it reads, up to the moment.             |

@@ -4,6 +4,15 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **OpenAI makes pictures too.** Under **Pictures** on a companion's page, **Made by** now also
+  offers OpenAI (its image model, `gpt-image-2.6-flare`), for any companion, Claude, Grok or GPT.
+  It runs on the OpenAI key the server already has. Its prompts are plain sentences, written from
+  their own **Picture instructions (OpenAI)**, and its one setting is **Quality** (low, medium,
+  high or auto), medium to start; the size follows the picture's shape. Like Grok Imagine it has no
+  seed and no negative prompt, so the picture dialog hides them. A picture costs about 5¢ at medium,
+  and its exact cost is shown under it in the gallery. Every companion stays on its engine until
+  you choose otherwise. No step by hand: the OpenAI key is already set up.
+
 - **Companions on GPT.** A new companion can now answer on OpenAI's GPT models, alongside Claude
   and Grok. The picker offers GPT-6 Luna first, then GPT-6.1 Terra, GPT-6.2 Sol and GPT-6.2 Astra,
   for chat and for memory (any other `gpt-` model can be typed in by hand). As with Grok, it is chosen when the

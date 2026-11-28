@@ -211,6 +211,22 @@ describe("pictures", () => {
     });
   });
 
+  it("OpenAI was making when the server stopped fail the same way", () => {
+    const { db, pictures, files } = setup();
+    const params = {
+      engine: "openai" as const,
+      model: "gpt-image-2.6-flare",
+      size: "1024x1536",
+      quality: "medium" as const,
+    };
+    pictures.create(newPicture("pic-00001", { engine: "openai", params }));
+    createPainter({ db, engines: { grok: grokImagineEngine(grokImagine()) }, files }).resume();
+    expect(pictures.get("pic-00001")).toMatchObject({
+      status: "failed",
+      error: expect.stringMatching(/while OpenAI was making/),
+    });
+  });
+
   it("go to each engine only with its own parameters", async () => {
     expect(() => jobFor({ prompt: "p", negativePrompt: "", params: grokParams })).toThrow(/not CivitAI/);
     await expect(grokImagineEngine(grokImagine()).submit({ prompt: "p", negativePrompt: "", params })).rejects.toThrow(

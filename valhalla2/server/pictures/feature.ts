@@ -1,16 +1,18 @@
 // Pictures, as the server starts: their folder, swept of files nothing refers to, and the engines
-// that make them: CivitAI when the server has a key for it, Grok Imagine when it has an xAI key.
-// Without either the files stay viewable and nothing new is made.
+// that make them: CivitAI when the server has a key for it, Grok Imagine when it has an xAI key,
+// OpenAI when it has an OpenAI key. Without any the files stay viewable and nothing new is made.
 import { resolve } from "node:path";
 import type { DatabaseSync } from "node:sqlite";
 import type { PictureEngineId } from "../../shared/protocol.ts";
 import { STATE_DIR } from "../db.ts";
 import { createFileStore, type FileStore } from "../files.ts";
 import { loadXaiKey } from "../grok/key.ts";
+import { loadOpenAiKey } from "../openai/key.ts";
 import { civitaiEngine, createCivitai } from "./civitai.ts";
 import type { PictureEngine } from "./engine.ts";
 import { createGrokImagine, grokImagineEngine } from "./grok.ts";
 import { loadCivitaiKey } from "./key.ts";
+import { createOpenAiImages, openAiImagesEngine } from "./openai.ts";
 import { createPainter } from "./painter.ts";
 import { knownFiles } from "./store.ts";
 
@@ -19,7 +21,7 @@ export const PICTURES_DIR = resolve(STATE_DIR, "pictures");
 
 export interface PicturesFeature {
   files: FileStore;
-  /** Makes pictures in the background; null when the server has neither a CivitAI nor an xAI key. */
+  /** Makes pictures in the background; null when the server has no CivitAI, xAI or OpenAI key. */
   painter: ReturnType<typeof createPainter> | null;
 }
 
@@ -30,9 +32,11 @@ export function startPictures(db: DatabaseSync): PicturesFeature {
 
   const civitaiKey = loadCivitaiKey();
   const xaiKey = loadXaiKey();
+  const openaiKey = loadOpenAiKey();
   const engines: Partial<Record<PictureEngineId, PictureEngine>> = {};
   if (civitaiKey) engines.civitai = civitaiEngine(createCivitai({ token: civitaiKey.token }));
   if (xaiKey) engines.grok = grokImagineEngine(createGrokImagine({ apiKey: xaiKey.apiKey }));
+  if (openaiKey) engines.openai = openAiImagesEngine(createOpenAiImages({ apiKey: openaiKey.apiKey }));
 
   const painter = Object.keys(engines).length > 0 ? createPainter({ db, engines, files }) : null;
   const said = [
@@ -40,11 +44,12 @@ export function startPictures(db: DatabaseSync): PicturesFeature {
       ? `CivitAI (key from ${civitaiKey.from === "credential" ? "the systemd credential" : "CIVITAI_API_KEY"})`
       : "",
     xaiKey ? `Grok Imagine (key from ${xaiKey.from === "credential" ? "the systemd credential" : "XAI_API_KEY"})` : "",
+    openaiKey
+      ? `OpenAI (key from ${openaiKey.from === "credential" ? "the systemd credential" : "OPENAI_API_KEY"})`
+      : "",
   ].filter(Boolean);
   console.log(
-    painter
-      ? `Pictures: ${PICTURES_DIR}, made by ${said.join(" and ")}`
-      : "Pictures: off, no CivitAI key and no xAI key",
+    painter ? `Pictures: ${PICTURES_DIR}, made by ${said.join(", ")}` : "Pictures: off, no CivitAI, xAI or OpenAI key",
   );
   if (painter) {
     const resumed = painter.resume();

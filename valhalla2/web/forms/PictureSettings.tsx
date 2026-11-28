@@ -1,22 +1,25 @@
 // What makes this companion's pictures, and how: on CivitAI, steps, CFG, sampler, clip skip, and the
-// seed the next picture starts from; on Grok Imagine, the quality and the size. Shown when the
-// server can make pictures; the engine can be chosen when it has keys for both.
+// seed the next picture starts from; on Grok Imagine, the quality and the size; on OpenAI, the
+// quality. Shown when the server can make pictures; the engine can be chosen when it has keys for
+// more than one.
 import { Dices } from "lucide-react";
 import {
   GROK_QUALITIES,
   GROK_RESOLUTIONS,
   LIMITS,
+  OPENAI_QUALITIES,
   PICTURE_ENGINE_LABELS,
   pictureEngineOf,
   SAMPLERS,
   type GrokQuality,
   type GrokResolution,
+  type OpenAiQuality,
   type PictureEngineId,
   type Sampler,
   type Settings,
 } from "../../shared/protocol.ts";
 import { Field, inputStyle } from "../ui/bits.tsx";
-import { grokPriceNote } from "../ui/pictureEngine.ts";
+import { grokPriceNote, OPENAI_PRICE_NOTE } from "../ui/pictureEngine.ts";
 import { rollSeed, seedFrom } from "../ui/seed.ts";
 
 /** The seed field with its dice, for here and for the picture dialog. */
@@ -61,6 +64,13 @@ const QUALITY_LABELS: Readonly<Record<GrokQuality, string>> = {
   medium: "Medium",
 };
 
+const OPENAI_QUALITY_LABELS: Readonly<Record<OpenAiQuality, string>> = {
+  low: "Low",
+  medium: "Medium",
+  high: "High",
+  auto: "Auto (OpenAI's choice)",
+};
+
 export function PictureSettings({
   settings,
   onChange,
@@ -77,7 +87,7 @@ export function PictureSettings({
     available.length > 1 ? (
       <Field
         label="Made by"
-        hint="CivitAI draws from Danbooru tags on an anime SDXL checkpoint; Grok Imagine (xAI) draws from plain sentences. Each has its own picture instructions."
+        hint="CivitAI draws from Danbooru tags on an anime SDXL checkpoint; Grok Imagine (xAI) and OpenAI draw from plain sentences. Each has its own picture instructions."
       >
         <select
           className={inputStyle}
@@ -92,6 +102,33 @@ export function PictureSettings({
         </select>
       </Field>
     ) : null;
+
+  if (engine === "openai") {
+    const quality = settings.openaiPictureQuality;
+    return (
+      <div className="grid gap-4 sm:grid-cols-2">
+        {choice}
+        <Field label="Quality" hint="Higher is finer and slower; OpenAI bills a picture by what it takes to make it.">
+          <select
+            className={inputStyle}
+            value={quality}
+            onChange={(e) => set("openaiPictureQuality", e.target.value as OpenAiQuality)}
+          >
+            {OPENAI_QUALITIES.map((value) => (
+              <option key={value} value={value}>
+                {OPENAI_QUALITY_LABELS[value]}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <p className="text-sm text-faint sm:col-span-2">
+          At this quality a picture costs {OPENAI_PRICE_NOTE[quality]} on the server&apos;s OpenAI account; the exact
+          cost is shown under each one. Its size follows the picture&apos;s shape. OpenAI has no seed: every picture is
+          drawn afresh, so the profile&apos;s description is what keeps the companion looking alike.
+        </p>
+      </div>
+    );
+  }
 
   if (engine === "grok") {
     return (

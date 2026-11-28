@@ -31,7 +31,7 @@ export function pictureRoutes(s: Services): Router {
   /** The painter, and the engine this companion's pictures are made by; or a refusal without one. */
   function needPictures(companion: Companion) {
     const painter =
-      s.painter ?? invalid("This Valhalla 2 has no CivitAI key and no xAI key, so it can't make pictures");
+      s.painter ?? invalid("This Valhalla 2 has no CivitAI, xAI or OpenAI key, so it can't make pictures");
     const id = pictureEngineOf(companion.settings.pictureEngine, painter.available);
     const engine = id ? painter.engines[id] : undefined;
     return engine ? { painter, engine } : invalid("This Valhalla 2 can't make pictures");

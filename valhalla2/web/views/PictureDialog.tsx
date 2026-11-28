@@ -1,5 +1,6 @@
-// Asking for a picture: the companion's own API (Claude or Grok) writes the prompt, you look it over
-// and change what you like, and only then does its picture engine (CivitAI or Grok Imagine) make it. With scenes (a companion with
+// Asking for a picture: the companion's own API (Claude, Grok or GPT) writes the prompt, you look it
+// over and change what you like, and only then does its picture engine (CivitAI, Grok Imagine or
+// OpenAI) make it. With scenes (a companion with
 // memory), a chat picture is drawn from the moment as its scene model worked it out, which you can
 // correct before writing the prompt again; without, from the message itself.
 import { useCallback, useEffect, useState } from "react";
@@ -20,7 +21,7 @@ import {
 } from "../../shared/protocol.ts";
 import { api, describeError } from "../api.ts";
 import { SeedInput } from "../forms/PictureSettings.tsx";
-import { grokPriceNote } from "../ui/pictureEngine.ts";
+import { grokPriceNote, OPENAI_PRICE_NOTE } from "../ui/pictureEngine.ts";
 import { rollSeed } from "../ui/seed.ts";
 import { usePage } from "../page.ts";
 import { Button, Dialog, Field, inputStyle, Notice } from "../ui/bits.tsx";
@@ -56,7 +57,8 @@ export function PictureDialog({
   /** What makes this picture: the companion's engine, or the one the server has. */
   const engine = pictureEngineOf(companion.settings.pictureEngine, health.pictureEngines) ?? "civitai";
   const engineName = PICTURE_ENGINE_LABELS[engine];
-  const grok = engine === "grok";
+  /** Only CivitAI takes a negative prompt and a seed. */
+  const civitai = engine === "civitai";
   const [draft, setDraft] = useState<PictureDraft | null>(start ?? null);
   /** The seed this picture is made with: the companion's, or a fresh roll. It becomes the companion's. */
   const [seed, setSeed] = useState<number | null>(() => companion.settings.pictureSeed ?? rollSeed());
@@ -110,7 +112,7 @@ export function PictureDialog({
     try {
       const picture = await api<Picture>(base, {
         method: "POST",
-        body: { kind, chatId, messageId, ...draft, ...(seed === null || grok ? {} : { seed }) },
+        body: { kind, chatId, messageId, ...draft, ...(seed === null || !civitai ? {} : { seed }) },
       });
       onMade(picture);
       onClose();
@@ -149,7 +151,7 @@ export function PictureDialog({
                 onChange={(e) => change({ prompt: e.target.value })}
               />
             </Field>
-            {grok ? null : (
+            {civitai ? (
               <Field label="Leave out" hint="The negative prompt: what the picture should not have.">
                 <textarea
                   className={`${inputStyle} min-h-14 resize-y font-mono text-xs leading-relaxed`}
@@ -159,7 +161,7 @@ export function PictureDialog({
                   onChange={(e) => change({ negativePrompt: e.target.value })}
                 />
               </Field>
-            )}
+            ) : null}
             <div className="flex flex-wrap items-end gap-4">
               <fieldset className="flex gap-3 text-sm">
                 <legend className="mb-1 text-sm font-medium">Shape</legend>
@@ -175,12 +177,12 @@ export function PictureDialog({
                   </label>
                 ))}
               </fieldset>
-              {grok ? null : (
+              {civitai ? (
                 <label className="w-56">
                   <span className="mb-1 block text-sm font-medium">Seed</span>
                   <SeedInput value={seed} onChange={setSeed} placeholder="A new one" disabled={writing} />
                 </label>
-              )}
+              ) : null}
               <label className="min-w-48 flex-1">
                 <span className="mb-1 block text-sm font-medium">Caption</span>
                 <input
@@ -270,9 +272,11 @@ export function PictureDialog({
             Cancel
           </Button>
           <span className="text-xs text-faint">
-            {grok
+            {engine === "grok"
               ? `xAI charges ${grokPriceNote()} for each picture, even one it refuses.`
-              : "CivitAI charges Buzz for each picture."}
+              : engine === "openai"
+                ? `OpenAI charges ${OPENAI_PRICE_NOTE[companion.settings.openaiPictureQuality]} for each picture.`
+                : "CivitAI charges Buzz for each picture."}
           </span>
         </div>
       </div>
