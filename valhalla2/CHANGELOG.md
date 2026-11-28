@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.56 — 2026-11-28
+
 - **Grok's voices for reading aloud.** Under **Voice** on a companion's page, Grok's voices (Eve,
   Ara, Rex, Leo, Sal and the rest) are listed first, beside Azure's, for any companion, Claude or
   Grok. They read on the xAI key the server already has, and read any language. A Grok voice reads
