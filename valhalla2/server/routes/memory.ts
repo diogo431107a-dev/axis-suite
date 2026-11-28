@@ -50,14 +50,14 @@ export function memoryRoutes(s: Services): Router {
   });
 
   /**
-   * Turns memory on for a Grok companion without it: its memory is built from every chat, which
+   * Turns memory on for a Grok or GPT companion without it: its memory is built from every chat, which
    * can take minutes, so this answers at once and the page watches the runs come in. Memory is on
    * only once that has worked; if it fails, the companion stays as it was.
    */
   routes.post("/companions/:id/memory/enable", (req: Request, res: Response) => {
     const companion = s.companionOf(req);
     if (companion.memory) invalid("This companion already has memory");
-    if (companion.provider !== "xai") invalid("Only a Grok companion can have memory turned on later");
+    if (companion.provider === "anthropic") invalid("A Claude companion can't have memory turned on later");
     s.scheduler.enableMemory(companion.id).then(
       (outcome) => {
         if (outcome.kind === "failed")

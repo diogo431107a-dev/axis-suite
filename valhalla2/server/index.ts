@@ -3,6 +3,7 @@
 import express from "express";
 import { keySource } from "./claude/client.ts";
 import { grokKeySource } from "./grok/client.ts";
+import { openAiKeySource } from "./openai/client.ts";
 import { DB_FILE, openDatabase } from "./db.ts";
 import { apiNotFound, onError } from "./http/errors.ts";
 import { chatRoutes } from "./routes/chats.ts";
@@ -23,6 +24,7 @@ const db = openDatabase(DB_FILE);
 console.log(`Everyone's companions, chats and memory: ${DB_FILE}`);
 console.log(`Claude API key: ${keySource()}`);
 console.log(`xAI API key: ${grokKeySource()}`);
+console.log(`OpenAI API key: ${openAiKeySource()}`);
 
 const services = createServices(db);
 

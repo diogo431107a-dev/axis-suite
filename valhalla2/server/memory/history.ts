@@ -17,7 +17,7 @@ export function tokensOf(message: Message): number {
 
 /**
  * The most a request of a companion without memory may send: xAI bills a prompt of 200K tokens or
- * more at twice the rate, all of it, so a chat slides before it gets there. Claude companions
+ * more at twice the rate, all of it, so a chat slides before it gets there. Claude and GPT companions
  * without memory keep to it too, so the rule is the same for every companion without memory.
  */
 export const LIMIT_WITHOUT_MEMORY = 200_000;

@@ -1,5 +1,6 @@
-// "Turn memory on", for a Grok companion made without memory. Its memory is built from every chat
-// it has had, by Grok, and memory is on only once that has worked. It can't be turned off again.
+// "Turn memory on", for a Grok or GPT companion made without memory. Its memory is built from every
+// chat it has had, by its own memory model, and memory is on only once that has worked. It can't be
+// turned off again.
 import { useState } from "react";
 import { Brain } from "lucide-react";
 import type { Companion, MemoryPage } from "../../../shared/protocol.ts";

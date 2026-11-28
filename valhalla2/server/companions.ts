@@ -2,14 +2,16 @@
 //
 // A companion is a name for the list, one profile text box the model reads as written (the user
 // persona goes inside it), its settings, its own versions of Valhalla 2's prompt texts, and the
-// voice its replies are read aloud in. Two things are chosen once, when it is created, and never
-// change: the API it talks to (Claude or Grok), and whether it has memory. Nothing a Grok companion
-// says goes to Anthropic, and nothing a Claude one says goes to xAI.
+// voice its replies are read aloud in. Two things are chosen when it is created: the API it talks
+// to (Claude, Grok or GPT), which never changes, and whether it has memory (which a Grok or GPT
+// companion can turn on later). Nothing a companion says goes to any API but its own.
 import type { DatabaseSync } from "node:sqlite";
 import {
   LIMITS,
-  grokReadingDefaults,
+  ownReadingDefaults,
   hasScenes,
+  PROVIDER_NAMES,
+  PROVIDERS,
   providerOf,
   type Companion,
   type Provider,
@@ -48,13 +50,13 @@ interface Row {
 /**
  * A companion's settings as kept. One saved before a setting existed has none of it, and gets what
  * a new one on its API would start with: no temperature, and its tone and scene read at low effort,
- * by the server's models on Claude and by its own chat model on Grok.
+ * by the server's models on Claude and by its own chat model on Grok or GPT.
  */
 function settingsOf(row: Row): Settings {
   const kept = JSON.parse(row.settings) as Partial<Settings> & Pick<Settings, "model">;
   const readings =
-    row.provider === "xai"
-      ? grokReadingDefaults(kept.model)
+    providerOfRow(row) !== "anthropic"
+      ? ownReadingDefaults(kept.model)
       : {
           toneModel: config.defaults.toneModel,
           toneEffort: config.defaults.toneEffort,
@@ -64,12 +66,16 @@ function settingsOf(row: Row): Settings {
   return { ...config.defaults, temperature: null, ...readings, ...kept };
 }
 
+/** The API a companion talks to, as kept. Rows from before there was a choice are Claude's. */
+const providerOfRow = (row: Row): Provider =>
+  (PROVIDERS as readonly string[]).includes(row.provider) ? (row.provider as Provider) : "anthropic";
+
 export const companionOf = (row: Row): Companion => ({
   id: row.id,
   name: row.name,
   profile: row.profile,
   settings: settingsOf(row),
-  provider: row.provider === "xai" ? "xai" : "anthropic",
+  provider: providerOfRow(row),
   memory: row.memory === 1,
   prompts: JSON.parse(row.prompts) as Companion["prompts"],
   voice: row.voice,
@@ -100,8 +106,6 @@ const COLUMNS = NAMES.join(", ");
 /** The columns companionOf() reads, each prefixed with a table alias, for a query that joins. */
 export const companionColumns = (alias: string): string => NAMES.map((name) => `${alias}.${name}`).join(", ");
 
-const PROVIDER_NAMES: Record<Provider, string> = { anthropic: "Claude", xai: "Grok" };
-
 /** One person's companions. `defaults` fills in settings a request leaves out. */
 export function createCompanions(db: DatabaseSync, owner: string, defaults: Settings) {
   function get(id: string): Companion {
@@ -130,13 +134,13 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
         { owner: string; provider: Provider; memory: number } | undefined;
       if (existing && existing.owner !== owner) notFound("companion");
 
-      // Claude or Grok, and memory or not: taken from a new companion, and held to on every change.
+      // Claude, Grok or GPT, and memory or not: taken from a new companion, and held to on every change.
       // The API is checked first, so a model of the other one is refused for what it is.
       const otherApi = (model: unknown, provider: Provider) => {
         if (typeof model === "string" && providerOf(model) !== provider) {
           invalid(
             `This companion talks to ${PROVIDER_NAMES[provider]}, so it can't use ${model}. ` +
-              "Claude or Grok is chosen when a companion is created.",
+              "Claude, Grok or GPT is chosen when a companion is created.",
           );
         }
       };
@@ -153,8 +157,8 @@ export function createCompanions(db: DatabaseSync, owner: string, defaults: Sett
       const tuning = checkTuning(fields.voiceTuning);
       const now = new Date().toISOString();
       const asked = fields.memory === undefined ? undefined : fields.memory === true;
-      // On unless said otherwise, for Claude and Grok alike. Once made, it changes only one way:
-      // a Grok companion without memory can have it turned on (memory/rebuild.ts), never off.
+      // On unless said otherwise, on every API alike. Once made, it changes only one way: a Grok or
+      // GPT companion without memory can have it turned on (memory/rebuild.ts), never off.
       const memory = existing ? existing.memory === 1 : asked !== false;
       if (existing && asked !== undefined && asked !== memory) {
         invalid("Whether a companion has memory is chosen when it is created, and can't be changed here");

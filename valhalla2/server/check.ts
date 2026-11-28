@@ -9,6 +9,7 @@ import {
   LIMITS,
   PICTURE_ENGINES,
   PROMPT_KEYS,
+  PROVIDER_NAMES,
   providerOf,
   SAMPLER_IDS,
   type Sampler,
@@ -69,11 +70,11 @@ export function model(value: unknown): string {
 
 /**
  * A temperature for a Grok companion: from 0 to 1 in steps of 0.05, or null for Grok's own default.
- * Grok samples at most at 1, so nothing above it is offered. Claude's models take none at all.
+ * Grok samples at most at 1, so nothing above it is offered. Claude's and GPT's models take none.
  */
 export function temperature(value: unknown, provider: Provider): number | null {
   if (value === undefined || value === null) return null;
-  if (provider !== "xai") invalid("Claude's models don't take a temperature");
+  if (provider !== "xai") invalid(`${PROVIDER_NAMES[provider]}'s models don't take a temperature`);
   if (typeof value !== "number" || !Number.isFinite(value) || value < 0 || value > 1) {
     invalid("The temperature has to be between 0 and 1");
   }
@@ -135,9 +136,9 @@ export function rowId(value: unknown, what: string): number {
 }
 
 /**
- * Settings from the page, anything left out taken from `defaults`. Both models are on the same API.
- * A Grok companion's memory model is a Grok model: the one it names, or else its chat model (the
- * defaults name a Claude one, and a Grok companion may have been saved before it had memory).
+ * Settings from the page, anything left out taken from `defaults`. Every model is on the same API.
+ * A Grok or GPT companion's memory model is one of its own API's: the one it names, or else its
+ * chat model (the defaults name a Claude one, and it may have been saved before it had memory).
  */
 export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS): Settings {
   if (value === undefined || value === null) return { ...defaults };
@@ -145,18 +146,19 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
   const chatModel = model(body.model ?? defaults.model);
   const provider = providerOf(chatModel);
   /**
-   * A model besides the chat model (memory, tone, scene). On Grok, one left out or not Grok's is
-   * the chat model; on Claude, one left out is the server's default, and Grok's is refused.
+   * A model besides the chat model (memory, tone, scene). On Grok or GPT, one left out or of
+   * another API is the chat model; on Claude, one left out is the server's default, and one of
+   * another API is refused.
    */
   const helper = (value: unknown, fallback: string, what: string): string => {
     const asked = value === undefined ? undefined : model(value);
     const chosen =
-      provider === "xai"
-        ? asked !== undefined && providerOf(asked) === "xai"
+      provider !== "anthropic"
+        ? asked !== undefined && providerOf(asked) === provider
           ? asked
           : chatModel
         : (asked ?? model(fallback));
-    if (providerOf(chosen) !== provider) invalid(`The ${what} has to be a Claude model`);
+    if (providerOf(chosen) !== provider) invalid(`The ${what} has to be a ${PROVIDER_NAMES[provider]} model`);
     return chosen;
   };
   const effort = (value: unknown, fallback: Effort, what: string): Effort =>

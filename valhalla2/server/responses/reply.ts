@@ -25,7 +25,7 @@ import { blockText, type ContentBlock, type Settings, type StreamEvent } from ".
 import type { Reply, WriteOptions } from "../claude/reply.ts";
 import { StoreError } from "../errors.ts";
 import type { SystemBlock } from "../prompt.ts";
-import type { ResponsesApi } from "./api.ts";
+import { apiErrorOf, type ResponsesApi } from "./api.ts";
 
 const textOf = (content: Anthropic.Beta.BetaMessageParam["content"]): string =>
   typeof content === "string" ? content : (content as unknown as ContentBlock[]).map(blockText).join("");
@@ -190,7 +190,9 @@ export function replyOf(response: Response, asked: string): Reply {
 
 /**
  * Asks the API for the next reply and reports it as it is written. Resolves with what to store —
- * including a declined reply, which is an answer, not a failure.
+ * including a declined reply, which is an answer, not a failure. A failure of the API is refused
+ * with its own vendor's name: Grok's and OpenAI's errors are the same SDK's, and can't be told
+ * apart later.
  */
 export async function streamResponsesReply(
   api: ResponsesApi,
@@ -199,6 +201,21 @@ export async function streamResponsesReply(
   settings: Settings,
   onEvent: (event: StreamEvent) => void,
   options: WriteOptions = {},
+): Promise<Reply> {
+  try {
+    return await streamed(api, system, messages, settings, onEvent, options);
+  } catch (err) {
+    throw apiErrorOf(api.vendor, err) ?? err;
+  }
+}
+
+async function streamed(
+  api: ResponsesApi,
+  system: SystemBlock[],
+  messages: Anthropic.Beta.BetaMessageParam[],
+  settings: Settings,
+  onEvent: (event: StreamEvent) => void,
+  options: WriteOptions,
 ): Promise<Reply> {
   const stream = await api.client().responses.create(requestFor(api, system, messages, settings, options.cacheKey));
   const watch = stopWatch(settings.stopSequences);

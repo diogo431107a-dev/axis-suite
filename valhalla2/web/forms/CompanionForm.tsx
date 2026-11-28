@@ -8,6 +8,7 @@ import {
   LIMITS,
   MODELS,
   PROMPT_KEYS,
+  PROVIDER_NAMES,
   providerOf,
   type Companion,
   type PictureEngineId,
@@ -203,9 +204,11 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
 
       {companion ? (
         <p className="-mt-2 text-sm text-faint">
-          {companion.provider === "xai" ? "Grok" : "Claude"} · {companion.memory ? "with memory" : "without memory"}.
-          Both were chosen when it was created
-          {companion.provider === "xai" && !companion.memory ? "; memory can be turned on from its Pins page." : "."}
+          {PROVIDER_NAMES[companion.provider]} · {companion.memory ? "with memory" : "without memory"}. Both were chosen
+          when it was created
+          {companion.provider !== "anthropic" && !companion.memory
+            ? "; memory can be turned on from its Pins page."
+            : "."}
         </p>
       ) : null}
 
@@ -243,7 +246,8 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
             <div>
               <h3 className="text-sm font-medium">Memory</h3>
               <p className="mt-0.5 text-xs text-faint">
-                Chosen now, with the model below: a companion can't change it, or move between Claude and Grok, later.
+                Chosen now, with the model below: a companion can't change it, or move between Claude, Grok and GPT,
+                later.
               </p>
             </div>
             <div className="space-y-2 text-sm">
@@ -254,7 +258,9 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
                   <span className="mt-0.5 block text-xs text-faint">
                     The memory model keeps what happens across chats; the oldest turns of a long chat slide out into it.
                     {" Topics to leave alone, and pictures drawn from the scene, which keeps track of the story."}
-                    {provider === "xai" ? " Nothing it says goes to Claude." : ""}
+                    {provider !== "anthropic"
+                      ? ` Nothing it says goes to any API but ${PROVIDER_NAMES[provider]}'s.`
+                      : ""}
                   </span>
                 </span>
               </label>
@@ -264,7 +270,7 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
                   Without memory
                   <span className="mt-0.5 block text-xs text-faint">
                     Every chat is sent whole each turn, with your pins. Pictures are drawn from the message you choose.
-                    {provider === "xai" ? " Memory can be turned on later." : ""}
+                    {provider !== "anthropic" ? " Memory can be turned on later." : ""}
                   </span>
                 </span>
               </label>

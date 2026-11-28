@@ -2,7 +2,7 @@
   "name": "valhalla2",
   "version": "0.0.58",
   "private": true,
-  "description": "Valhalla 2 — companions you define, through the Claude API",
+  "description": "Valhalla 2 — companions you define, on Claude, Grok or GPT",
   "type": "module",
   "engines": {
     "node": ">=24.11"

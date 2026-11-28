@@ -146,6 +146,61 @@ describe("Claude or Grok, with or without memory", () => {
   });
 });
 
+describe("GPT companions", () => {
+  const gpt = { ...DEFAULT_SETTINGS, model: "gpt-6-luna" };
+
+  it("are kept as GPT's, read back as GPT's, with every helper model their own", () => {
+    const { companions } = setup();
+    expect(companions.save("comp-0001", { name: "Beowulf", settings: gpt })).toMatchObject({
+      provider: "openai",
+      memory: true,
+      settings: {
+        model: "gpt-6-luna",
+        memoryModel: "gpt-6-luna",
+        toneModel: "gpt-6-luna",
+        sceneModel: "gpt-6-luna",
+        temperature: null,
+      },
+    });
+    expect(companions.get("comp-0001").provider).toBe("openai");
+    expect(companions.list().map((companion) => companion.provider)).toEqual(["openai"]);
+  });
+
+  it("stay on GPT, and take no temperature", () => {
+    const { companions } = setup();
+    companions.save("comp-0001", { name: "Beowulf", settings: gpt });
+    expect(() => companions.save("comp-0001", { name: "Beowulf", settings: { model: "grok-4.7" } })).toThrow(
+      /talks to GPT/,
+    );
+    expect(() => companions.save("comp-0001", { name: "Beowulf", settings: { model: "claude-opus-5-5" } })).toThrow(
+      /talks to GPT/,
+    );
+    expect(() => companions.save("comp-0001", { name: "Beowulf", settings: { ...gpt, temperature: 0.4 } })).toThrow(
+      /GPT's models don't take a temperature/,
+    );
+    // A Claude companion can't move to GPT either.
+    companions.save("comp-0002", { name: "Hrothgar" });
+    expect(() => companions.save("comp-0002", { name: "Hrothgar", settings: gpt })).toThrow(/talks to Claude/);
+  });
+
+  it("get the larger window with memory, as on Grok", async () => {
+    const { companions } = setup();
+    const gptWith = companions.save("comp-0001", { name: "Beowulf", settings: gpt, memory: true });
+    expect(await chatWindow(gptWith)).toEqual({ tokens: config.openaiWindowTokens, chunk: config.windowChunk });
+    const gptWithout = companions.save("comp-0002", { name: "Beowulf", settings: gpt, memory: false });
+    expect(await chatWindow(gptWithout)).toEqual({
+      ...windowWithout(1_050_000, gpt.maxTokens),
+      chunk: config.windowChunk,
+    });
+  });
+
+  it("have scenes with memory, read on GPT", () => {
+    const { companions } = setup();
+    const gptWith = companions.save("comp-0001", { name: "Beowulf", settings: gpt, memory: true });
+    expect(needScenes(gptWith)).toBe(gptWith);
+  });
+});
+
 describe("companions from before the choice existed", () => {
   const made: string[] = [];
   afterEach(() => {

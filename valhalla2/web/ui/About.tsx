@@ -27,7 +27,7 @@ export function About() {
             <p className="text-xs text-faint">Development: these are the numbers of the last release.</p>
           ) : null}
           <p className="text-faint">
-            Companions you define, through the Claude API. You write the personality, the appearance and the behavior;
+            Companions you define, on Claude, Grok or GPT. You write the personality, the appearance and the behavior;
             Valhalla 2 sends them with every message and adds no words, no checks and no warnings of its own. What the
             model says is what you get.
           </p>

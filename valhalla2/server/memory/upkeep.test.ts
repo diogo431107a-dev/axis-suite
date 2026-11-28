@@ -227,7 +227,30 @@ describe("rebuilding from every chat", () => {
     expect(memory.files(companion.id)).toEqual([]);
   });
 
-  it("turns memory on only for a Grok companion without it", async () => {
+  it("turns memory on for a GPT companion without it, on its own memory model", async () => {
+    const { db, chats, memory } = setup();
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    const gpt = { ...DEFAULT_SETTINGS, model: "gpt-6-luna" };
+    const companion = companions.save("comp-0002", { name: "Beowulf", settings: gpt, memory: false });
+    chats.create({ id: "chat-0001", companionId: companion.id });
+    put(chats.tree("chat-0001"), null, "assistant", "I crossed the sea.");
+    const model = scriptedModel(() => [note("Came over the sea.")]);
+    const scheduler = createScheduler({
+      db,
+      memory,
+      limits: LIMITS,
+      run: model.run,
+      maxIterations: 8,
+      idleMinutes: 30,
+      cleanup: { every: 10, days: 7 },
+      partTokens: 20_000,
+    });
+    expect(await scheduler.enableMemory(companion.id)).toMatchObject({ kind: "done" });
+    expect(model.asked[0]!.settings.memoryModel).toBe("gpt-6-luna");
+    expect(companions.get(companion.id).memory).toBe(true);
+  });
+
+  it("turns memory on only for a Grok or GPT companion without it", async () => {
     const { db, companion, memory } = setup();
     const scheduler = createScheduler({
       db,
@@ -242,7 +265,7 @@ describe("rebuilding from every chat", () => {
     expect(await scheduler.enableMemory(companion.id)).toMatchObject({ kind: "nothing" });
     const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
     const claude = companions.save("comp-0003", { name: "Beowulf", memory: false });
-    expect(await scheduler.enableMemory(claude.id)).toMatchObject({ kind: "nothing", reason: /Only a Grok/ });
+    expect(await scheduler.enableMemory(claude.id)).toMatchObject({ kind: "nothing", reason: /A Claude companion/ });
     expect(companions.get(claude.id).memory).toBe(false);
   });
 

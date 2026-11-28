@@ -1,7 +1,7 @@
 # Valhalla 2
 
-Companions you define, through the Claude API or the xAI API on Grok, who remember — or, created
-that way, who don't.
+Companions you define, through the Claude API, the xAI API on Grok or the OpenAI API on GPT, who
+remember — or, created that way, who don't.
 
 It began as a fork of Valhalla, an earlier companions module that was compared with it and then
 retired from the suite (2026-11-25). Nothing of Valhalla's was carried over.
@@ -14,17 +14,19 @@ you like, and any message can be edited, deleted, branched from, copied or pinne
 It has no login of its own: it uses the sessions of [Heimdall](../heimdall/README.md), and whoever is
 signed in there sees their own companions and chats and nobody else's.
 
-|          |                                                                                       |
-| -------- | ------------------------------------------------------------------------------------- |
-| Frontend | React 19, Vite 8, Tailwind 4                                                          |
-| Backend  | Express 5, the Claude API through `@anthropic-ai/sdk`, xAI's through `openai`         |
-| Data     | SQLite (`node:sqlite`): `/var/lib/valhalla2/valhalla2.db` on a server, `data/` in dev |
-| Sign-in  | Heimdall, through `@axis-suite/heimdall-client`                                       |
-| Address  | `https://valhalla2.<domain>`; https://localhost:8458 in WSL; port 5188 in `pnpm dev`  |
+|          |                                                                                            |
+| -------- | ------------------------------------------------------------------------------------------ |
+| Frontend | React 19, Vite 8, Tailwind 4                                                               |
+| Backend  | Express 5, the Claude API through `@anthropic-ai/sdk`, xAI's and OpenAI's through `openai` |
+| Data     | SQLite (`node:sqlite`): `/var/lib/valhalla2/valhalla2.db` on a server, `data/` in dev      |
+| Sign-in  | Heimdall, through `@axis-suite/heimdall-client`                                            |
+| Address  | `https://valhalla2.<domain>`; https://localhost:8458 in WSL; port 5188 in `pnpm dev`       |
 
 Like Fafnir, Valhalla 2 calls outside the suite: every message goes to
 `api.anthropic.com`, on the server's API key, which whoever runs the suite pays for; everything a
-Grok companion asks goes to `api.x.ai` instead, on the server's xAI key, and never to Anthropic. Pictures, when
+Grok companion asks goes to `api.x.ai` instead, on the server's xAI key, and never to Anthropic;
+everything a GPT companion asks goes to `api.openai.com`, on the server's OpenAI key, and nowhere
+else. Pictures, when
 you ask for one, are made by CivitAI (`orchestration.civitai.com`) on the server's CivitAI key, which
 pays in Buzz, or, for a companion that chose Grok Imagine, by xAI's image model (`api.x.ai`) on the
 server's xAI key. Replies read aloud are read by Azure AI Speech (`<region>.tts.speech.microsoft.com`) on
@@ -52,9 +54,10 @@ default. See [Chats](docs/chats.md#what-valhalla-2-adds-to-a-request).
   second model keeps up to date after each chat, which every chat reads whole. You can read, edit
   and put back the files, pin exact words, and list topics to leave alone, on the companion's
   **Memory** page. See [How memory works](docs/memory.md).
-- **Claude or Grok.** A companion answers through the Claude API or through xAI's on Grok, with or
-  without memory; a Grok one can have memory turned on later. The two never mix: a Grok companion's
-  memory is kept by Grok. See [providers](docs/providers.md).
+- **Claude, Grok or GPT.** A companion answers through the Claude API, through xAI's on Grok or
+  through OpenAI's on GPT, with or without memory; a Grok or GPT one can have memory turned on
+  later. They never mix: a Grok companion's memory is kept by Grok, a GPT one's by GPT. See
+  [providers](docs/providers.md).
 - **Pictures and reading aloud.** A picture of any moment, or of the companion, made by CivitAI or
   Grok Imagine;
   replies read aloud by Azure AI Speech or in one of Grok's voices, each line with its feeling. See
@@ -66,7 +69,7 @@ default. See [Chats](docs/chats.md#what-valhalla-2-adds-to-a-request).
 
 The [`docs/`](docs/README.md) folder explains how everything works:
 [how memory works](docs/memory.md), [chats](docs/chats.md),
-[Claude or Grok, with or without memory](docs/providers.md),
+[Claude, Grok or GPT, with or without memory](docs/providers.md),
 [scenes, pictures and reading aloud](docs/scenes-pictures-speech.md), and
 [how it is built](docs/architecture.md), for working on the code.
 
@@ -101,6 +104,12 @@ For Grok, add the xAI key the same way (it also reads aloud in Grok's voices):
 echo 'XAI_API_KEY=<your key>' >> valhalla2/data/secret.env
 ```
 
+For GPT, add the OpenAI key the same way:
+
+```bash
+echo 'OPENAI_API_KEY=<your key>' >> valhalla2/data/secret.env
+```
+
 To read aloud, add the Azure Speech key the same way (its region is `SPEECH_REGION` in `dev.env`):
 
 ```bash
@@ -116,37 +125,39 @@ pnpm --filter valhalla2 smoke   # one real chat, then its memory, against the AP
 ```
 
 `CHAT_MODEL=grok-4.7 pnpm --filter valhalla2 smoke` makes a Grok companion instead: the chat runs on
-Grok, and so does its memory step, with Grok as the memory model.
+Grok, and so does its memory step, with Grok as the memory model. `CHAT_MODEL=gpt-6-luna` does the
+same on GPT.
 
 ## Settings
 
 Set in `dev.env` for development and in `deploy/valhalla2.service` on a server. Every one has a
 default.
 
-| Variable                      | Default                                          | What it does                                                       |
-| ----------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
-| `CHAT_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion answers with. Each can change it.        |
-| `MEMORY_MODEL`                | `claude-sonnet-5-5`                              | The model a new companion keeps its memory with. Each can change.  |
-| `VALHALLA_SWIPE_ASK`          | `5`                                              | Swipes on one reply before asking why they aren't working.         |
-| `VALHALLA_WINDOW_TOKENS`      | `20000`                                          | About how many tokens of a chat are sent each turn.                |
-| `VALHALLA_GROK_WINDOW_TOKENS` | `60000`                                          | The same, for a Grok companion with memory.                        |
-| `VALHALLA_WINDOW_CHUNK`       | `10`                                             | How many exchanges slide out at once when a chat outgrows that.    |
-| `VALHALLA_IDLE_MINUTES`       | `30`                                             | How long a chat is quiet before it is folded into memory.          |
-| `VALHALLA_MEMORY_FILE_KB`     | `8`                                              | The largest a memory file may be.                                  |
-| `VALHALLA_MEMORY_STORY_KB`    | `16`                                             | The largest `story/recent.md` and `story/arcs.md` may be.          |
-| `VALHALLA_MEMORY_FILES`       | `20`                                             | How many memory files a companion may have.                        |
-| `VALHALLA_MEMORY_ITERATIONS`  | `16`                                             | The most requests one run of the memory model may make.            |
-| `VALHALLA_CLEANUP_EVERY`      | `10`                                             | Consolidations between two tidy-ups of a companion's memory.       |
-| `VALHALLA_CLEANUP_DAYS`       | `7`                                              | …or days, if memory changed at all in that time.                   |
-| `VALHALLA_BACKUPS_KEPT`       | `14`                                             | How many daily backups of the database are kept.                   |
-| `PICTURE_MODEL`               | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                  |
-| `PICTURE_PROMPT_MODEL`        | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                          |
-| `GROK_PICTURE_MODEL`          | `grok-imagine-image-2.0`                         | The xAI image model a companion on Grok Imagine makes pictures on. |
-| `SCENE_MODEL`                 | `claude-haiku-5-5`                               | The model a new companion works out a picture's scene with.        |
-| `TONE_MODEL`                  | `claude-haiku-5-5`                               | The model a new companion works out how lines are said aloud with. |
-| `VALHALLA_SCENE_TOKENS`       | `12000`                                          | About how much of the chat it reads, up to the moment.             |
-| `SPEECH_REGION`               | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.        |
-| `SPEECH_VOICE`                | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none (`grok:eve` for Grok). |
+| Variable                        | Default                                          | What it does                                                       |
+| ------------------------------- | ------------------------------------------------ | ------------------------------------------------------------------ |
+| `CHAT_MODEL`                    | `claude-haiku-5-5`                               | The model a new companion answers with. Each can change it.        |
+| `MEMORY_MODEL`                  | `claude-sonnet-5-5`                              | The model a new companion keeps its memory with. Each can change.  |
+| `VALHALLA_SWIPE_ASK`            | `5`                                              | Swipes on one reply before asking why they aren't working.         |
+| `VALHALLA_WINDOW_TOKENS`        | `20000`                                          | About how many tokens of a chat are sent each turn.                |
+| `VALHALLA_GROK_WINDOW_TOKENS`   | `60000`                                          | The same, for a Grok companion with memory.                        |
+| `VALHALLA_OPENAI_WINDOW_TOKENS` | `60000`                                          | The same, for a GPT companion with memory.                         |
+| `VALHALLA_WINDOW_CHUNK`         | `10`                                             | How many exchanges slide out at once when a chat outgrows that.    |
+| `VALHALLA_IDLE_MINUTES`         | `30`                                             | How long a chat is quiet before it is folded into memory.          |
+| `VALHALLA_MEMORY_FILE_KB`       | `8`                                              | The largest a memory file may be.                                  |
+| `VALHALLA_MEMORY_STORY_KB`      | `16`                                             | The largest `story/recent.md` and `story/arcs.md` may be.          |
+| `VALHALLA_MEMORY_FILES`         | `20`                                             | How many memory files a companion may have.                        |
+| `VALHALLA_MEMORY_ITERATIONS`    | `16`                                             | The most requests one run of the memory model may make.            |
+| `VALHALLA_CLEANUP_EVERY`        | `10`                                             | Consolidations between two tidy-ups of a companion's memory.       |
+| `VALHALLA_CLEANUP_DAYS`         | `7`                                              | …or days, if memory changed at all in that time.                   |
+| `VALHALLA_BACKUPS_KEPT`         | `14`                                             | How many daily backups of the database are kept.                   |
+| `PICTURE_MODEL`                 | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                  |
+| `PICTURE_PROMPT_MODEL`          | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                          |
+| `GROK_PICTURE_MODEL`            | `grok-imagine-image-2.0`                         | The xAI image model a companion on Grok Imagine makes pictures on. |
+| `SCENE_MODEL`                   | `claude-haiku-5-5`                               | The model a new companion works out a picture's scene with.        |
+| `TONE_MODEL`                    | `claude-haiku-5-5`                               | The model a new companion works out how lines are said aloud with. |
+| `VALHALLA_SCENE_TOKENS`         | `12000`                                          | About how much of the chat it reads, up to the moment.             |
+| `SPEECH_REGION`                 | `brazilsouth`                                    | The Azure region of the Speech resource the key belongs to.        |
+| `SPEECH_VOICE`                  | `en-US-AvaMultilingualNeural`                    | The voice for a companion that chooses none (`grok:eve` for Grok). |
 
 The unit file sets both models to Haiku 5.5 and Sonnet 5.5.
 
@@ -177,6 +188,12 @@ empty file means no Grok:
 
 ```
 read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-xai.key && unset KEY
+```
+
+**So does the OpenAI key**, which lets a companion answer on GPT; an empty file means no GPT:
+
+```
+read -rs KEY && printf '%s' "$KEY" | sudo install -m 600 -o root -g root /dev/stdin /etc/axis-suite/valhalla2-openai.key && unset KEY
 ```
 
 **So does the Azure Speech key**, which reads replies aloud; again an empty file means none. Its

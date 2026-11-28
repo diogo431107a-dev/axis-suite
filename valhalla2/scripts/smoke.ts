@@ -3,8 +3,9 @@
 //   pnpm smoke
 //
 // It spends money — a fraction of a cent on Haiku — which is why it is not part of `pnpm test`.
-// CHAT_MODEL picks the model that answers. A grok- one makes a Grok companion: the chat runs on
-// Grok, and so does its memory model, with the memory tool as a function (server/responses/memory.ts).
+// CHAT_MODEL picks the model that answers. A grok- one makes a Grok companion, a gpt- one a GPT
+// companion: the chat runs on that API, and so does its memory model, with the memory tool as a
+// function (server/responses/memory.ts).
 // It runs on a throwaway database in memory and goes through the same code the server uses: a
 // greeting after the hidden opener, two turns, another version of the last reply, and an edit
 // of the greeting before one more turn. The edit changes what the earlier thinking was bound to,
@@ -24,12 +25,12 @@ import { createCompanions } from "../server/companions.ts";
 import { openDatabase } from "../server/db.ts";
 
 const model = process.env.CHAT_MODEL || "claude-haiku-5-5";
-// A Grok companion's memory model is its own chat model.
-const grok = providerOf(model) === "xai";
+// A Grok or GPT companion's memory model is its own chat model.
+const ownMemory = providerOf(model) !== "anthropic";
 const settings = {
   ...DEFAULT_SETTINGS,
   model,
-  memoryModel: grok ? model : DEFAULT_SETTINGS.memoryModel,
+  memoryModel: ownMemory ? model : DEFAULT_SETTINGS.memoryModel,
   maxTokens: 512,
   effort: "high" as const,
 };
