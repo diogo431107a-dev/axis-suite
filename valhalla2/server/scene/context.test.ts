@@ -71,13 +71,15 @@ describe("what Claude is given to write a picture's prompt", () => {
   });
 
   it("uses the Grok Imagine instructions, in sentences, for an engine that reads them", () => {
-    const natural = sceneRequest(companion, { kind: "profile" }, "", nothing, 1000, undefined, "natural");
+    const natural = sceneRequest(companion, { kind: "profile" }, "", nothing, 1000, undefined, "grokPicture");
     expect(natural.system).toBe(DEFAULT_PROMPTS.grokPicture);
     expect(natural.system).toContain("anime illustration");
-    expect(plainPictureRequest(companion, { kind: "profile" }, "", "natural").system).toBe(DEFAULT_PROMPTS.grokPicture);
+    expect(plainPictureRequest(companion, { kind: "profile" }, "", "grokPicture").system).toBe(
+      DEFAULT_PROMPTS.grokPicture,
+    );
     expect(plainPictureRequest(companion, { kind: "profile" }, "").system).toBe(DEFAULT_PROMPTS.picture);
     const own = { ...companion, prompts: { grokPicture: "Watercolour only." } };
-    expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000, undefined, "natural").system).toBe(
+    expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000, undefined, "grokPicture").system).toBe(
       "Watercolour only.",
     );
     expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000).system).toBe(DEFAULT_PROMPTS.picture);

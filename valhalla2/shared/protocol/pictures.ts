@@ -119,6 +119,10 @@ export type PictureParams = CivitaiParams | GrokPictureParams;
 /** Whether a picture's parameters are Grok Imagine's. */
 export const isGrokParams = (params: PictureParams): params is GrokPictureParams => params.engine === "grok";
 
+/** Whether a picture's parameters are CivitAI's: those made before there were engines have none. */
+export const isCivitaiParams = (params: PictureParams): params is CivitaiParams =>
+  params.engine === undefined || params.engine === "civitai";
+
 /** A picture of a companion, made or being made. Its file is GET /api/pictures/:id/file. */
 export interface Picture extends PictureDraft {
   id: string;

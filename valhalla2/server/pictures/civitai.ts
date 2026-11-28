@@ -5,7 +5,7 @@
 // are separate, so a picture the server was stopped in the middle of can be picked up again from
 // the workflow's id.
 
-import { DEFAULT_SETTINGS, isGrokParams } from "../../shared/protocol.ts";
+import { DEFAULT_SETTINGS, isCivitaiParams } from "../../shared/protocol.ts";
 import { EngineError, type PictureEngine, type PictureOrder } from "./engine.ts";
 
 const API = "https://orchestration.civitai.com/v2/consumer/workflows";
@@ -160,7 +160,7 @@ export type Civitai = ReturnType<typeof createCivitai>;
  * chosen gets what a new companion starts with.
  */
 export function jobFor({ prompt, negativePrompt, params }: PictureOrder): PictureJob {
-  if (isGrokParams(params)) throw new CivitaiError("This picture is for Grok Imagine, not CivitAI");
+  if (!isCivitaiParams(params)) throw new CivitaiError("This picture is for another engine, not CivitAI");
   const { sampler, clipSkip, engine: _engine, ...rest } = params;
   return {
     prompt,
@@ -175,7 +175,8 @@ export function jobFor({ prompt, negativePrompt, params }: PictureOrder): Pictur
 export function civitaiEngine(civitai: Civitai): PictureEngine {
   return {
     id: "civitai",
-    promptStyle: "tags",
+    promptKey: "picture",
+    takesNegative: true,
     submit: async (order) => ({ job: await civitai.submit(jobFor(order)) }),
     // A job it answered is a workflow; the painter only ever hands back what submit gave it.
     finish: (job) => civitai.finish(typeof job === "string" ? job : (job as Workflow)),

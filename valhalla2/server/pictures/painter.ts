@@ -68,8 +68,10 @@ export function createPainter({ db, engines, files }: PainterOptions) {
         const engine = engines[madeBy as PictureEngineId];
         if (workflowId && engine && engine.id === madeBy) void paint(id, workflowId);
         else if (workflowId) markFailed(db, id, "This picture was asked of another picture engine. Make it again.");
-        else if (madeBy === "grok") {
-          markFailed(db, id, "The server stopped while Grok Imagine was making this picture. Make it again.");
+        else if (madeBy !== "civitai" && madeBy in PICTURE_ENGINE_LABELS) {
+          // An engine that makes the picture within the one request has no job to pick up.
+          const label = PICTURE_ENGINE_LABELS[madeBy as PictureEngineId];
+          markFailed(db, id, `The server stopped while ${label} was making this picture. Make it again.`);
         } else markFailed(db, id, "The server stopped before this picture was asked for. Make it again.");
       }
       return left.length;

@@ -212,9 +212,9 @@ describe("pictures", () => {
   });
 
   it("go to each engine only with its own parameters", async () => {
-    expect(() => jobFor({ prompt: "p", negativePrompt: "", params: grokParams })).toThrow(/Grok Imagine/);
+    expect(() => jobFor({ prompt: "p", negativePrompt: "", params: grokParams })).toThrow(/not CivitAI/);
     await expect(grokImagineEngine(grokImagine()).submit({ prompt: "p", negativePrompt: "", params })).rejects.toThrow(
-      /CivitAI/,
+      /not Grok Imagine/,
     );
   });
 

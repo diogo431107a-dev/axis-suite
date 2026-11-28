@@ -1,21 +1,18 @@
 // Pictures of a companion: a profile picture from its page, a chat picture from a message. A model
-// writes the prompt, you look it over, and the companion's picture engine (CivitAI or Grok Imagine)
+// writes the prompt, you look it over, and the companion's picture engine (pictures/engine.ts)
 // makes the picture in the background.
 import { Router, type Request, type Response } from "express";
 import { randomUUID } from "node:crypto";
 import {
-  GROK_ASPECT,
   hasScenes,
   LIMITS,
   ORIENTATIONS,
   PICTURE_KINDS,
-  PICTURE_SIZES,
   pictureEngineOf,
   type ApiError,
   type Companion,
   type Orientation,
   type PictureDraftReply,
-  type PictureParams,
   type PictureKind,
 } from "../../shared/protocol.ts";
 import { writePictureFor } from "../chat/write.ts";
@@ -24,6 +21,7 @@ import { config } from "../config.ts";
 import { invalid } from "../errors.ts";
 import { sendStored } from "../http/sendStored.ts";
 import { randomSeed } from "../pictures/civitai.ts";
+import { paramsFor } from "../pictures/params.ts";
 import { backgroundOf, plainPictureRequest, sceneRequest, type Scene } from "../scene/context.ts";
 import type { Services } from "../services.ts";
 
@@ -70,9 +68,9 @@ export function pictureRoutes(s: Services): Router {
           backgroundOf(companion, s.remembered(companion.id)),
           config.scene.tokens,
           read?.sheet,
-          engine.promptStyle,
+          engine.promptKey,
         )
-      : plainPictureRequest(companion, scene, hint, engine.promptStyle);
+      : plainPictureRequest(companion, scene, hint, engine.promptKey);
     const draft = await writePictureFor(companion, request);
     res.json({ ...draft, scene: read } satisfies PictureDraftReply);
   });
@@ -86,29 +84,11 @@ export function pictureRoutes(s: Services): Router {
     const orientation = oneOf<Orientation>(body.orientation, ORIENTATIONS, "The orientation");
     const settings = companion.settings;
     // On CivitAI, the seed you chose, or the companion's, or a new one; whichever it is, the next
-    // picture carries on from it. Grok Imagine has no seed.
-    const seed =
-      engine.id === "civitai"
-        ? ((body.seed === undefined ? null : checkSeed(body.seed)) ?? settings.pictureSeed ?? randomSeed())
-        : null;
-    const params: PictureParams =
-      seed === null
-        ? {
-            engine: "grok",
-            model: config.pictures.grokModel,
-            aspectRatio: GROK_ASPECT[orientation],
-            resolution: settings.grokPictureResolution,
-            quality: settings.grokPictureQuality,
-          }
-        : {
-            model: config.pictures.model,
-            ...PICTURE_SIZES[orientation],
-            steps: settings.pictureSteps,
-            cfgScale: settings.pictureCfg,
-            sampler: settings.pictureSampler,
-            clipSkip: settings.pictureClipSkip,
-            seed,
-          };
+    // picture carries on from it. The other engines have no seed.
+    const seed = engine.takesNegative
+      ? ((body.seed === undefined ? null : checkSeed(body.seed)) ?? settings.pictureSeed ?? randomSeed())
+      : null;
+    const params = paramsFor(engine.id, settings, orientation, seed);
     const my = s.ownedBy(req);
     const picture = my.pictures.create({
       id: randomUUID(),
@@ -117,9 +97,10 @@ export function pictureRoutes(s: Services): Router {
       chatId: from?.chat.id ?? null,
       messageId: from?.messageId ?? null,
       prompt: required(body.prompt, LIMITS.picturePrompt, "The prompt"),
-      // Grok Imagine takes no negative prompt, so none is kept with its pictures.
-      negativePrompt:
-        engine.id === "grok" ? "" : text(body.negativePrompt ?? "", LIMITS.picturePrompt, "The negative prompt"),
+      // Only CivitAI takes a negative prompt: none is kept with the other engines' pictures.
+      negativePrompt: engine.takesNegative
+        ? text(body.negativePrompt ?? "", LIMITS.picturePrompt, "The negative prompt")
+        : "",
       orientation,
       caption: text(body.caption ?? "", LIMITS.pictureCaption, "The caption"),
       params,
