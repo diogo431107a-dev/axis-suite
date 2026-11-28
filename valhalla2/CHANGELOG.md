@@ -4,6 +4,8 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+## 0.0.66 — 2026-11-28
+
 - **Choose the CivitAI checkpoint.** Under **Pictures** on a companion's page, **Checkpoint** shows
   the SDXL checkpoint its CivitAI pictures are made on (WAI-illustrious-SDXL v17.0 to start). Paste
   the link to another one's page on CivitAI and press **Look up**: Valhalla 2 shows its name and

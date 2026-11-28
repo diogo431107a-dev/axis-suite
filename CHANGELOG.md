@@ -4,6 +4,29 @@ The Axis Suite as a whole, newest first: each version says which version of ever
 
 ## Unreleased
 
+## 0.0.249 — 2026-11-28
+
+Valhalla 2 0.0.66: each companion can choose the SDXL checkpoint its CivitAI pictures are made on, by pasting a CivitAI link (looked up for its name, base model and Buzz cost; only SDXL-family checkpoints are taken), and have its prompts written in Danbooru tags or plain sentences, guessed from the base model. The prompt writer is told the checkpoint, so it uses that family's quality tags. Every companion stays on WAI-illustrious until changed. Nothing by hand.
+
+| Module     | Version |
+| ---------- | ------- |
+| Heimdall   | 0.0.33  |
+| Loggbok    | 0.0.18  |
+| Yggdrasil  | 1.2.1   |
+| Janus      | 0.0.9   |
+| Papyrus    | 0.0.9   |
+| Vinr       | 0.0.8   |
+| Chronos    | 0.0.9   |
+| Valkyrie   | 0.0.8   |
+| Althing    | 0.0.6   |
+| Mimir      | 0.0.8   |
+| Urd        | 2.1.1   |
+| Saga       | 1.1.1   |
+| Star       | 0.0.6   |
+| Fafnir     | 2.0.1   |
+| Tyr        | 0.0.10  |
+| Valhalla 2 | 0.0.66  |
+
 ## 0.0.247 — 2026-11-28
 
 Valhalla 2 0.0.64: companions on GPT, OpenAI's models, beside Claude and Grok (GPT-6 Luna first, then Terra, Sol and Astra), with everything a GPT companion asks kept on OpenAI: replies, memory, scenes, tone tags and picture prompts. And OpenAI makes pictures too, beside CivitAI and Grok Imagine, for any companion (gpt-image-2.6-flare, medium quality to start, about 4¢ a picture, its cost shown). By hand: the OpenAI key in /etc/axis-suite/valhalla2-openai.key before installing (an empty file will do; without the file the service won't start).

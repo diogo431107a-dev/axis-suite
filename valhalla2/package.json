@@ -1,6 +1,6 @@
 {
   "name": "valhalla2",
-  "version": "0.0.64",
+  "version": "0.0.66",
   "private": true,
   "description": "Valhalla 2 — companions you define, on Claude, Grok or GPT",
   "type": "module",
