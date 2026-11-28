@@ -158,14 +158,18 @@ export function CompanionForm({ companion }: { companion: Companion | null }) {
   const memory = companion?.memory ?? withMemory;
 
   const chatCount = companion ? chats.filter((chat) => chat.companionId === companion.id).length : 0;
-  // Each engine's picture instructions show only when the server has that engine.
+  // Each engine's picture instructions show only when the server has that engine; of CivitAI's two,
+  // only the ones for the prompt style chosen.
   const engineOnly: Partial<Record<PromptKey, PictureEngineId>> = {
     picture: "civitai",
+    civitaiSentencesPicture: "civitai",
     grokPicture: "grok",
     openaiPicture: "openai",
   };
+  const otherStyle: PromptKey = settings.picturePromptStyle === "sentences" ? "picture" : "civitaiSentencesPicture";
   const shownPrompts = PROMPT_KEYS.filter((key) => memory || !MEMORY_ONLY.includes(key)).filter((key) => {
     const engine = engineOnly[key];
+    if (key === otherStyle) return false;
     return !engine || health.pictureEngines.length === 0 || health.pictureEngines.includes(engine);
   });
   const ownCount = shownPrompts.filter((key) => !isDefault(key, prompts[key])).length;

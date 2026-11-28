@@ -1,5 +1,5 @@
 // The models, what they cost, and the settings a companion sends with a request.
-import type { GrokQuality, GrokResolution, OpenAiQuality, PictureEngineId, Sampler } from "./pictures.ts";
+import type { GrokQuality, GrokResolution, OpenAiQuality, PictureEngineId, PromptStyle, Sampler } from "./pictures.ts";
 
 /**
  * How much effort the model puts into a reply. This replaces the temperature slider other
@@ -138,6 +138,10 @@ export const DEFAULT_SETTINGS: Settings = {
   toneTokens: 4_000,
   sceneModel: "claude-haiku-5-5",
   sceneEffort: "low",
+  pictureModel: "urn:air:sdxl:checkpoint:civitai:827184@2883731",
+  pictureModelName: "WAI-illustrious-SDXL v17.0",
+  pictureBaseModel: "Illustrious",
+  picturePromptStyle: "tags",
   pictureSteps: 20,
   pictureCfg: 7,
   pictureSampler: "euler_a",
@@ -195,6 +199,15 @@ export interface Settings {
   /** The model that works out a moment for a picture of it (with memory only), and its effort. */
   sceneModel: string;
   sceneEffort: Effort;
+  /**
+   * The SDXL checkpoint CivitAI makes its pictures on, as an AIR, with its name and base model as
+   * CivitAI gives them ("" when unknown, as for one set by PICTURE_MODEL).
+   */
+  pictureModel: string;
+  pictureModelName: string;
+  pictureBaseModel: string;
+  /** Whether its prompts are written in Danbooru tags or in plain sentences. */
+  picturePromptStyle: PromptStyle;
   /** How many steps CivitAI takes over a picture: more is finer, slower and dearer. */
   pictureSteps: number;
   /** How closely the picture follows its prompt (CFG): higher is more literal, lower freer. */

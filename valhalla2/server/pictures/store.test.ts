@@ -79,6 +79,7 @@ function civitai(error?: string): Civitai & { submitted: number } {
       fake.submitted++;
       return error ? Promise.reject(new CivitaiError(error)) : Promise.resolve({ id: "wf-1", status: "succeeded" });
     },
+    estimate: () => Promise.resolve(3),
     finish: () => Promise.resolve("https://img"),
     download: () => Promise.resolve({ bytes: PNG, type: "image/png", ext: "png" }),
   };

@@ -5,7 +5,7 @@
 // are separate, so a picture the server was stopped in the middle of can be picked up again from
 // the workflow's id.
 
-import { DEFAULT_SETTINGS, isCivitaiParams } from "../../shared/protocol.ts";
+import { DEFAULT_SETTINGS, isCivitaiParams, type Settings } from "../../shared/protocol.ts";
 import { EngineError, type PictureEngine, type PictureOrder } from "./engine.ts";
 
 const API = "https://orchestration.civitai.com/v2/consumer/workflows";
@@ -43,6 +43,18 @@ export function sniffImage(head: Uint8Array): { type: string; ext: string } | nu
   if (head[0] === 0xff && head[1] === 0xd8 && head[2] === 0xff) return { type: "image/jpeg", ext: "jpg" };
   if (ascii(0, "RIFF") && ascii(8, "WEBP")) return { type: "image/webp", ext: "webp" };
   return null;
+}
+
+/** What CivitAI said when it refused a request: its messages, when it lists them, or the start of its answer. */
+export function refusalOf(text: string): string {
+  try {
+    const answer = JSON.parse(text) as { errors?: { messages?: unknown } };
+    const messages = answer.errors?.messages;
+    if (Array.isArray(messages) && messages.length > 0) return messages.map(String).join(" ");
+  } catch {
+    // Not JSON: shown as it is.
+  }
+  return text.slice(0, 500);
 }
 
 /** The addresses of a finished workflow's images. */
@@ -99,7 +111,7 @@ export function createCivitai(options: CivitaiOptions) {
     if (res.status === 401 || res.status === 403) {
       throw new CivitaiError("CivitAI refused the server's API key. Whoever runs this Valhalla 2 needs to check it.");
     }
-    if (!res.ok) throw new CivitaiError(`CivitAI answered ${res.status}: ${text.slice(0, 500)}`);
+    if (!res.ok) throw new CivitaiError(`CivitAI answered ${res.status}: ${refusalOf(text)}`);
     try {
       return JSON.parse(text) as Workflow;
     } catch {
@@ -107,14 +119,34 @@ export function createCivitai(options: CivitaiOptions) {
     }
   }
 
+  const body = (job: PictureJob) =>
+    JSON.stringify({
+      steps: [
+        {
+          $type: "imageGen",
+          input: { engine: "sdcpp", ecosystem: "sdxl", operation: "createImage", quantity: 1, ...job },
+        },
+      ],
+    });
+
   return {
     /** Asks for a picture. CivitAI holds the answer up to a minute, so it is often already done. */
     submit(job: PictureJob): Promise<Workflow> {
-      const input = { engine: "sdcpp", ecosystem: "sdxl", operation: "createImage", quantity: 1, ...job };
-      return call(`${API}?wait=60`, {
-        method: "POST",
-        body: JSON.stringify({ steps: [{ $type: "imageGen", input }] }),
-      });
+      return call(`${API}?wait=60`, { method: "POST", body: body(job) });
+    },
+
+    /**
+     * What a picture would cost, in Buzz, asked without making it (null when CivitAI doesn't say).
+     * Refused, as a submission would be, when CivitAI won't make it: a checkpoint it can't run.
+     */
+    async estimate(job: PictureJob): Promise<number | null> {
+      const answer = (await call(`${API}?whatif=true`, { method: "POST", body: body(job) })) as Workflow & {
+        transactions?: { list?: { type?: string; amount?: number }[] };
+      };
+      const debits = (answer.transactions?.list ?? []).filter(
+        (entry) => entry.type === "debit" && typeof entry.amount === "number",
+      );
+      return debits.length > 0 ? debits.reduce((sum, entry) => sum + entry.amount!, 0) : null;
     },
 
     /** Looks at a workflow until it has finished, and returns its image's address. */
@@ -161,7 +193,7 @@ export type Civitai = ReturnType<typeof createCivitai>;
  */
 export function jobFor({ prompt, negativePrompt, params }: PictureOrder): PictureJob {
   if (!isCivitaiParams(params)) throw new CivitaiError("This picture is for another engine, not CivitAI");
-  const { sampler, clipSkip, engine: _engine, ...rest } = params;
+  const { sampler, clipSkip, engine: _engine, modelName: _name, ...rest } = params;
   return {
     prompt,
     negativePrompt,
@@ -171,11 +203,23 @@ export function jobFor({ prompt, negativePrompt, params }: PictureOrder): Pictur
   };
 }
 
-/** CivitAI as a picture engine: SDXL checkpoints, which read Danbooru tags. */
+/** What the prompt writer is told about the checkpoint, so it writes in the words it expects. */
+export function checkpointNote({ pictureModel, pictureModelName, pictureBaseModel }: Settings): string {
+  const base = pictureBaseModel ? ` (base model: ${pictureBaseModel})` : "";
+  return (
+    `The picture is made on the SDXL checkpoint ${pictureModelName || pictureModel}${base}. ` +
+    "Write the prompt in the words and quality tags it expects."
+  );
+}
+
+/** CivitAI as a picture engine: the companion's SDXL checkpoint, read in tags or in sentences. */
 export function civitaiEngine(civitai: Civitai): PictureEngine {
   return {
     id: "civitai",
-    promptKey: "picture",
+    instructionsFor: (settings) => ({
+      key: settings.picturePromptStyle === "sentences" ? "civitaiSentencesPicture" : "picture",
+      note: checkpointNote(settings),
+    }),
     takesNegative: true,
     submit: async (order) => ({ job: await civitai.submit(jobFor(order)) }),
     // A job it answered is a workflow; the painter only ever hands back what submit gave it.

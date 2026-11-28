@@ -146,7 +146,7 @@ export function openAiImagesEngine(openai: OpenAiImages): PictureEngine {
   };
   return {
     id: "openai",
-    promptKey: "openaiPicture",
+    instructionsFor: () => ({ key: "openaiPicture", note: null }),
     takesNegative: false,
     async submit({ prompt, params }) {
       if (!isOpenAiParams(params)) throw new OpenAiImagesError("This picture is for another engine, not OpenAI");

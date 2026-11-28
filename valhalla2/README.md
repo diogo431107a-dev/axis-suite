@@ -151,7 +151,7 @@ default.
 | `VALHALLA_CLEANUP_EVERY`        | `10`                                             | Consolidations between two tidy-ups of a companion's memory.       |
 | `VALHALLA_CLEANUP_DAYS`         | `7`                                              | …or days, if memory changed at all in that time.                   |
 | `VALHALLA_BACKUPS_KEPT`         | `14`                                             | How many daily backups of the database are kept.                   |
-| `PICTURE_MODEL`                 | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI model that makes pictures, as an AIR.                  |
+| `PICTURE_MODEL`                 | `urn:air:sdxl:checkpoint:civitai:827184@2883731` | The CivitAI checkpoint a new companion starts on, as an AIR.       |
 | `PICTURE_PROMPT_MODEL`          | `claude-sonnet-5-5`                              | The model that writes a picture's prompt.                          |
 | `GROK_PICTURE_MODEL`            | `grok-imagine-image-2.0`                         | The xAI image model a companion on Grok Imagine makes pictures on. |
 | `OPENAI_PICTURE_MODEL`          | `gpt-image-2.6-flare`                            | The OpenAI image model a companion on OpenAI makes pictures on.    |

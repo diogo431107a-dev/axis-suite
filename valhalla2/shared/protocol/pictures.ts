@@ -92,6 +92,61 @@ export type Sampler = (typeof SAMPLERS)[number]["id"];
 export const SAMPLER_IDS: readonly Sampler[] = SAMPLERS.map((entry) => entry.id);
 export const samplerLabel = (id: string): string => SAMPLERS.find((entry) => entry.id === id)?.label ?? id;
 
+/**
+ * How a CivitAI picture's prompt is written: in Danbooru tags, which anime checkpoints read best, or
+ * in plain sentences, for checkpoints trained on them.
+ */
+export const PROMPT_STYLES = ["tags", "sentences"] as const;
+export type PromptStyle = (typeof PROMPT_STYLES)[number];
+export const PROMPT_STYLE_LABELS: Readonly<Record<PromptStyle, string>> = {
+  tags: "Danbooru tags",
+  sentences: "Plain sentences",
+};
+
+/**
+ * The base models CivitAI names for the SDXL family, the only one Valhalla 2 makes pictures on: its
+ * sizes, samplers, clip skip and negative prompt all fit SDXL.
+ */
+export const SDXL_BASE_MODELS: readonly string[] = [
+  "SDXL 1.0",
+  "SDXL 0.9",
+  "SDXL Lightning",
+  "SDXL Hyper",
+  "SDXL Turbo",
+  "SDXL Distilled",
+  "Pony",
+  "Illustrious",
+  "NoobAI",
+];
+
+/** The base models whose checkpoints read Danbooru tags best. */
+export const TAG_BASE_MODELS: readonly string[] = ["Pony", "Illustrious", "NoobAI"];
+
+/** The prompt style a checkpoint is guessed to want, from its base model. */
+export const styleFor = (baseModel: string): PromptStyle =>
+  TAG_BASE_MODELS.includes(baseModel) ? "tags" : "sentences";
+
+/** The checkpoint a companion's CivitAI pictures are made on, as CivitAI names it. */
+export interface Checkpoint {
+  /** As CivitAI's orchestration API takes it: urn:air:sdxl:checkpoint:civitai:827184@2883731. */
+  air: string;
+  /** The model and the version: WAI-illustrious-SDXL v17.0. */
+  name: string;
+  /** Illustrious, Pony, SDXL 1.0… */
+  baseModel: string;
+  /** The prompt style guessed from the base model. */
+  style: PromptStyle;
+}
+
+/** What looking a checkpoint up answers: it, and what CivitAI says one picture on it costs. */
+export interface CheckpointLookup extends Checkpoint {
+  /** In Buzz, at the companion's steps and sampler; null when CivitAI doesn't say. */
+  buzz: number | null;
+}
+
+/** The shape of an SDXL checkpoint's AIR, the only kind a companion may choose. */
+export const SDXL_CHECKPOINT_AIR = /^urn:air:sdxl:checkpoint:civitai:\d+@\d+$/;
+
 /** A picture's prompt, written by the companion's API and yours to change before the picture is made. */
 export interface PictureDraft {
   prompt: string;
@@ -113,7 +168,10 @@ export interface PictureDraftReply extends PictureDraft {
 export interface CivitaiParams {
   /** Absent on pictures made before there was a second engine. */
   engine?: "civitai";
+  /** The checkpoint's AIR. */
   model: string;
+  /** The checkpoint's name; absent on pictures made before it could be chosen, or when unknown. */
+  modelName?: string;
   width: number;
   height: number;
   steps: number;

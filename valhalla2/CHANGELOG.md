@@ -4,6 +4,22 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
 
 ## Unreleased
 
+- **Choose the CivitAI checkpoint.** Under **Pictures** on a companion's page, **Checkpoint** shows
+  the SDXL checkpoint its CivitAI pictures are made on (WAI-illustrious-SDXL v17.0 to start). Paste
+  the link to another one's page on CivitAI and press **Look up**: Valhalla 2 shows its name and
+  base model, checks that CivitAI will make pictures on it, and says what one costs in Buzz. Only
+  SDXL checkpoints are taken (Illustrious, Pony, NoobAI, SDXL 1.0 and merges of them); a Flux or
+  SD 1.5 one is refused with the reason. **Back to the server's default** returns to WAI. Every
+  companion keeps WAI until you choose otherwise.
+
+- **Prompts in tags or in sentences.** **Prompt written as** chooses Danbooru tags or plain
+  sentences for CivitAI. Choosing a checkpoint sets it from its base model (tags for Illustrious,
+  Pony and NoobAI, sentences for the rest), and you can change it, which is the way to set a
+  semi-realistic checkpoint. Each style has its own instructions on the companion's page; only
+  the one in use is shown. The writer is now told which checkpoint the picture is for, so it uses
+  that family's quality tags (Pony's `score_9…`, Illustrious's `masterpiece…`) without you
+  rewriting the instructions. Pictures on WAI come out as before.
+
 ## 0.0.64 — 2026-11-28
 
 - **OpenAI makes pictures too.** Under **Pictures** on a companion's page, **Made by** now also

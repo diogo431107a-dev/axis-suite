@@ -80,7 +80,8 @@ describe("OpenAI's image model", () => {
 
   it("is an engine of its own: plain sentences, no negative prompt, no seed", async () => {
     const engine = openAiImagesEngine(createOpenAiImages({ apiKey: "k", fetch: answering(200, made(JPEG)).fetch }));
-    expect(engine).toMatchObject({ id: "openai", promptKey: "openaiPicture", takesNegative: false });
+    expect(engine).toMatchObject({ id: "openai", takesNegative: false });
+    expect(engine.instructionsFor(DEFAULT_SETTINGS)).toEqual({ key: "openaiPicture", note: null });
     const params = paramsFor("openai", DEFAULT_SETTINGS, "portrait", null);
     const done = await engine.submit({ prompt: "p", negativePrompt: "", params });
     expect("image" in done && done.image.cost).toBeGreaterThan(0);
@@ -89,6 +90,8 @@ describe("OpenAI's image model", () => {
     ).rejects.toThrow(/not OpenAI/);
   });
 });
+
+const OPENAI = { key: "openaiPicture", note: null } as const;
 
 describe("an OpenAI picture", () => {
   it("is made in the size of its orientation, at the companion's quality, medium to start", () => {
@@ -109,10 +112,10 @@ describe("an OpenAI picture", () => {
 
   it("is written from its own instructions, not Grok Imagine's", () => {
     const companion = { prompts: {} };
-    expect(pictureInstructions(companion, "openaiPicture")).toBe(DEFAULT_PROMPTS.openaiPicture);
+    expect(pictureInstructions(companion, OPENAI)).toBe(DEFAULT_PROMPTS.openaiPicture);
     expect(DEFAULT_PROMPTS.openaiPicture).toContain("OpenAI's image model");
     expect(DEFAULT_PROMPTS.openaiPicture).not.toContain("Grok");
-    expect(pictureInstructions({ prompts: { openaiPicture: "Watercolour." } }, "openaiPicture")).toBe("Watercolour.");
+    expect(pictureInstructions({ prompts: { openaiPicture: "Watercolour." } }, OPENAI)).toBe("Watercolour.");
   });
 
   it("gives way to another engine when the server has no OpenAI key", () => {

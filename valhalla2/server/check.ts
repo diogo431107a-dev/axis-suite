@@ -10,6 +10,9 @@ import {
   LIMITS,
   PICTURE_ENGINES,
   PROMPT_KEYS,
+  PROMPT_STYLES,
+  SDXL_CHECKPOINT_AIR,
+  type PromptStyle,
   PROVIDER_NAMES,
   providerOf,
   SAMPLER_IDS,
@@ -184,6 +187,12 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
     ),
     sceneModel: helper(body.sceneModel, defaults.sceneModel, "scene model"),
     sceneEffort: effort(body.sceneEffort, defaults.sceneEffort, "The scene effort"),
+    ...checkpoint(body, defaults),
+    picturePromptStyle: oneOf<PromptStyle>(
+      body.picturePromptStyle ?? defaults.picturePromptStyle,
+      PROMPT_STYLES,
+      "The prompt style",
+    ),
     pictureSteps: whole(
       body.pictureSteps ?? defaults.pictureSteps,
       LIMITS.pictureStepsMin,
@@ -219,6 +228,31 @@ export function settings(value: unknown, defaults: Settings = DEFAULT_SETTINGS):
       OPENAI_QUALITIES,
       "The picture quality",
     ),
+  };
+}
+
+/**
+ * A companion's CivitAI checkpoint: an SDXL checkpoint's AIR, with its name and base model. Left out,
+ * it is the default's, name and all; a new AIR without a name has none.
+ */
+function checkpoint(
+  body: Record<string, unknown>,
+  defaults: Settings,
+): Pick<Settings, "pictureModel" | "pictureModelName" | "pictureBaseModel"> {
+  if (body.pictureModel === undefined) {
+    const { pictureModel, pictureModelName, pictureBaseModel } = defaults;
+    return { pictureModel, pictureModelName, pictureBaseModel };
+  }
+  const air = text(body.pictureModel, 200, "The checkpoint");
+  if (!SDXL_CHECKPOINT_AIR.test(air)) {
+    invalid(
+      "The checkpoint has to be an SDXL checkpoint's AIR, such as urn:air:sdxl:checkpoint:civitai:827184@2883731",
+    );
+  }
+  return {
+    pictureModel: air,
+    pictureModelName: text(body.pictureModelName ?? "", 200, "The checkpoint's name"),
+    pictureBaseModel: text(body.pictureBaseModel ?? "", 60, "The checkpoint's base model"),
   };
 }
 

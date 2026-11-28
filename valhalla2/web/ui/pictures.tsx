@@ -34,6 +34,7 @@ function madeWith(picture: Picture): string {
     return ` · ${PICTURE_ENGINE_LABELS.openai} · ${params.size.replace("x", "×")} · ${params.quality} quality${cost}`;
   }
   return [
+    params.modelName ? ` · ${params.modelName}` : "",
     ` · ${params.width}×${params.height} · ${params.steps} steps · CFG ${params.cfgScale}`,
     params.sampler ? ` · ${samplerLabel(params.sampler)}` : "",
     params.clipSkip ? ` · clip skip ${params.clipSkip}` : "",

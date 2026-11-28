@@ -4,6 +4,8 @@ import { DEFAULT_PROMPTS } from "../../shared/prompts.ts";
 import { draftOf } from "../pictures/draft.ts";
 import { backgroundOf, plainPictureRequest, renderSheet, sceneRequest } from "./context.ts";
 
+const GROK = { key: "grokPicture", note: null } as const;
+
 const companion: Companion = {
   id: "comp-0001",
   name: "Freya",
@@ -71,18 +73,24 @@ describe("what Claude is given to write a picture's prompt", () => {
   });
 
   it("uses the Grok Imagine instructions, in sentences, for an engine that reads them", () => {
-    const natural = sceneRequest(companion, { kind: "profile" }, "", nothing, 1000, undefined, "grokPicture");
+    const natural = sceneRequest(companion, { kind: "profile" }, "", nothing, 1000, undefined, GROK);
     expect(natural.system).toBe(DEFAULT_PROMPTS.grokPicture);
     expect(natural.system).toContain("anime illustration");
-    expect(plainPictureRequest(companion, { kind: "profile" }, "", "grokPicture").system).toBe(
-      DEFAULT_PROMPTS.grokPicture,
-    );
+    expect(plainPictureRequest(companion, { kind: "profile" }, "", GROK).system).toBe(DEFAULT_PROMPTS.grokPicture);
     expect(plainPictureRequest(companion, { kind: "profile" }, "").system).toBe(DEFAULT_PROMPTS.picture);
     const own = { ...companion, prompts: { grokPicture: "Watercolour only." } };
-    expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000, undefined, "grokPicture").system).toBe(
-      "Watercolour only.",
-    );
+    expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000, undefined, GROK).system).toBe("Watercolour only.");
     expect(sceneRequest(own, { kind: "profile" }, "", nothing, 1000).system).toBe(DEFAULT_PROMPTS.picture);
+  });
+
+  it("uses CivitAI's sentence instructions for that style, with the checkpoint said after them", () => {
+    const note = "The picture is made on the SDXL checkpoint Juggernaut XL.";
+    const sentences = { key: "civitaiSentencesPicture", note } as const;
+    const expected = `${DEFAULT_PROMPTS.civitaiSentencesPicture}\n\n${note}`;
+    expect(sceneRequest(companion, { kind: "profile" }, "", nothing, 1000, undefined, sentences).system).toBe(expected);
+    expect(plainPictureRequest(companion, { kind: "profile" }, "", sentences).system).toBe(expected);
+    expect(DEFAULT_PROMPTS.civitaiSentencesPicture).toContain("plain descriptive English");
+    expect(DEFAULT_PROMPTS.picture).not.toContain("WAI");
   });
 
   it("always has the moment, even past the budget", () => {

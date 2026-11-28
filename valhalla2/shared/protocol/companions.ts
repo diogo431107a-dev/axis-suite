@@ -16,6 +16,7 @@ export const PROMPT_KEYS = [
   "cleanup",
   "scene",
   "picture",
+  "civitaiSentencesPicture",
   "grokPicture",
   "openaiPicture",
   "tone",

@@ -237,6 +237,31 @@ describe("companions from before the choice existed", () => {
     db.close();
   });
 
+  it("keep making their CivitAI pictures on WAI-illustrious, in tags", () => {
+    const dir = mkdtempSync(join(tmpdir(), "valhalla2-migrate-"));
+    made.push(dir);
+    const file = join(dir, "valhalla2.db");
+    const db = openDatabase(file);
+    const {
+      pictureModel: _model,
+      pictureModelName: _name,
+      pictureBaseModel: _base,
+      picturePromptStyle: _style,
+      ...oldSettings
+    } = DEFAULT_SETTINGS;
+    db.prepare(
+      `INSERT INTO companions (id, name, profile, settings, prompts, voice, voice_feeling, created_at, updated_at, owner)
+       VALUES ('comp-0001', 'Hrothgar', '', ?, '{}', NULL, 1, 'then', 'then', 'odin')`,
+    ).run(JSON.stringify(oldSettings));
+    expect(createCompanions(db, "odin", DEFAULT_SETTINGS).get("comp-0001").settings).toMatchObject({
+      pictureModel: "urn:air:sdxl:checkpoint:civitai:827184@2883731",
+      pictureModelName: "WAI-illustrious-SDXL v17.0",
+      pictureBaseModel: "Illustrious",
+      picturePromptStyle: "tags",
+    });
+    db.close();
+  });
+
   it("keep how their replies were already read aloud, as tags apart from the scene", () => {
     const dir = mkdtempSync(join(tmpdir(), "valhalla2-migrate-"));
     made.push(dir);

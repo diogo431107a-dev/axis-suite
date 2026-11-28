@@ -37,7 +37,8 @@ export function paramsFor(
     case "civitai":
       if (seed === null) throw new Error("A CivitAI picture needs a seed");
       return {
-        model: config.pictures.model,
+        model: settings.pictureModel,
+        ...(settings.pictureModelName ? { modelName: settings.pictureModelName } : {}),
         ...PICTURE_SIZES[orientation],
         steps: settings.pictureSteps,
         cfgScale: settings.pictureCfg,
