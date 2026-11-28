@@ -4,6 +4,7 @@ import { LIMITS, type StreamEvent } from "../../shared/protocol.ts";
 import { generate, prepare, send, type TurnContext } from "../chat/turn.ts";
 import { apiError, chatWindow, tokensFor, writeReply } from "../chat/write.ts";
 import { id as checkId, messageId, object, required } from "../check.ts";
+import { invalid } from "../errors.ts";
 import { stream } from "../http/stream.ts";
 import { memoryBusy, withMemoryLock } from "../memory/lock.ts";
 import { asParams, promptView } from "../prompt.ts";
@@ -126,6 +127,24 @@ export function chatRoutes(s: Services): Router {
       const answered = await generate(context(tell), parentId);
       tell({ type: "done", message: answered });
     });
+  });
+
+  /** Pauses memory in the chat. What is written from now on is held back from it. */
+  routes.post("/chats/:id/pause", (req: Request, res: Response) => {
+    const my = s.ownedBy(req);
+    const id = checkId(req.params.id);
+    my.chats.pause(id);
+    res.json(my.chats.page(id));
+  });
+
+  /** Resumes memory in the chat, keeping what was written while paused or leaving it out for good. */
+  routes.post("/chats/:id/resume", (req: Request, res: Response) => {
+    const my = s.ownedBy(req);
+    const id = checkId(req.params.id);
+    const keep = object(req.body).keep;
+    if (typeof keep !== "boolean") invalid("Say whether to keep what was written while memory was paused");
+    my.chats.resume(id, keep);
+    res.json(my.chats.page(id));
   });
 
   /** Folds the chat into the companion's memory now, and says how that went. */

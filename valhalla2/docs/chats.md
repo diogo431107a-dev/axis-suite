@@ -57,6 +57,13 @@ keeps a one-shot's events out of the story while keeping what it shows about the
 details, including what switching does, are in
 [How memory works: Canon and one-shot](memory.md#canon-and-one-shot).
 
+## Pausing memory
+
+**Pause** in a chat's header holds memory back from what you write next, to try something out
+without it becoming part of who the companion is. **Resume** asks whether memory should have what
+was written meanwhile, or leave it out for good. The companion isn't told. The details are in
+[How memory works: Pausing memory](memory.md#pausing-memory).
+
 ## Liking a reply
 
 Swipes tell memory what didn't work; a like tells it what did. The heart under a companion's reply

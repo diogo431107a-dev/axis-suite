@@ -18,6 +18,7 @@ export function Entry({
   companionName,
   busy,
   like,
+  offRecord,
   pinned,
   pictures,
   editing,
@@ -46,6 +47,8 @@ export function Entry({
   companionName: string;
   busy: boolean;
   like: Liked | undefined;
+  /** Held back from memory: written while it was paused, or left out for good. */
+  offRecord: "paused" | "left-out" | null;
   pinned: boolean;
   pictures: Picture[];
   editing: { id: number; text: string } | null;
@@ -81,6 +84,18 @@ export function Entry({
     <article className={mine ? "pl-6 sm:pl-16" : "pr-6 sm:pr-16"}>
       <h3 className={`mb-1 font-display text-sm ${mine ? "text-right text-faint" : "text-accent"}`}>
         {mine ? "You" : companionName}
+        {offRecord ? (
+          <span
+            className="ml-2 font-body text-xs font-normal text-faint"
+            title={
+              offRecord === "paused"
+                ? "Written while memory is paused: memory doesn't read it until you resume and keep it"
+                : "Left out of memory: the memory model never reads it"
+            }
+          >
+            {offRecord === "paused" ? "· memory paused" : "· left out of memory"}
+          </span>
+        ) : null}
       </h3>
       {editing?.id === message.id ? (
         <div className="space-y-2">

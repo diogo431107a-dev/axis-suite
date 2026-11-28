@@ -351,6 +351,15 @@ const migrations: ((db: DatabaseSync) => void)[] = [
       );
     }
   },
+  // v13: memory can be paused in a chat (memory/record.ts). What is written while it is paused is
+  // held back from the memory model until you resume, and then filed or left out for good.
+  (db) => {
+    db.exec(`
+      ALTER TABLE chats ADD COLUMN memory_paused INTEGER NOT NULL DEFAULT 0;       -- 1 while paused
+      ALTER TABLE messages ADD COLUMN off_record INTEGER NOT NULL DEFAULT 0;       -- 0 filed as usual, 1 written while paused, 2 left out
+      ALTER TABLE swipe_feedback ADD COLUMN off_record INTEGER NOT NULL DEFAULT 0; -- the same, for a reason you gave
+    `);
+  },
 ];
 
 /**

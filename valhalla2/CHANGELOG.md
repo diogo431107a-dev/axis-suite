@@ -16,6 +16,11 @@ What changed in Valhalla 2, newest first. Each version is tagged in git as `valh
   Valhalla 2's own texts folds on its own, marked when it is your own words. The text boxes grow with
   what you write (the profile starts at most of the window), the page is wider, and Save stays at
   the bottom of the window.
+- **Pause memory in a chat**, to try something without it becoming part of who the companion is.
+  **Pause** in the chat's header holds memory back from everything written next; those messages say
+  **memory paused**. **Resume** asks whether memory should keep what happened meanwhile, or leave it
+  out for good. The companion isn't told, and nothing it is sent changes. For companions with
+  memory, Claude and Grok alike.
 
 ## 0.0.48 — 2026-11-28
 

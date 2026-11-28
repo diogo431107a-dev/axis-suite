@@ -16,6 +16,7 @@ import { quietOf } from "../quiet.ts";
 import { promptFor } from "./consolidate.ts";
 import { tokensOf } from "./history.ts";
 import { withMemoryLock } from "./lock.ts";
+import { heldBack } from "./record.ts";
 import { abandonRun, finishRun, runStep, type RunDeps } from "./run.ts";
 
 /** Splits a path into parts of about `budget` tokens, each at least one message. */
@@ -64,11 +65,16 @@ export function rebuild(
     const filed: { chatId: string; ids: number[]; feedback: number[]; praise: Praise[] }[] = [];
 
     for (const chat of chats) {
-      const path = createTree(db, chat.id).activePath();
+      // What was written while memory was paused, and not kept, stays out of a rebuild too.
+      const held = heldBack(db, chat.id);
+      const path = createTree(db, chat.id)
+        .activePath()
+        .filter((message) => !held.has(message.id));
       if (path.length === 0) continue;
       const feedback = db
         .prepare(
-          "SELECT id, parent_id, reason FROM swipe_feedback WHERE chat_id = ? AND reason IS NOT NULL ORDER BY id",
+          `SELECT id, parent_id, reason FROM swipe_feedback
+           WHERE chat_id = ? AND reason IS NOT NULL AND off_record = 0 ORDER BY id`,
         )
         .all(chat.id) as { id: number; parent_id: number | null; reason: string }[];
       const praise = allPraise(db, chat.id, new Set(path.map((message) => message.id)));

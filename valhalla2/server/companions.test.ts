@@ -211,6 +211,29 @@ describe("companions from before the choice existed", () => {
     expect(JSON.parse(tones[0]!.lines as string)).toEqual([line]);
     db.close();
   });
+
+  it("keep their chats with memory running, and every message on the record", () => {
+    const dir = mkdtempSync(join(tmpdir(), "valhalla2-migrate-"));
+    made.push(dir);
+    const file = join(dir, "valhalla2.db");
+    const old = openDatabase(file, 12);
+    old.exec(`
+      INSERT INTO companions (id, name, profile, settings, prompts, created_at, updated_at, owner)
+        VALUES ('comp-0001', 'Freya', '', '{"model":"claude-haiku-5-5"}', '{}', 'then', 'then', 'odin');
+      INSERT INTO chats (id, companion_id, title, created_at, last_activity_at)
+        VALUES ('chat-0001', 'comp-0001', 'The hall', 'then', 'then');
+      INSERT INTO messages (id, chat_id, role, content, created_at)
+        VALUES (1, 'chat-0001', 'assistant', '[{"type":"text","text":"Hi."}]', 'then');
+      UPDATE chats SET active_leaf_id = 1;
+    `);
+    old.close();
+    const db = openDatabase(file);
+    const companions = createCompanions(db, "odin", DEFAULT_SETTINGS);
+    const chats = createChats(db, "odin", companions, 5);
+    expect(chats.get("chat-0001").memoryPaused).toBe(false);
+    expect(chats.page("chat-0001").offRecord).toEqual({ paused: [], leftOut: [] });
+    db.close();
+  });
 });
 
 describe("a chat without memory", () => {

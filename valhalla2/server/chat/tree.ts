@@ -13,6 +13,7 @@ import type { DatabaseSync } from "node:sqlite";
 import type { ContentBlock, Message, PathEntry, ReplyDetails } from "../../shared/protocol.ts";
 import { transaction } from "../db.ts";
 import { invalid, notFound } from "../errors.ts";
+import { OFF_RECORD_NOW } from "../memory/record.ts";
 
 interface Row {
   id: number;
@@ -162,8 +163,9 @@ export function createTree(db: DatabaseSync, chatId: string) {
       if (message.parentId !== null) get(message.parentId);
       const { lastInsertRowid } = db
         .prepare(
-          `INSERT INTO messages (chat_id, parent_id, role, content, instruction, is_greeting, reply, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO messages (chat_id, parent_id, role, content, instruction, is_greeting, reply, created_at,
+                                 off_record)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ${OFF_RECORD_NOW})`,
         )
         .run(
           chatId,
@@ -174,6 +176,7 @@ export function createTree(db: DatabaseSync, chatId: string) {
           message.isGreeting ? 1 : 0,
           message.reply ? JSON.stringify(message.reply) : null,
           message.at ?? new Date().toISOString(),
+          chatId,
         );
       return get(Number(lastInsertRowid));
     },

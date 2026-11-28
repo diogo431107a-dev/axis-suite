@@ -11,6 +11,9 @@
 //   - the chat's mode, and a note when it changed since the chat was last filed. A chat switched
 //     from canon to one-shot is re-filed with world.md and story/ open, to take its events out.
 //
+// What was written while memory was paused in the chat, and not kept when it resumed, is never
+// read at all (record.ts): the path it reads is the selected path without it.
+//
 // The model works with the memory tool on a scratch copy of the companion's files. Only when it
 // finishes is the copy swapped in, in one transaction with the marks that say what was processed;
 // a run that fails, is declined or runs out of steps changes nothing and can run again. With
@@ -29,6 +32,7 @@ import { transaction } from "../db.ts";
 import { createTree } from "../chat/tree.ts";
 import { markFiled, praiseFor, type Praise } from "../likes.ts";
 import { quietBlock, quietOf } from "../quiet.ts";
+import { heldBack } from "./record.ts";
 import { renderFiles } from "./render.ts";
 import { withMemoryLock } from "./lock.ts";
 import type { Memory } from "./store.ts";
@@ -60,8 +64,11 @@ export function pendingFor(db: DatabaseSync, chatId: string) {
     { id: string; companion_id: string; title: string; mode: ChatMode; consolidated_mode: ChatMode | null } | undefined;
   if (!chat) return null;
   const tree = createTree(db, chatId);
-  const path = tree.activePath();
-  const onPath = new Set(path.map((message) => message.id));
+  const selected = tree.activePath();
+  const onPath = new Set(selected.map((message) => message.id));
+  // What memory may read of the selected path: all of it but what was written while paused.
+  const held = heldBack(db, chatId);
+  const path = selected.filter((message) => !held.has(message.id));
   const fresh = path.filter(
     (message) =>
       (
@@ -109,7 +116,7 @@ export function pendingFor(db: DatabaseSync, chatId: string) {
   const feedback = db
     .prepare(
       `SELECT id, parent_id, reason FROM swipe_feedback
-       WHERE chat_id = ? AND reason IS NOT NULL AND consolidated_at IS NULL ORDER BY id`,
+       WHERE chat_id = ? AND reason IS NOT NULL AND consolidated_at IS NULL AND off_record = 0 ORDER BY id`,
     )
     .all(chatId) as { id: number; parent_id: number | null; reason: string }[];
 

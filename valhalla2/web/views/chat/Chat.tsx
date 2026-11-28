@@ -1,9 +1,10 @@
 // A chat: the selected path through it, the other versions of each message one click away, and
 // the composer.
 import { Fragment, useCallback, useEffect, useRef, useState } from "react";
-import { BookmarkCheck, Brain, Eye, Settings2, Volume2, VolumeX } from "lucide-react";
+import { BookmarkCheck, Brain, CirclePause, CirclePlay, Eye, Settings2, Volume2, VolumeX } from "lucide-react";
 import {
   hasScenes,
+  type ChatPage,
   type Message,
   type PathEntry,
   type Picture,
@@ -12,7 +13,7 @@ import {
 } from "../../../shared/protocol.ts";
 import { api, describeError } from "../../api.ts";
 import { usePage } from "../../page.ts";
-import { Button, Notice } from "../../ui/bits.tsx";
+import { Button, Dialog, Notice } from "../../ui/bits.tsx";
 import { toClipboard } from "../../ui/clipboard.ts";
 import { MODE_LABELS } from "../../ui/modes.ts";
 import { PictureView } from "../../ui/pictures.tsx";
@@ -57,6 +58,9 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
   } = useChat(id, greet, onAnswered);
 
   const [editing, setEditing] = useState<{ id: number; text: string } | null>(null);
+  /** The resume dialog is open: keep what was written while memory was paused, or leave it out. */
+  const [resuming, setResuming] = useState(false);
+  const [pausing, setPausing] = useState(false);
   const [deleting, setDeleting] = useState<number | null>(null);
   /** The liked reply whose comment box is open. */
   const [noting, setNoting] = useState<number | null>(null);
@@ -109,6 +113,24 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
     setTimeout(() => setCopied((at) => (at === messageId ? null : at)), 1500);
   };
 
+  /** Pauses memory in this chat, or resumes it keeping (or not) what was written meanwhile. */
+  const pauseOrResume = async (what: "pause" | "resume", keep?: boolean) => {
+    setPausing(true);
+    setError("");
+    try {
+      const next = await api<ChatPage>(`/api/chats/${id}/${what}`, {
+        method: "POST",
+        body: what === "resume" ? { keep } : {},
+      });
+      setPage(next);
+      setResuming(false);
+    } catch (err) {
+      setError(describeError(err));
+    } finally {
+      setPausing(false);
+    }
+  };
+
   if (loadError) {
     return (
       <div className="p-5">
@@ -137,7 +159,8 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           <h1 className="truncate font-display text-lg">{chat.title}</h1>
           <p className="truncate text-xs text-faint">
             {companion.name}
-            {companion.memory ? ` · ${MODE_LABELS[chat.mode].label.toLowerCase()}` : ""} · {companion.settings.model}
+            {companion.memory ? ` · ${MODE_LABELS[chat.mode].label.toLowerCase()}` : ""}
+            {chat.memoryPaused ? " · memory paused" : ""} · {companion.settings.model}
           </p>
         </div>
         {health.speech ? (
@@ -155,6 +178,26 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           >
             {readAloud ? <Volume2 size={15} /> : <VolumeX size={15} />}{" "}
             <span className="hidden sm:inline">{readAloud ? "Aloud" : "Silent"}</span>
+          </Button>
+        ) : null}
+        {companion.memory ? (
+          <Button
+            kind="plain"
+            onClick={() => {
+              if (!chat.memoryPaused) void pauseOrResume("pause");
+              // Nothing on the path was written while paused: what is left of it was tried and set aside.
+              else if (page.offRecord.paused.length === 0) void pauseOrResume("resume", false);
+              else setResuming(true);
+            }}
+            disabled={pausing || busy}
+            title={
+              chat.memoryPaused
+                ? "Memory is paused: what you write now is held back from it. Click to resume."
+                : "Pause memory: what you write from now on is held back from it until you resume, so you can try things out"
+            }
+          >
+            {chat.memoryPaused ? <CirclePlay size={15} /> : <CirclePause size={15} />}{" "}
+            <span className="hidden sm:inline">{chat.memoryPaused ? "Resume" : "Pause"}</span>
           </Button>
         ) : null}
         {companion.memory ? (
@@ -215,6 +258,13 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
                 companionName={companion.name}
                 busy={busy}
                 like={page.liked.find((liked) => liked.messageId === entry.message.id)}
+                offRecord={
+                  page.offRecord.paused.includes(entry.message.id)
+                    ? "paused"
+                    : page.offRecord.leftOut.includes(entry.message.id)
+                      ? "left-out"
+                      : null
+                }
                 pinned={page.pinned.includes(entry.message.id)}
                 pictures={page.pictures.filter((picture) => picture.messageId === entry.message.id)}
                 editing={editing}
@@ -249,6 +299,32 @@ export function Chat({ id, greet }: { id: string; greet: boolean }) {
           <div ref={bottom} />
         </div>
       </div>
+
+      {resuming ? (
+        <Dialog open onClose={() => setResuming(false)} title="Resume memory">
+          <div className="space-y-4 text-sm">
+            <p>
+              {page.offRecord.paused.length === 1
+                ? "One message on this path was written while memory was paused."
+                : `${page.offRecord.paused.length} messages on this path were written while memory was paused.`}{" "}
+              Should {companion.name}'s memory have them?
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button kind="strong" disabled={pausing} onClick={() => void pauseOrResume("resume", true)}>
+                Keep what happened while paused
+              </Button>
+              <Button kind="plain" disabled={pausing} onClick={() => void pauseOrResume("resume", false)}>
+                Leave it out
+              </Button>
+            </div>
+            <p className="text-xs text-faint">
+              Kept, it is filed into memory as usual, with the rest of the chat. Left out, memory never reads it, nor
+              the likes and reasons given for it; the chat itself keeps it, and {companion.name} still sees it while it
+              is in what is sent.
+            </p>
+          </div>
+        </Dialog>
+      ) : null}
 
       <Composer
         error={error}
